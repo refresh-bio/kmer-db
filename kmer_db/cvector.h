@@ -294,6 +294,8 @@ public:
 
 		size_t to_alloc = 1;
 
+		// Adam: alokacja na jednego osobnika
+
 		mem_pattern_desc += sizeof(T);
 		mem_os_pattern_desc += round_up_16(sizeof(T));
 	}
@@ -448,7 +450,8 @@ public:
 		
 		T* old_data = data;
 		data = nullptr;
-//		data = new T[to_alloc];
+		// Adam: robiæ alokacje w blokach po 16B
+//		data = new T[to_alloc]; 
 		// kopiowanie
 
 		mem_pattern_desc += sizeof(T);
