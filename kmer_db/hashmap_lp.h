@@ -3,29 +3,32 @@
 // Szablon klasy tablicy haszuj¹cej wykorzystujacy adresowanie liniowe
 
 #include <mmintrin.h>
+#include <cstdint>
 
-size_t ht_memory = 0;
-
-size_t ht_total = 0;
-size_t ht_match = 0;
+extern size_t ht_memory;
+extern size_t ht_total;
+extern size_t ht_match;
 
 template<typename T>
-size_t my_hasher(T x)
+inline size_t my_hasher(T x)
 {
 	return 0;			// !!! Fake impl.
 }
 
+
 template<>
-size_t my_hasher<uint64_t>(uint64_t x)
+inline size_t my_hasher<uint64_t>(uint64_t x)
 {
 	return x * 0xc70f6907ull;
 }
 
+
 template<>
-size_t my_hasher<uint32_t>(uint32_t x)
+inline size_t my_hasher<uint32_t>(uint32_t x)
 {
 	return x * 0xc70f6907ul;
 }
+
 
 template <typename Key, typename Value>
 class hash_map {
@@ -186,7 +189,7 @@ public:
 				h = (h + 1) & allocated_mask;
 	}
 
-	size_t get_size(void)
+	size_t get_size(void) const
 	{
 		return filled;
 	}
