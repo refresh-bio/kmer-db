@@ -18,6 +18,7 @@
 #include "cvector.h"
 #include "hashmap_lp.h"
 #include "kmc_api/kmc_file.h"
+#include "pattern.h"
 
 using namespace std;
 
@@ -26,7 +27,6 @@ vector<string> kmc_file_list;
 
 // K-mer database structures
 hash_map<uint64_t, uint32_t> hm_kmer_dict;
-//hash_map<uint64_t, uint64_t> hm_kmer_dict;
 
 
 typedef pattern_desc<uint16_t> vid_t;

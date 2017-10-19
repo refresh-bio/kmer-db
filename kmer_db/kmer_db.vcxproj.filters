@@ -42,6 +42,9 @@
     <ClInclude Include="hashmap_lp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="pattern.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
