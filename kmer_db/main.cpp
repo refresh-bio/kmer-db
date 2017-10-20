@@ -11,13 +11,13 @@
 #include <chrono>
 #include <stack>
 
+using namespace std;
+
 #ifndef WIN32
 #include <parallel/algorithm>
 #endif
 
 #include "kmer_db.h"
-
-using namespace std;
 
 
 
