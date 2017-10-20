@@ -52,7 +52,7 @@ public:
 		parent = nullptr;
 
 		data = new T[round_count(1)];
-		T[0] = x;
+		data[0] = x;
 	}
 
 	subpattern_t(subpattern_t &v, T x)
@@ -144,7 +144,7 @@ public:
 		if (v.parent != parent)
 			return false;
 
-		size_t to_compare = = num_local_samples();
+		size_t to_compare = get_num_local_samples();
 
 		for (size_t i = 0; i < to_compare; ++i)
 			if (data[i] != v.data[i])
