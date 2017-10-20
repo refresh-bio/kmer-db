@@ -118,7 +118,7 @@ int main(int argc, char **argv)
 	std::vector<uint64_t> kmers;
 
 	pat_sizes.resize(kmc_file_list.size() + 1, 0);
-	kmc_file_list.resize(1);
+	kmc_file_list.resize(3);
 
 	std::chrono::duration<double> loadingTime, naiveTime, fastTime;
 

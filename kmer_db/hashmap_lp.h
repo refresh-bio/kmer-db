@@ -90,7 +90,7 @@ public:
 	}
 
 
-	hash_map()
+	hash_map(Key k_empty, Key k_erased)
 	{
 		ht_memory = 0;
 		ht_total = 0;
@@ -108,6 +108,11 @@ public:
 		ht_memory += allocated * sizeof(item_t);
 
 		size_when_restruct = (size_t)(allocated * max_fill_factor);
+
+		empty_key = k_empty;
+		erased_key = k_erased;
+
+		clear();
 	}
 
 	~hash_map()
@@ -118,14 +123,6 @@ public:
 
 	size_t getMem() const {
 		return ht_memory;
-	}
-
-	void set_special_keys(Key k_empty, Key k_erased)
-	{
-		empty_key = k_empty;
-		erased_key = k_erased;
-
-		clear();
 	}
 
 	void clear(void)

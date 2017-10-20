@@ -39,7 +39,7 @@ public:
 	std::vector<std::vector<sample_id_t>> patterns;
 
 public:
-	NaiveKmerDb() {
+	NaiveKmerDb() : kmers2patternIds((unsigned long long) - 1, (unsigned long long) - 2) {
 		mem_pattern_desc = 0;
 	}
 	

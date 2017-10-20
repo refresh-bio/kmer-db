@@ -115,11 +115,9 @@ void NaiveKmerDb::mapKmers2Samples(uint64_t kmer, std::vector<sample_id_t>& samp
 /****************************************************************************************************************************************************/
 
 
-FastKmerDb::FastKmerDb() {
+FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1, (unsigned long long) - 2) {
 
 	mem_pattern_desc = 0;
-
-	kmers2patternIds.set_special_keys((unsigned long long) - 1, (unsigned long long) - 2);
 	patterns.push_back(pattern_t{ 0, new subpattern_t<sample_id_t>() });
 }
 
