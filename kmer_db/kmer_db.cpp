@@ -20,6 +20,7 @@
 
 using namespace std;
 
+/****************************************************************************************************************************************************/
 
 bool AbstractKmerDb::extractKmers(const string &filename, std::vector<uint64_t>& kmers) {
 	CKMCFile kmc_file;
@@ -63,10 +64,54 @@ bool AbstractKmerDb::extractKmers(const string &filename, std::vector<uint64_t>&
 }
 
 
+/****************************************************************************************************************************************************/
+
+void NaiveKmerDb::addKmers(sample_id_t sampleId, const std::vector<uint64_t>& kmers)
+{
+	uint64_t u_kmer;
+	//uint64_t prefetch_kmer;
+	//const size_t prefetch_dist = 48;
+	auto n_kmers = kmers.size();
+
+	for (size_t i = 0; i < n_kmers; ++i)
+	{
+		u_kmer = kmers[i];
+		//if (i + prefetch_dist < n_kmers)
+		//{
+		//	prefetch_kmer = kmers[i + prefetch_dist];
+		//	kmers2samples.prefetch(prefetch_kmer);
+		//}
+
+		// ***** Sprawdzanie w slowniku czy taki k-mer juz istnieje
+		auto v = kmers2samples.find(u_kmer);
+		
+		if (v == kmers2samples.end()) {
+			kmers2samples[u_kmer] = std::vector<sample_id_t>(sampleId);
+		}
+		else {
+			v->second.push_back(sampleId);
+		}
+	}
+}
+
+
+void NaiveKmerDb::getKmerSamples(uint64_t kmer, std::vector<sample_id_t>& samples) {
+	samples.clear();
+	auto v = kmers2samples.find(kmer);
+
+	if (v != kmers2samples.end()) {
+		samples = v->second;
+	}
+}
+
+
+
+/****************************************************************************************************************************************************/
+
 
 FastKmerDb::FastKmerDb() {
 	hm_kmer_dict.set_special_keys((unsigned long long) - 1, (unsigned long long) - 2);
-	v_kmer_patterns.push_back(pattern_t{ 0, new vid_t() });
+	v_kmer_patterns.push_back(pattern_t{ 0, new subpattern_t<sample_id_t>() });
 }
 
 
@@ -126,15 +171,15 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<uint64_t>& kme
 				break;
 		size_t pid_count = j - i; 
 
-		if (v_kmer_patterns[p_id].num_occ == pid_count && !v_kmer_patterns[p_id].vid->get_is_parrent())
+		if (v_kmer_patterns[p_id].num_occ == pid_count && !v_kmer_patterns[p_id].last_subpattern->get_is_parrent())
 		{
 			// Wzorzec mozna po prostu rozszerzyæ, bo wszystkie wskazniki do niego beda rozszerzane (realokacja tablicy id próbek we wzorcu) 
-			v_kmer_patterns[p_id].vid->expand(sampleId);
+			v_kmer_patterns[p_id].last_subpattern->expand(sampleId);
 		}
 		else
 		{
 			// Trzeba wygenerowaæ nowy wzorzec (podczepiony pod wzorzec macierzysty)
-			vid_t *pat = new vid_t(*(v_kmer_patterns[p_id].vid), sampleId);
+			auto *pat = new subpattern_t<sample_id_t>(*(v_kmer_patterns[p_id].last_subpattern), sampleId);
 
 			v_kmer_patterns.push_back(pattern_t{ (uint32_t) pid_count, pat });
 			if(p_id)
@@ -151,16 +196,19 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<uint64_t>& kme
 }
 
 
-void FastKmerDb::kmer2samples(uint64_t kmer, std::vector<sample_id_t>& samples) {
+void FastKmerDb::getKmerSamples(uint64_t kmer, std::vector<sample_id_t>& samples) {
 	
 	// find corresponding pattern id
 	auto p_id = hm_kmer_dict.find(kmer);
 	samples.clear();
 	if (p_id != nullptr) { 
-		auto subpattern = v_kmer_patterns[*p_id].vid;
+		const subpattern_t<sample_id_t>* subpattern = v_kmer_patterns[*p_id].last_subpattern;
 		
 		do {
-			
+			for (int i = 0; i < subpattern->num_local_samples(); ++i) {
+				samples.push_back((*subpattern)[i]);
+			}
+
 		} while (subpattern != nullptr);
 	}
 
