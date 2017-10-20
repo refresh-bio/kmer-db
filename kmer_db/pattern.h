@@ -25,7 +25,8 @@ class subpattern_t {
 
 public:
 
-	size_t num_local_samples() const {
+	size_t get_num_samples() const { return num_samples; }
+	size_t get_num_local_samples() const {
 		return num_samples - (parent != nullptr ? parent->num_samples : 0);
 	}
 
@@ -156,7 +157,7 @@ public:
 	void expand(const T x)
 	{
 		++num_samples;
-		size_t to_alloc = num_local_samples();
+		size_t to_alloc = get_num_local_samples();
 
 		// if no space left - reallocate and copy existing ids 
 		if (to_alloc > num_locally_allocated) {

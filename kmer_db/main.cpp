@@ -118,7 +118,7 @@ int main(int argc, char **argv)
 	std::vector<uint64_t> kmers;
 
 	pat_sizes.resize(kmc_file_list.size() + 1, 0);
-	kmc_file_list.resize(3);
+	kmc_file_list.resize(50);
 
 	std::chrono::duration<double> loadingTime, naiveTime, fastTime;
 
@@ -139,17 +139,19 @@ int main(int argc, char **argv)
 		cout << "loading time=" << dt.count() << endl;
 		loadingTime += dt;
 
+#ifdef COMPARE
 		start = std::chrono::high_resolution_clock::now();
 		naive_db.addKmers(i, kmers);
 		dt = std::chrono::high_resolution_clock::now() - start;
 		cout << "Naive: time=" << dt.count() << ", ";
 		naiveTime += dt;
 		show_progress(naive_db);
+#endif
 
 		start = std::chrono::high_resolution_clock::now();
 		fast_db.addKmers(i, kmers);
 		dt = std::chrono::high_resolution_clock::now() - start;
-		cout << "Naive: time=" << dt.count() << ", ";
+		cout << "Fast: time=" << dt.count() << ", ";
 		fastTime += dt;
 		show_progress(fast_db);
 
@@ -164,6 +166,8 @@ int main(int argc, char **argv)
 		<< "Fast processing: " << fastTime.count() << endl;
 
 	// compare naive and fast implementation
+
+#ifdef COMPARE
 	cout << "Comparing naive and fast implementations" << endl;
 	std::vector<sample_id_t> samples;
 	int i = 0;
@@ -183,10 +187,12 @@ int main(int argc, char **argv)
 
 		if (!eq) {
 			cout << "k-mer: " << it->key << endl;
+
 		}
 
 	}
 	cout << "done" << endl;
+#endif
 
 	store_pat_sizes(1000000);
 
