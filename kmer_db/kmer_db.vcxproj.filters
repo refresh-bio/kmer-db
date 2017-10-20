@@ -31,9 +31,6 @@
     <ClInclude Include="hashmap_lp.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="memlog.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="kmer_db.cpp">
@@ -49,12 +46,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="memlog.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="hashmap_lp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

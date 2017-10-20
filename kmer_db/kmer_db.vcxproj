@@ -152,17 +152,14 @@
     <ClInclude Include="kmc_api\kmer_api.h" />
     <ClInclude Include="kmc_api\kmer_defs.h" />
     <ClInclude Include="kmc_api\mmer.h" />
-    <ClInclude Include="memlog.h" />
     <ClInclude Include="pattern.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="hashmap_lp.cpp" />
     <ClCompile Include="kmc_api\kmc_file.cpp" />
     <ClCompile Include="kmc_api\kmer_api.cpp" />
     <ClCompile Include="kmc_api\mmer.cpp" />
     <ClCompile Include="kmer_db.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="memlog.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

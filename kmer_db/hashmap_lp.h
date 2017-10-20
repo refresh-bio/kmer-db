@@ -5,9 +5,6 @@
 #include <mmintrin.h>
 #include <cstdint>
 
-extern size_t ht_memory;
-extern size_t ht_total;
-extern size_t ht_match;
 
 template<typename T>
 inline size_t my_hasher(T x)
@@ -49,6 +46,10 @@ class hash_map {
 	size_t size_when_restruct;
 	size_t allocated_mask;
 
+	size_t ht_memory;
+	size_t ht_total;
+	size_t ht_match;
+
 	void restruct(void)
 	{
 		item_t *old_data = data;
@@ -75,9 +76,26 @@ class hash_map {
 		ht_memory -= old_allocated  * sizeof(item_t);
 	}
 
+	
+	
 public:
+	// fixme: iterator-like functionality - change to iterator
+	item_t* begin() { return data; }
+	const item_t* cbegin() const { return data; }
+	item_t* end() { return data + allocated; }
+	const item_t* cend() const { return data + allocated; }
+
+	bool is_free(const item_t& item) {
+		return item.key == empty_key || item.key == erased_key;
+	}
+
+
 	hash_map()
 	{
+		ht_memory = 0;
+		ht_total = 0;
+		ht_match = 0;
+		
 		allocated = 16;
 		allocated_mask = allocated - 1;
 
@@ -96,6 +114,10 @@ public:
 	{
 		if (data)
 			delete[] data;
+	}
+
+	size_t getMem() const {
+		return ht_memory;
 	}
 
 	void set_special_keys(Key k_empty, Key k_erased)
@@ -209,14 +231,14 @@ public:
 		allocated_mask = allocated - 1;
 		size_when_restruct = (size_t)(allocated * max_fill_factor);
 
-		//cout << "\n--- Realloc to: " << allocated << "...";
+		cout << "\n--- Realloc to: " << allocated << "...";
 
 		data = new item_t[allocated];
 		clear();
 
 		ht_memory += allocated * sizeof(item_t);
 
-		//cout << "done!" << endl;
+		cout << "done!" << endl;
 
 		for (size_t i = 0; i < old_allocated; ++i)
 			if (old_data[i].key != empty_key && old_data[i].key != erased_key)

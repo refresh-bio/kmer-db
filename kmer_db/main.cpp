@@ -28,7 +28,7 @@ vector<uint32_t> pat_sizes;						// rozmiar wzorca -> liczba wyst wzorcow z taki
 
 												// Functions
 bool load_file_list(string file_list);
-void show_progress(const FastKmerDb &db);
+void show_progress(const AbstractKmerDb &db);
 void store_pat_sizes(int num);
 
 // Wczytuje plik zawierajacy liste baz KMC do przetworzenia
@@ -60,17 +60,16 @@ bool load_file_list(const string& file_list, vector<string>& kmc_file_list)
 
 
 // Pokazuje stan
-void show_progress(const FastKmerDb &db)
+void show_progress(const AbstractKmerDb &db)
 {
 	size_t tot_pat_size = 0;
 	size_t num_calc = 0;			// Liczba operacji przy wyznaczaniu macierzy podobieñstwa
 
-	cout << "*** dict: " << db.getKmersCount()
+	cout << "dict= " << db.getKmersCount()
 		<< " (" << db.getKmersCount() * 2 * sizeof(uint64_t) / (1ull << 20) << " MB)   "
-		<< "patterns: " << db.getPatternsCount()
-		<< " mem_pat: " << mem_pattern_desc / 1000000 << "MB"
-		<< " mem_os_pat: " << mem_os_pattern_desc / 1000000 << "MB"
-		<< " ht memory: " << ht_memory / 1000000 << "MB"
+		<< "patterns= " << db.getPatternsCount()
+		<< " patterns mem= " << db.getPatternMem() / 1000000 << "MB"
+		<< " ht mem= " << db.getHashtableMem() / 1000000 << "MB"
 		<< endl;
 
 	fflush(stdout);
@@ -119,7 +118,7 @@ int main(int argc, char **argv)
 	std::vector<uint64_t> kmers;
 
 	pat_sizes.resize(kmc_file_list.size() + 1, 0);
-	kmc_file_list.resize(2);
+	kmc_file_list.resize(1);
 
 	std::chrono::duration<double> loadingTime, naiveTime, fastTime;
 
@@ -127,7 +126,7 @@ int main(int argc, char **argv)
 
 	for (size_t i = 0; i < kmc_file_list.size(); ++i)
 	{
-		cout << kmc_file_list[i] << "(" << i + 1 << "/" << kmc_file_list.size() << "): ";
+		cout << kmc_file_list[i] << " (" << i + 1 << "/" << kmc_file_list.size() << "): ";
 
 		std::chrono::duration<double> dt;
 
@@ -137,23 +136,25 @@ int main(int argc, char **argv)
 			break;
 		}
 		dt = std::chrono::high_resolution_clock::now() - start;
-		cout << "loading time=" << dt.count();
+		cout << "loading time=" << dt.count() << endl;
 		loadingTime += dt;
 
 		start = std::chrono::high_resolution_clock::now();
 		naive_db.addKmers(i, kmers);
 		dt = std::chrono::high_resolution_clock::now() - start;
-		cout << ", naive time=" << dt.count();
+		cout << "Naive: time=" << dt.count() << ", ";
 		naiveTime += dt;
+		show_progress(naive_db);
 
 		start = std::chrono::high_resolution_clock::now();
 		fast_db.addKmers(i, kmers);
 		dt = std::chrono::high_resolution_clock::now() - start;
-		cout << ", fast time=" << dt.count();
+		cout << "Naive: time=" << dt.count() << ", ";
 		fastTime += dt;
-		
-		cout << endl;
 		show_progress(fast_db);
+
+		cout << endl;
+		
 		store_pat_sizes(i);
 	}
 
@@ -165,14 +166,23 @@ int main(int argc, char **argv)
 	// compare naive and fast implementation
 	cout << "Comparing naive and fast implementations" << endl;
 	std::vector<sample_id_t> samples;
-	for (auto it = naive_db.kmers2samples.begin(); it != naive_db.kmers2samples.end(); ++it) {
-		auto& naiveSamples = it->second;
-		fast_db.getKmerSamples(it->first, samples);
+	int i = 0;
 
-		auto mis = std::mismatch(naiveSamples.begin(), naiveSamples.end(), samples.begin());
+	for (auto it = naive_db.kmers2patternIds.begin(); it < naive_db.kmers2patternIds.end(); ++it, ++i) {
+		
+		if (naive_db.kmers2patternIds.is_free(*it)) {
+			continue;
+		}
+		
+		auto patternId = it->val;
+		auto& naiveSamples = naive_db.patterns[patternId];
+		
+		fast_db.mapKmers2Samples(it->key, samples);
 
-		if (mis.first != naiveSamples.end() || mis.second != samples.end()) {
-			cout << "k-mer: " << it->first << endl;
+		bool eq = std::equal(naiveSamples.begin(), naiveSamples.end(), samples.begin(), samples.end());
+
+		if (!eq) {
+			cout << "k-mer: " << it->key << endl;
 		}
 
 	}

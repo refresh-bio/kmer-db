@@ -1,5 +1,4 @@
 #pragma once
-#include "memlog.h"
 
 
 template<typename T>
@@ -35,6 +34,8 @@ public:
 
 	bool get_is_parrent() const { return is_parent; }
 	bool get_is_child() const { return is_child; }
+	subpattern_t* get_parent() { return parent; }
+	const subpattern_t* get_parent() const { return parent; }
 
 	subpattern_t() : num_samples(0), num_locally_allocated(0), data(nullptr), is_parent(false), is_child(false), parent(nullptr)
 	{
@@ -51,9 +52,6 @@ public:
 
 		data = new T[round_count(1)];
 		T[0] = x;
-
-		mem_pattern_desc += sizeof(T);
-		mem_os_pattern_desc += sizeof(T) * round_count(1);
 	}
 
 	subpattern_t(subpattern_t &v, T x)
@@ -79,9 +77,6 @@ public:
 		num_locally_allocated = round_count(1);
 		data = new T[num_locally_allocated];	
 		data[0] = x;
-
-		mem_pattern_desc += sizeof(T);
-		mem_os_pattern_desc += sizeof(T) * num_locally_allocated;
 	}
 
 	subpattern_t(const subpattern_t &v) = delete;
@@ -134,11 +129,6 @@ public:
 		if (num_samples)
 		{
 			delete[] data;
-
-			size_t to_free = = num_local_samples();
-
-			mem_pattern_desc -= sizeof(T) * to_free;
-			mem_os_pattern_desc -= sizeof(T) * round_count(to_free);
 		}
 	}
 
@@ -178,25 +168,22 @@ public:
 				data[i] = old_data[i];
 			}
 			
-			mem_os_pattern_desc += sizeof(T) * round_count(1);
 			delete[] old_data;
 		}
 
 		data[to_alloc - 1] = x;
-		mem_os_pattern_desc += sizeof(T);
 	}
 
-	size_t get_mem(void)
+	size_t getMem(void)
 	{
 		size_t r;
 
 		r = sizeof(subpattern_t);
-		r += sizeof(T) * num_samples;
-		if (parent)
-			r -= sizeof(T) * parent->num_samples;
+		r += sizeof(T) * num_locally_allocated;
 
 		return r;
 	}
+
 
 };
 

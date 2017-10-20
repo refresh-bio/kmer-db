@@ -18,22 +18,42 @@ public:
 
 	virtual void addKmers(sample_id_t sampleId, const std::vector<uint64_t>& kmers) = 0;
 
-	virtual void getKmerSamples(uint64_t kmer, std::vector<sample_id_t>& samples) = 0;
+	virtual void mapKmers2Samples(uint64_t kmer, std::vector<sample_id_t>& samples) = 0;
 
 	virtual const size_t getKmersCount() const = 0;
+
+	virtual const size_t getPatternsCount() const = 0;
+
+	virtual const size_t getPatternMem() const = 0;
+
+	virtual const size_t getHashtableMem() const = 0;
 };
 
 
 class NaiveKmerDb : public AbstractKmerDb {
 public:
-	std::unordered_map<uint64_t, std::vector<sample_id_t>> kmers2samples;
+	size_t mem_pattern_desc = 0;		// iloœæ pamiêci zajmowana przez wszystkie wzorce
+	
+	hash_map<uint64_t, uint32_t> kmers2patternIds;
+
+	std::vector<std::vector<sample_id_t>> patterns;
 
 public:
+	NaiveKmerDb() {
+		mem_pattern_desc = 0;
+	}
+	
 	virtual void addKmers(sample_id_t sampleId, const std::vector<uint64_t>& kmers);
 
-	virtual void getKmerSamples(uint64_t kmer, std::vector<sample_id_t>& samples);
+	virtual void mapKmers2Samples(uint64_t kmer, std::vector<sample_id_t>& samples);
 
-	virtual const size_t getKmersCount() const { return kmers2samples.size(); }
+	virtual const size_t getKmersCount() const { return kmers2patternIds.get_size(); }
+
+	virtual const size_t getPatternsCount() const { return kmers2patternIds.get_size(); }
+
+	virtual const size_t getPatternMem() const { return mem_pattern_desc;  }
+
+	virtual const size_t getHashtableMem() const { return kmers2patternIds.getMem();  }
 
 
 };
@@ -41,11 +61,13 @@ public:
 
 class FastKmerDb : public AbstractKmerDb {
 protected:
+	size_t mem_pattern_desc;		// iloœæ pamiêci zajmowana przez wszystkie wzorce
+	
 	// K-mer database structures
-	hash_map<uint64_t, uint32_t> hm_kmer_dict;
+	hash_map<uint64_t, uint32_t> kmers2patternIds;
 
 	// liczba wystapien wzorca w kmer_dict, wektor id osobnikow zawierajacych k - mer)
-	std::vector<pattern_t> v_kmer_patterns;					
+	std::vector<pattern_t> patterns;					
 
 	std::vector<std::pair<uint64_t, uint32_t*>> v_current_file_pids;
 
@@ -56,10 +78,16 @@ public:
 
 	virtual void addKmers(sample_id_t sampleId, const std::vector<uint64_t>& kmers);
 
-	virtual void getKmerSamples(uint64_t kmer, std::vector<sample_id_t>& samples);
+	virtual void mapKmers2Samples(uint64_t kmer, std::vector<sample_id_t>& samples);
 
-	virtual const size_t getKmersCount() const { return hm_kmer_dict.get_size(); }
-	virtual const size_t getPatternsCount() const { return v_kmer_patterns.size(); }
+	virtual const size_t getKmersCount() const { return kmers2patternIds.get_size(); }
+	
+	virtual const size_t getPatternsCount() const { return patterns.size(); }
+
+	virtual const size_t getPatternMem() const { return mem_pattern_desc; }
+
+	virtual const size_t getHashtableMem() const { return kmers2patternIds.getMem(); };
+
 
 
 };
