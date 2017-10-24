@@ -230,6 +230,8 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 	});
 #endif
 
+	std::atomic<int> new_pid = patterns.size();
+
 	for (size_t i = 0; i < n_kmers;)
 	{
 		size_t j;
@@ -260,10 +262,10 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 				patterns[p_id].num_occ -= pid_count;
 			}
 
-			uint32_t new_p_id = patterns.size() - 1;
-
-			for (size_t k = i; k < j; ++k)
-				*(samplePatterns[k].second) = new_p_id;
+			for (size_t k = i; k < j; ++k) {
+				*(samplePatterns[k].second) = new_pid;
+			}
+			++new_pid;
 		}
 
 		i = j;
