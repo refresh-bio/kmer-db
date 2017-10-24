@@ -10,18 +10,18 @@
 #include <vector>
 #include <chrono>
 #include <stack>
+#include <thread>
+#include <sstream>
 
 using namespace std;
+
+//#define COMPARE
 
 #ifndef WIN32
 #include <parallel/algorithm>
 #endif
 
 #include "kmer_db.h"
-
-
-
-
 
 //map<uint32_t, uint32_t> pat_sizes;			// (rozmiar wzorca, liczba wyst wzorcow z takim rozmiarem)
 vector<uint32_t> pat_sizes;						// rozmiar wzorca -> liczba wyst wzorcow z takim rozmiarem
@@ -115,7 +115,7 @@ int main(int argc, char **argv)
 
 	FastKmerDb fast_db;
 	NaiveKmerDb naive_db;
-	std::vector<uint64_t> kmers;
+	//std::vector<uint64_t> kmers;
 
 	pat_sizes.resize(kmc_file_list.size() + 1, 0);
 	kmc_file_list.resize(50);
@@ -123,40 +123,68 @@ int main(int argc, char **argv)
 	std::chrono::duration<double> loadingTime, naiveTime, fastTime;
 
 	cout << "PROCESSING SAMPLES..." << endl;
+	
+	int n_threads = std::thread::hardware_concurrency();
+	std::vector<std::vector<uint64_t>> kmersCollections(n_threads);
+	std::vector<std::thread> readers(n_threads);
 
-	for (size_t i = 0; i < kmc_file_list.size(); ++i)
+
+	for (size_t i = 0; i < kmc_file_list.size(); i += n_threads)
 	{
-		cout << kmc_file_list[i] << " (" << i + 1 << "/" << kmc_file_list.size() << "): ";
-
 		std::chrono::duration<double> dt;
-
 		auto start = std::chrono::high_resolution_clock::now();
-		if (!fast_db.extractKmers(kmc_file_list[i], kmers)) {
-			cout << "Error processing sample" << endl;
-			break;
-		}
-		dt = std::chrono::high_resolution_clock::now() - start;
-		cout << "loading time=" << dt.count() << endl;
-		loadingTime += dt;
+		
+		for (int tid = 0; tid < n_threads; ++tid) {
+			readers[tid] = std::thread([tid, i, n_threads, &kmersCollections, &kmc_file_list, &fast_db, &naive_db]() {
+				size_t file_id = i + tid;
 
-#ifdef COMPARE
-		start = std::chrono::high_resolution_clock::now();
-		naive_db.addKmers(i, kmers);
+				if (file_id < kmc_file_list.size()) {
+					std::ostringstream oss;
+					oss << kmc_file_list[file_id] << " (" << file_id + 1 << "/" << kmc_file_list.size() << ")...";
+					if (!fast_db.extractKmers(kmc_file_list[file_id], kmersCollections[tid])) {
+						oss << "Error processing sample" << endl;
+					}
+					else {
+						oss << "done!" << endl;
+					}
+					cout << oss.str();
+				}
+			});
+		}
+		
+
+		for (int tid = 0; tid < n_threads; ++tid) {
+			readers[tid].join();
+		}
+	
 		dt = std::chrono::high_resolution_clock::now() - start;
-		cout << "Naive: time=" << dt.count() << ", ";
-		naiveTime += dt;
-		show_progress(naive_db);
+		cout << "Processed " << n_threads << " files in: " << dt.count() << endl;
+		loadingTime += dt;
+		
+		for (int tid = 0; tid < n_threads; ++tid) {
+			size_t file_id = i + tid;
+
+			if (file_id < kmc_file_list.size()) {
+#ifdef COMPARE
+				start = std::chrono::high_resolution_clock::now();
+				naive_db.addKmers(i, kmersCollections[tid]);
+				dt = std::chrono::high_resolution_clock::now() - start;
+				cout << "Naive: time=" << dt.count() << ", ";
+				naiveTime += dt;
+				show_progress(naive_db);
 #endif
 
-		start = std::chrono::high_resolution_clock::now();
-		fast_db.addKmers(i, kmers);
-		dt = std::chrono::high_resolution_clock::now() - start;
-		cout << "Fast: time=" << dt.count() << ", ";
-		fastTime += dt;
-		show_progress(fast_db);
+				start = std::chrono::high_resolution_clock::now();
+				fast_db.addKmers(i, kmersCollections[tid]);
+				dt = std::chrono::high_resolution_clock::now() - start;
+				cout << "Fast: time=" << dt.count() << ", ";
+				fastTime += dt;
+				show_progress(fast_db);
+				
+				cout << endl;
+			}
+		}
 
-		cout << endl;
-		
 		store_pat_sizes(i);
 	}
 

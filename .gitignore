@@ -1,0 +1,6 @@
+/kmer_db/Debug
+/kmer_db/Release
+/kmer_db/x64
+/kmer_db/.vs/kmer_db/v14/*.suo
+/kmer_db/kmer_db.VC.VC.opendb
+/kmer_db/kmer_db.VC.db

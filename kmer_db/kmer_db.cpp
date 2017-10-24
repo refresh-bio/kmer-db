@@ -10,6 +10,8 @@
 #include <vector>
 #include <chrono>
 #include <stack>
+#include <thread>
+#include <mutex>
 
 #ifndef WIN32
 #include <parallel/algorithm>
@@ -119,50 +121,106 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1, (unsigned 
 
 	mem_pattern_desc = 0;
 	patterns.push_back(pattern_t{ 0, new subpattern_t<sample_id_t>() });
+	
+	/*
+	samplePatterns.reserve(2 << 23); // 16M elements
+	
+	for (int i = 0; i < threadsSamplePatterns.size(); ++i) {
+		threadsSamplePatterns[i].reserve(samplePatterns.size() / threadsSamplePatterns.size());
+	}*/
+	
 }
 
 
 // Przetwarza pojedyncza baze KMC
 void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<uint64_t>& kmers)
 {
-	uint64_t u_kmer;
-	uint64_t prefetch_kmer;
-	const size_t prefetch_dist = 48;
-	auto n_kmers = kmers.size();
-	
-	v_current_file_pids.clear();
+	size_t n_kmers = kmers.size();
 	
 	// Musimy miec poprawne wskazniki do HT po wstawieniu do n_kmers elementow, a wiec nie moze sie w tym czasie zrobic restrukturyzacja
 	// Jesli jest ryzyko, to niech zrobi sie wczesniej, przed wstawianiem elementow
 	kmers2patternIds.reserve_for_additional(n_kmers);
+	std::mutex hashmapLock;
+	
+	samplePatterns.resize(n_kmers);
+	int n_threads = std::thread::hardware_concurrency();
+	std::vector<size_t> threadsExistingSamples(n_threads);
 
-	for (size_t i = 0; i < n_kmers; ++i)
-	{
-		u_kmer = kmers[i];
-		if (i + prefetch_dist < n_kmers)
-		{
-			prefetch_kmer = kmers[i + prefetch_dist];
-			kmers2patternIds.prefetch(prefetch_kmer);
-		}
+	std::vector<std::thread> threads(n_threads);
+	for (int tid = 0; tid < threads.size(); ++tid) {
+		threads[tid] = std::thread([this, &kmers, tid, n_threads, &threadsExistingSamples]() {
+			
+			size_t n_kmers = kmers.size();
+			size_t block = n_kmers / n_threads;
+			size_t lo = tid * block;
+			size_t hi = (tid == n_threads - 1) ? n_kmers : lo + block;
 
-		// ***** Sprawdzanie w slowniku czy taki k-mer juz istnieje
-		auto i_kmer = kmers2patternIds.find(u_kmer);
-		uint64_t p_id;				// tu bedzie id wzorca (pattern), ktory aktualnie jest przypisany do tego k-mera
+		
+			size_t existing_sample_id = lo;
+			size_t to_add_id = hi - 1;
 
-		if (i_kmer == nullptr)
-		{
-			i_kmer = kmers2patternIds.insert(u_kmer, 0);
-			p_id = 0;						// Pierwsze wyst. k-mera, wiec przypisujemy taki sztuczny wzorzec 0
-		}
-		else
-			p_id = *i_kmer;
+			uint64_t u_kmer;
+			uint64_t prefetch_kmer;
+			const size_t prefetch_dist = 48;
 
-		v_current_file_pids.push_back(make_pair(p_id, i_kmer));
-//		hm_current_file_pids.insert(make_pair(p_id, i_kmer));
+			for (size_t i = lo; i < hi; ++i)
+			{
+				u_kmer = kmers[i];
+				if (i + prefetch_dist < hi)
+				{
+					prefetch_kmer = kmers[i + prefetch_dist];
+					kmers2patternIds.prefetch(prefetch_kmer);
+				}
+
+				// ***** Sprawdzanie w slowniku czy taki k-mer juz istnieje
+				auto i_kmer = kmers2patternIds.find(u_kmer);
+				uint64_t p_id;				// tu bedzie id wzorca (pattern), ktory aktualnie jest przypisany do tego k-mera
+
+				if (i_kmer == nullptr)
+				{
+					//i_kmer = kmers2patternIds.insert(u_kmer, 0);
+					//p_id = 0;						// Pierwsze wyst. k-mera, wiec przypisujemy taki sztuczny wzorzec 0
+
+					// do not add kmer to hashtable - just mark as to be added
+					samplePatterns[to_add_id].first = u_kmer;
+					--to_add_id;
+				}
+				else {
+					p_id = *i_kmer;
+
+					samplePatterns[existing_sample_id].first = p_id;
+					samplePatterns[existing_sample_id].second = i_kmer;
+					existing_sample_id++;
+				}
+			}
+			threadsExistingSamples[tid] = existing_sample_id;
+			cout << "Thread " << tid << ", existing: " << existing_sample_id - lo << ", added: " << hi - existing_sample_id << endl;
+		});
 	}
 
+	size_t n_patterns = 0;
+	for (int tid = 0; tid < threads.size(); ++tid) {
+		threads[tid].join();
+	}
+
+	// add kmers to hashtables
+	for (int tid = 0; tid < threads.size(); ++tid) {
+		size_t n_kmers = kmers.size();
+		size_t block = n_kmers / n_threads;
+		size_t lo = tid * block;
+		size_t hi = (tid == n_threads - 1) ? n_kmers : lo + block;
+
+		for (size_t i = threadsExistingSamples[tid]; i < hi; ++i) {
+			auto i_kmer = kmers2patternIds.insert(samplePatterns[i].first, 0); // Pierwsze wyst. k-mera, wiec przypisujemy taki sztuczny wzorzec 0				
+			samplePatterns[i].first = 0;
+			samplePatterns[i].second = i_kmer;
+		}
+	}
+
+
+		
 #ifdef WIN32
-	sort(v_current_file_pids.begin(), v_current_file_pids.end());
+	sort(samplePatterns.begin(), samplePatterns.end());
 #else
 	__gnu_parallel::sort(v_current_file_pids.begin(), v_current_file_pids.end());
 #endif
@@ -170,11 +228,11 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<uint64_t>& kme
 	for (size_t i = 0; i < n_kmers;)
 	{
 		size_t j;
-		auto p_id = v_current_file_pids[i].first;
+		auto p_id = samplePatterns[i].first;
 
 		// zliczamy odczyty z aktualnego pliku (osobnika) o tym samym wzorcu
 		for (j = i + 1; j < n_kmers; ++j)
-			if (p_id != v_current_file_pids[j].first)
+			if (p_id != samplePatterns[j].first)
 				break;
 		size_t pid_count = j - i; 
 
@@ -200,7 +258,7 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<uint64_t>& kme
 			uint32_t new_p_id = patterns.size() - 1;
 
 			for (size_t k = i; k < j; ++k)
-				*(v_current_file_pids[k].second) = new_p_id;
+				*(samplePatterns[k].second) = new_p_id;
 		}
 
 		i = j;

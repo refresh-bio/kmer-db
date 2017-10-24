@@ -69,7 +69,9 @@ protected:
 	// liczba wystapien wzorca w kmer_dict, wektor id osobnikow zawierajacych k - mer)
 	std::vector<pattern_t> patterns;					
 
-	std::vector<std::pair<uint64_t, uint32_t*>> v_current_file_pids;
+	std::vector<std::pair<uint64_t, uint32_t*>> samplePatterns;
+
+	std::vector<std::vector<std::pair<uint64_t, uint32_t*>>> threadsSamplePatterns;
 
 	
 public:
