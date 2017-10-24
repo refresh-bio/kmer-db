@@ -146,6 +146,7 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="hashmap_dh.h" />
     <ClInclude Include="hashmap_lp.h" />
     <ClInclude Include="kmer_db.h" />
     <ClInclude Include="kmc_api\kmc_file.h" />

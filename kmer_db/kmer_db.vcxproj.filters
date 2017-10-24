@@ -31,6 +31,9 @@
     <ClInclude Include="hashmap_lp.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="hashmap_dh.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="kmer_db.cpp">

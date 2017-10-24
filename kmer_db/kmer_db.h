@@ -1,6 +1,7 @@
 #pragma once
 #include "pattern.h"
 #include "hashmap_lp.h"
+#include "hashmap_dh.h"
 
 typedef uint16_t sample_id_t;
 
@@ -64,7 +65,7 @@ protected:
 	size_t mem_pattern_desc;		// iloœæ pamiêci zajmowana przez wszystkie wzorce
 	
 	// K-mer database structures
-	hash_map<uint64_t, uint32_t> kmers2patternIds;
+	hash_map_dh<uint64_t, uint32_t> kmers2patternIds;
 
 	// liczba wystapien wzorca w kmer_dict, wektor id osobnikow zawierajacych k - mer)
 	std::vector<pattern_t> patterns;					
