@@ -12,6 +12,7 @@
 #include <stack>
 #include <thread>
 #include <mutex>
+#include <atomic>
 
 #ifndef WIN32
 #include <parallel/algorithm>
@@ -24,7 +25,7 @@ using namespace std;
 
 /****************************************************************************************************************************************************/
 
-bool AbstractKmerDb::extractKmers(const string &filename, std::vector<uint64_t>& kmers) {
+bool AbstractKmerDb::extractKmers(const string &filename, std::vector<kmer_t>& kmers) {
 	CKMCFile kmc_file;
 	uint32_t counter;
 
@@ -68,7 +69,7 @@ bool AbstractKmerDb::extractKmers(const string &filename, std::vector<uint64_t>&
 
 /****************************************************************************************************************************************************/
 
-void NaiveKmerDb::addKmers(sample_id_t sampleId, const std::vector<uint64_t>& kmers)
+void NaiveKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers)
 {
 	uint64_t u_kmer;
 	uint64_t prefetch_kmer;
@@ -103,7 +104,7 @@ void NaiveKmerDb::addKmers(sample_id_t sampleId, const std::vector<uint64_t>& km
 }
 
 
-void NaiveKmerDb::mapKmers2Samples(uint64_t kmer, std::vector<sample_id_t>& samples) {
+void NaiveKmerDb::mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) {
 	samples.clear();
 	auto v = kmers2patternIds.find(kmer);
 
@@ -133,14 +134,14 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1, (unsigned 
 
 
 // Przetwarza pojedyncza baze KMC
-void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<uint64_t>& kmers)
+void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers)
 {
 	size_t n_kmers = kmers.size();
 	
 	// Musimy miec poprawne wskazniki do HT po wstawieniu do n_kmers elementow, a wiec nie moze sie w tym czasie zrobic restrukturyzacja
 	// Jesli jest ryzyko, to niech zrobi sie wczesniej, przed wstawianiem elementow
 	kmers2patternIds.reserve_for_additional(n_kmers);
-	std::mutex hashmapLock;
+	std::mutex lock;
 	
 	samplePatterns.resize(n_kmers);
 	int n_threads = std::thread::hardware_concurrency();
@@ -159,8 +160,8 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<uint64_t>& kme
 			size_t existing_sample_id = lo;
 			size_t to_add_id = hi - 1;
 
-			uint64_t u_kmer;
-			uint64_t prefetch_kmer;
+			kmer_t u_kmer;
+			kmer_t prefetch_kmer;
 			const size_t prefetch_dist = 48;
 
 			for (size_t i = lo; i < hi; ++i)
@@ -174,7 +175,7 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<uint64_t>& kme
 
 				// ***** Sprawdzanie w slowniku czy taki k-mer juz istnieje
 				auto i_kmer = kmers2patternIds.find(u_kmer);
-				uint64_t p_id;				// tu bedzie id wzorca (pattern), ktory aktualnie jest przypisany do tego k-mera
+				pid_t p_id;				// tu bedzie id wzorca (pattern), ktory aktualnie jest przypisany do tego k-mera
 
 				if (i_kmer == nullptr)
 				{
@@ -194,7 +195,7 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<uint64_t>& kme
 				}
 			}
 			threadsExistingSamples[tid] = existing_sample_id;
-			cout << "Thread " << tid << ", existing: " << existing_sample_id - lo << ", added: " << hi - existing_sample_id << endl;
+			cout << "Thread " << tid << ", existing: " << existing_sample_id - lo << ", to add: " << hi - existing_sample_id << endl;
 		});
 	}
 
@@ -203,7 +204,7 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<uint64_t>& kme
 		threads[tid].join();
 	}
 
-	// add kmers to hashtables
+	// add kmers to hashtable sequentially
 	for (int tid = 0; tid < threads.size(); ++tid) {
 		size_t n_kmers = kmers.size();
 		size_t block = n_kmers / n_threads;
@@ -220,9 +221,13 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<uint64_t>& kme
 
 		
 #ifdef WIN32
-	sort(samplePatterns.begin(), samplePatterns.end());
+	sort(samplePatterns.begin(), samplePatterns.end(), [](std::pair<pid_t, pid_t*>& a, std::pair<pid_t, pid_t*>& b)->bool {
+		return a.first < b.first;
+	});
 #else
-	__gnu_parallel::sort(v_current_file_pids.begin(), v_current_file_pids.end());
+	__gnu_parallel::sort(samplePatterns.begin(), samplePatterns.end(), [](std::pair<pid_t, pid_t*>& a, std::pair<pid_t, pid_t*>& b)->bool {
+		return a.first < b.first;
+	});
 #endif
 
 	for (size_t i = 0; i < n_kmers;)

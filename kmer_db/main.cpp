@@ -15,7 +15,7 @@
 
 using namespace std;
 
-//#define COMPARE
+#define COMPARE
 
 #ifndef WIN32
 #include <parallel/algorithm>
@@ -115,8 +115,7 @@ int main(int argc, char **argv)
 
 	FastKmerDb fast_db;
 	NaiveKmerDb naive_db;
-	//std::vector<uint64_t> kmers;
-
+	
 	pat_sizes.resize(kmc_file_list.size() + 1, 0);
 	kmc_file_list.resize(50);
 
