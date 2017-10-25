@@ -15,7 +15,7 @@
 
 using namespace std;
 
-#define COMPARE
+//#define COMPARE
 
 #ifndef WIN32
 #include <parallel/algorithm>
@@ -117,7 +117,7 @@ int main(int argc, char **argv)
 	NaiveKmerDb naive_db;
 	
 	pat_sizes.resize(kmc_file_list.size() + 1, 0);
-	kmc_file_list.resize(50);
+//	kmc_file_list.resize(50);
 
 	std::chrono::duration<double> loadingTime, naiveTime, fastTime;
 

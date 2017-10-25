@@ -123,12 +123,7 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1, (unsigned 
 	mem_pattern_desc = 0;
 	patterns.push_back(pattern_t{ 0, new subpattern_t<sample_id_t>() });
 	
-	/*
-	samplePatterns.reserve(2 << 23); // 16M elements
-	
-	for (int i = 0; i < threadsSamplePatterns.size(); ++i) {
-		threadsSamplePatterns[i].reserve(samplePatterns.size() / threadsSamplePatterns.size());
-	}*/
+	threadPatterns.resize(std::thread::hardware_concurrency());
 	
 }
 
@@ -145,11 +140,11 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 	
 	samplePatterns.resize(n_kmers);
 	int n_threads = std::thread::hardware_concurrency();
-	std::vector<size_t> threadsExistingSamples(n_threads);
+	std::vector<size_t> num_existing_kmers(n_threads);
 
 	std::vector<std::thread> threads(n_threads);
-	for (int tid = 0; tid < threads.size(); ++tid) {
-		threads[tid] = std::thread([this, &kmers, tid, n_threads, &threadsExistingSamples]() {
+	for (int tid = 0; tid < n_threads; ++tid) {
+		threads[tid] = std::thread([this, &kmers, tid, n_threads, &num_existing_kmers]() {
 			
 			size_t n_kmers = kmers.size();
 			size_t block = n_kmers / n_threads;
@@ -157,7 +152,7 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 			size_t hi = (tid == n_threads - 1) ? n_kmers : lo + block;
 
 		
-			size_t existing_sample_id = lo;
+			size_t existing_id = lo;
 			size_t to_add_id = hi - 1;
 
 			kmer_t u_kmer;
@@ -189,13 +184,13 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 				else {
 					p_id = *i_kmer;
 
-					samplePatterns[existing_sample_id].first = p_id;
-					samplePatterns[existing_sample_id].second = i_kmer;
-					existing_sample_id++;
+					samplePatterns[existing_id].first = p_id;
+					samplePatterns[existing_id].second = i_kmer;
+					existing_id++;
 				}
 			}
-			threadsExistingSamples[tid] = existing_sample_id;
-			cout << "Thread " << tid << ", existing: " << existing_sample_id - lo << ", to add: " << hi - existing_sample_id << endl;
+			num_existing_kmers[tid] = existing_id;
+			cout << "Thread " << tid << ", existing: " << existing_id - lo << ", to add: " << hi - existing_id << endl;
 		});
 	}
 
@@ -205,71 +200,122 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 	}
 
 	// add kmers to hashtable sequentially
-	for (int tid = 0; tid < threads.size(); ++tid) {
+	for (int tid = 0; tid < n_threads; ++tid) {
 		size_t n_kmers = kmers.size();
 		size_t block = n_kmers / n_threads;
 		size_t lo = tid * block;
 		size_t hi = (tid == n_threads - 1) ? n_kmers : lo + block;
 
-		for (size_t i = threadsExistingSamples[tid]; i < hi; ++i) {
+		for (size_t i = num_existing_kmers[tid]; i < hi; ++i) {
 			auto i_kmer = kmers2patternIds.insert(samplePatterns[i].first, 0); // Pierwsze wyst. k-mera, wiec przypisujemy taki sztuczny wzorzec 0				
 			samplePatterns[i].first = 0;
 			samplePatterns[i].second = i_kmer;
 		}
 	}
 
-
+	auto pid_comparer = [](const std::pair<pid_t, pid_t*>& a, const std::pair<pid_t, pid_t*>& b)->bool {
+		return a.first < b.first;
+	};
 		
 #ifdef WIN32
-	sort(samplePatterns.begin(), samplePatterns.end(), [](std::pair<pid_t, pid_t*>& a, std::pair<pid_t, pid_t*>& b)->bool {
-		return a.first < b.first;
-	});
+	sort(samplePatterns.begin(), samplePatterns.end(), pid_comparer);
 #else
-	__gnu_parallel::sort(samplePatterns.begin(), samplePatterns.end(), [](std::pair<pid_t, pid_t*>& a, std::pair<pid_t, pid_t*>& b)->bool {
-		return a.first < b.first;
-	});
+	__gnu_parallel::sort(samplePatterns.begin(), samplePatterns.end(), pid_comparer);
 #endif
 
+	
 	std::atomic<int> new_pid = patterns.size();
 
-	for (size_t i = 0; i < n_kmers;)
-	{
-		size_t j;
-		auto p_id = samplePatterns[i].first;
+	// calculate ranges
+	std::vector<size_t> ranges(n_threads + 1, n_kmers);
+	ranges[0] = 0;
+	size_t block = n_kmers / n_threads;
 
-		// zliczamy odczyty z aktualnego pliku (osobnika) o tym samym wzorcu
-		for (j = i + 1; j < n_kmers; ++j)
-			if (p_id != samplePatterns[j].first)
-				break;
-		size_t pid_count = j - i; 
+	auto currentIndex = block;
 
-		if (patterns[p_id].num_occ == pid_count && !patterns[p_id].last_subpattern->get_is_parrent())
-		{
-			// Wzorzec mozna po prostu rozszerzyæ, bo wszystkie wskazniki do niego beda rozszerzane (realokacja tablicy id próbek we wzorcu) 
-			mem_pattern_desc -= patterns[p_id].last_subpattern->getMem();
-			patterns[p_id].last_subpattern->expand(sampleId);
-			mem_pattern_desc += patterns[p_id].last_subpattern->getMem();
+	for (int tid = 0; tid < n_threads; ++tid) {
+		auto it = std::upper_bound(
+			samplePatterns.begin() + currentIndex,
+			samplePatterns.end(), 
+			*(samplePatterns.begin() + currentIndex - 1), 
+			pid_comparer);
+
+		size_t range = it - samplePatterns.begin();
+		ranges[tid + 1] = range;
+		currentIndex =  range + block;
+		
+		if (currentIndex >= samplePatterns.size()) {
+			break;
 		}
-		else
-		{
-			// Trzeba wygenerowaæ nowy wzorzec (podczepiony pod wzorzec macierzysty)
-			auto *pat = new subpattern_t<sample_id_t>(*(patterns[p_id].last_subpattern), sampleId);
-
-			mem_pattern_desc += pat->getMem();
-
-			patterns.push_back(pattern_t{ (uint32_t) pid_count, pat });
-			if (p_id) {
-				patterns[p_id].num_occ -= pid_count;
-			}
-
-			for (size_t k = i; k < j; ++k) {
-				*(samplePatterns[k].second) = new_pid;
-			}
-			++new_pid;
-		}
-
-		i = j;
 	}
+
+
+	for (int tid = 0; tid < n_threads; ++tid) {
+		threads[tid] = std::thread([this, tid, n_threads, &ranges, sampleId, &new_pid, n_kmers]() {
+			threadPatterns[tid].clear();
+			threadPatterns[tid].reserve(n_kmers);
+
+			size_t lo = ranges[tid];
+			size_t hi = ranges[tid + 1];
+			
+			for (size_t i = lo; i < hi;) {
+				size_t j;
+				auto p_id = samplePatterns[i].first;
+
+				// zliczamy odczyty z aktualnego pliku (osobnika) o tym samym wzorcu
+				for (j = i + 1; j < hi; ++j) {
+					if (p_id != samplePatterns[j].first) {
+						break;
+					}
+				}
+				size_t pid_count = j - i;
+
+				if (patterns[p_id].num_occ == pid_count && !patterns[p_id].last_subpattern->get_is_parrent()) {
+					// Wzorzec mozna po prostu rozszerzyæ, bo wszystkie wskazniki do niego beda rozszerzane (realokacja tablicy id próbek we wzorcu) 
+				//	mem_pattern_desc -= patterns[p_id].last_subpattern->getMem();
+					patterns[p_id].last_subpattern->expand(sampleId);
+					//	mem_pattern_desc += patterns[p_id].last_subpattern->getMem();
+				}
+				else
+				{
+					// Trzeba wygenerowaæ nowy wzorzec (podczepiony pod wzorzec macierzysty)
+					auto *pat = new subpattern_t<sample_id_t>(*(patterns[p_id].last_subpattern), sampleId);
+
+					//	mem_pattern_desc += pat->getMem();
+
+					//	patterns.push_back(pattern_t{ (uint32_t)pid_count, pat });
+					pid_t local_pid = new_pid.fetch_add(1);
+
+					threadPatterns[tid].emplace_back(local_pid, pattern_t{ (uint32_t)pid_count, pat });
+
+					if (p_id) {
+						patterns[p_id].num_occ -= pid_count;
+					}
+
+					for (size_t k = i; k < j; ++k) {
+						*(samplePatterns[k].second) = local_pid;
+					}
+					
+				}
+
+				i = j;
+			}
+		});
+	}
+
+
+	for (int tid = 0; tid < threads.size(); ++tid) {
+		threads[tid].join();
+	}
+
+	patterns.resize(new_pid);
+
+	for (int tid = 0; tid < threads.size(); ++tid) {
+		for (const auto& tp : threadPatterns[tid]) {
+			patterns[tp.first] = tp.second;
+		}
+	}
+
 }
 
 

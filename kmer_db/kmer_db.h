@@ -70,7 +70,9 @@ protected:
 	hash_map_dh<kmer_t, pid_t> kmers2patternIds;
 
 	// liczba wystapien wzorca w kmer_dict, wektor id osobnikow zawierajacych k - mer)
-	std::vector<pattern_t> patterns;					
+	std::vector<pattern_t> patterns;		
+
+	std::vector<std::vector<std::pair<pid_t, pattern_t>>> threadPatterns;
 
 	// first element - pattern id, second element 
 	std::vector<std::pair<pid_t, pid_t*>> samplePatterns;
