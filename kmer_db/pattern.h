@@ -25,6 +25,8 @@ class subpattern_t {
 
 public:
 
+	const T* get_data() const { return data; }
+
 	size_t get_num_samples() const { return num_samples; }
 	size_t get_num_local_samples() const {
 		return num_samples - (parent != nullptr ? parent->num_samples : 0);
@@ -185,8 +187,25 @@ public:
 		return r;
 	}
 
-
+	std::string toString() const {
+		std::string out;
+		if (parent) {
+			out += parent->toString() + " | ";
+		}
+		
+		for (int i = 0; i< get_num_local_samples(); ++i) {
+			out += std::to_string(data[i]) + ", ";
+		}
+		return out;
+	}
 };
 
 
+template <class T>
+class pattern_t
+{
+public:
+	uint32_t num_occ;
+	subpattern_t<T> *last_subpattern;
 
+};

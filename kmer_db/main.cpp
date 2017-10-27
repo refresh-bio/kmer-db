@@ -12,10 +12,12 @@
 #include <stack>
 #include <thread>
 #include <sstream>
+#include <iomanip>
+#include <fstream>
 
 using namespace std;
 
-//#define COMPARE
+#define COMPARE
 
 #ifndef WIN32
 #include <parallel/algorithm>
@@ -117,7 +119,7 @@ int main(int argc, char **argv)
 	NaiveKmerDb naive_db;
 	
 	pat_sizes.resize(kmc_file_list.size() + 1, 0);
-//	kmc_file_list.resize(50);
+	kmc_file_list.resize(7);
 
 	std::chrono::duration<double> loadingTime, naiveTime, fastTime;
 
@@ -166,7 +168,7 @@ int main(int argc, char **argv)
 			if (file_id < kmc_file_list.size()) {
 #ifdef COMPARE
 				start = std::chrono::high_resolution_clock::now();
-				naive_db.addKmers(i, kmersCollections[tid]);
+				naive_db.addKmers(file_id, kmersCollections[tid]);
 				dt = std::chrono::high_resolution_clock::now() - start;
 				cout << "Naive: time=" << dt.count() << ", ";
 				naiveTime += dt;
@@ -174,7 +176,7 @@ int main(int argc, char **argv)
 #endif
 
 				start = std::chrono::high_resolution_clock::now();
-				fast_db.addKmers(i, kmersCollections[tid]);
+				fast_db.addKmers(file_id, kmersCollections[tid]);
 				dt = std::chrono::high_resolution_clock::now() - start;
 				cout << "Fast: time=" << dt.count() << ", ";
 				fastTime += dt;
@@ -219,6 +221,40 @@ int main(int argc, char **argv)
 
 	}
 	cout << "done" << endl;
+
+	std::ofstream ofs("d:/kmer-cmp.txt");
+
+	ofs << endl << "NAIVE distance matrix:" << endl;
+	Array<uint32_t> naiveMatrix;
+	naive_db.calculateSimilarityMatrix(naiveMatrix);
+	for (int i = 0; i < naiveMatrix.size(); ++i) {
+		for (int j = 0; j < naiveMatrix.size(); ++j) {
+			ofs << setw(10) << naiveMatrix[i][j];
+		}
+		ofs << endl;
+	}
+
+	ofs << endl << "Fast distance matrix:" << endl;
+
+	Array<uint32_t> fastMatrix;
+	fast_db.calculateSimilarityMatrix(fastMatrix);
+	for (int i = 0; i < fastMatrix.size(); ++i) {
+		for (int j = 0; j < fastMatrix.size(); ++j) {
+			ofs << setw(10) << fastMatrix[i][j];
+		}
+		ofs << endl;
+	}
+
+	ofs << endl << "DIFF:" << endl;
+	Array<uint32_t> diffMatrix = fastMatrix - naiveMatrix;
+	for (int i = 0; i < diffMatrix.size(); ++i) {
+		for (int j = 0; j < diffMatrix.size(); ++j) {
+			ofs << setw(10) << diffMatrix[i][j];
+		}
+		ofs << endl;
+	}
+
+
 #endif
 
 	store_pat_sizes(1000000);

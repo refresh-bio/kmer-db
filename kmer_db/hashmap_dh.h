@@ -106,7 +106,7 @@ public:
 	item_t* end() { return data + allocated; }
 	const item_t* cend() const { return data + allocated; }
 
-	bool is_free(const item_t& item) {
+	bool is_free(const item_t& item) const {
 		return item.key == empty_key || item.key == erased_key;
 	}
 
@@ -190,7 +190,11 @@ public:
 		return &(data[h].val);
 	}
 
-	Value* find(Key k)
+	const Value* cfind(Key k) const {
+		return find(k);
+	}
+
+	Value* find(Key k) const
 	{
 		size_t h = my_hasher_dh1<Key>(k) & allocated_mask;
 		if (data[h].key == k)

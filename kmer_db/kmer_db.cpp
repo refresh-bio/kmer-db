@@ -71,6 +71,8 @@ bool AbstractKmerDb::extractKmers(const string &filename, std::vector<kmer_t>& k
 
 void NaiveKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers)
 {
+	AbstractKmerDb::addKmers(sampleId, kmers);
+	
 	uint64_t u_kmer;
 	uint64_t prefetch_kmer;
 	const size_t prefetch_dist = 48;
@@ -104,7 +106,7 @@ void NaiveKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmer
 }
 
 
-void NaiveKmerDb::mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) {
+void NaiveKmerDb::mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const {
 	samples.clear();
 	auto v = kmers2patternIds.find(kmer);
 
@@ -114,6 +116,29 @@ void NaiveKmerDb::mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& sample
 }
 
 
+void NaiveKmerDb::calculateSimilarityMatrix(Array<uint32_t>& matrix) const {
+	matrix.resize(numSamples, numSamples);
+	matrix.clear();
+
+	for (auto it = kmers2patternIds.cbegin(); it < kmers2patternIds.cend(); ++it) {
+		
+		if (kmers2patternIds.is_free(*it)) {
+			continue;
+		}
+
+		auto & samples = patterns[it->val];
+		
+		for (int i = 0; i < samples.size() - 1; ++i) {
+			auto& Si = samples[i];
+			for (int j = i + 1; j < samples.size(); ++j) {
+				auto& Sj = samples[j];
+				++matrix[Si][Sj];
+				++matrix[Sj][Si];
+			}
+		}
+	}
+}
+
 
 /****************************************************************************************************************************************************/
 
@@ -121,7 +146,7 @@ void NaiveKmerDb::mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& sample
 FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1, (unsigned long long) - 2) {
 
 	mem_pattern_desc = 0;
-	patterns.push_back(pattern_t{ 0, new subpattern_t<sample_id_t>() });
+	patterns.push_back(pattern_t<sample_id_t>{ 0, new subpattern_t<sample_id_t>() });
 	
 	threadPatterns.resize(std::thread::hardware_concurrency());
 	
@@ -131,6 +156,7 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1, (unsigned 
 // Przetwarza pojedyncza baze KMC
 void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers)
 {
+	AbstractKmerDb::addKmers(sampleId, kmers);
 	size_t n_kmers = kmers.size();
 	
 	// Musimy miec poprawne wskazniki do HT po wstawieniu do n_kmers elementow, a wiec nie moze sie w tym czasie zrobic restrukturyzacja
@@ -170,7 +196,7 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 
 				// ***** Sprawdzanie w slowniku czy taki k-mer juz istnieje
 				auto i_kmer = kmers2patternIds.find(u_kmer);
-				pid_t p_id;				// tu bedzie id wzorca (pattern), ktory aktualnie jest przypisany do tego k-mera
+				pattern_id_t p_id;				// tu bedzie id wzorca (pattern), ktory aktualnie jest przypisany do tego k-mera
 
 				if (i_kmer == nullptr)
 				{
@@ -190,7 +216,7 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 				}
 			}
 			num_existing_kmers[tid] = existing_id;
-			cout << "Thread " << tid << ", existing: " << existing_id - lo << ", to add: " << hi - existing_id << endl;
+			//cout << "Thread " << tid << ", existing: " << existing_id - lo << ", to add: " << hi - existing_id << endl;
 		});
 	}
 
@@ -213,7 +239,7 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 		}
 	}
 
-	auto pid_comparer = [](const std::pair<pid_t, pid_t*>& a, const std::pair<pid_t, pid_t*>& b)->bool {
+	auto pid_comparer = [](const std::pair<pattern_id_t, pattern_id_t*>& a, const std::pair<pattern_id_t, pattern_id_t*>& b)->bool {
 		return a.first < b.first;
 	};
 		
@@ -224,7 +250,7 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 #endif
 
 	
-	std::atomic<int> new_pid = patterns.size();
+	std::atomic<size_t> new_pid(patterns.size());
 
 	// calculate ranges
 	std::vector<size_t> ranges(n_threads + 1, n_kmers);
@@ -274,19 +300,20 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 					// Wzorzec mozna po prostu rozszerzyæ, bo wszystkie wskazniki do niego beda rozszerzane (realokacja tablicy id próbek we wzorcu) 
 				//	mem_pattern_desc -= patterns[p_id].last_subpattern->getMem();
 					patterns[p_id].last_subpattern->expand(sampleId);
+					cout << "Expanding " << p_id << ": " << patterns[p_id].last_subpattern->toString() << endl;
 					//	mem_pattern_desc += patterns[p_id].last_subpattern->getMem();
 				}
 				else
 				{
 					// Trzeba wygenerowaæ nowy wzorzec (podczepiony pod wzorzec macierzysty)
 					auto *pat = new subpattern_t<sample_id_t>(*(patterns[p_id].last_subpattern), sampleId);
-
 					//	mem_pattern_desc += pat->getMem();
 
 					//	patterns.push_back(pattern_t{ (uint32_t)pid_count, pat });
-					pid_t local_pid = new_pid.fetch_add(1);
+					pattern_id_t local_pid = new_pid.fetch_add(1);
 
-					threadPatterns[tid].emplace_back(local_pid, pattern_t{ (uint32_t)pid_count, pat });
+					threadPatterns[tid].emplace_back(local_pid, pattern_t<sample_id_t>{ (uint32_t)pid_count, pat });
+					cout << "Creating " << local_pid << ": " << threadPatterns[tid].back().second.last_subpattern->toString() << endl;
 
 					if (p_id) {
 						patterns[p_id].num_occ -= pid_count;
@@ -319,7 +346,7 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 }
 
 
-void FastKmerDb::mapKmers2Samples(uint64_t kmer, std::vector<sample_id_t>& samples) {
+void FastKmerDb::mapKmers2Samples(uint64_t kmer, std::vector<sample_id_t>& samples) const {
 	
 	// find corresponding pattern id
 	auto p_id = kmers2patternIds.find(kmer);
@@ -338,6 +365,59 @@ void FastKmerDb::mapKmers2Samples(uint64_t kmer, std::vector<sample_id_t>& sampl
 
 		} while (subpattern != nullptr);
 	}
+}
 
 
+void FastKmerDb::calculateSimilarityMatrix(Array<uint32_t>& matrix) const {
+	matrix.resize(numSamples, numSamples);
+	matrix.clear();
+
+	for (auto it = kmers2patternIds.cbegin(); it < kmers2patternIds.cend(); ++it) {
+
+		if (kmers2patternIds.is_free(*it)) {
+			continue;
+		}
+
+		std::vector<sample_id_t> samples;
+		mapKmers2Samples(it->key, samples);
+
+		for (int i = 0; i < samples.size() - 1; ++i) {
+			auto& Si = samples[i];
+			for (int j = i + 1; j < samples.size(); ++j) {
+				auto& Sj = samples[j];
+				++matrix[Si][Sj];
+				++matrix[Sj][Si];
+			}
+		}
+	}
+
+
+	/*
+	for (const auto& pattern : patterns) {
+		auto subpattern = pattern.last_subpattern;
+
+		// iterate over subpatterns
+		while (subpattern) {
+			// iterate over elements in subpatterns
+			for (int i = subpattern->get_num_local_samples() - 1; i >= 0 ; --i) {
+				sample_id_t Si = subpattern->get_data()[i];
+
+				auto temp = subpattern;
+				while (temp) {
+					for (int j = temp->get_num_local_samples() - 1; j >= 0; --j) {
+						sample_id_t Sj = temp->get_data()[j];
+						if (Si != Sj) {
+							matrix[Si][Sj] += pattern.num_occ;
+							matrix[Sj][Si] += pattern.num_occ;
+						}
+					}
+
+					temp = temp->get_parent();
+				}
+			}
+			
+			subpattern = subpattern->get_parent();
+		}
+	}
+	*/
 }
