@@ -17,7 +17,7 @@
 
 using namespace std;
 
-#define COMPARE
+//#define COMPARE
 
 #ifndef WIN32
 #include <parallel/algorithm>
@@ -104,6 +104,36 @@ void store_pat_sizes(int num)
 
 int main(int argc, char **argv)
 {
+	int n_threads = 48;
+
+	std::chrono::duration<double> dt;
+	auto start = std::chrono::high_resolution_clock::now();
+
+	std::vector<std::thread*> pthreads;
+	pthreads.reserve(n_threads);
+
+	for (int i = 0; i < 10; ++i)
+	{
+		for (int tid = 0; tid < n_threads; ++tid) {
+			pthreads.push_back(new std::thread([tid]() {
+				cout << tid << endl;
+			}));
+		}
+
+		for (int tid = 0; tid < n_threads; ++tid) {
+			pthreads[tid]->join();
+			delete pthreads[tid];
+		}
+
+		pthreads.clear();
+	}
+
+	dt = std::chrono::high_resolution_clock::now() - start;
+	cout << "Processed " << n_threads << " files in: " << dt.count() << endl;
+
+	getchar();
+
+
 	vector<string> kmc_file_list;
 	
 	if (argc < 2)
@@ -119,13 +149,13 @@ int main(int argc, char **argv)
 	NaiveKmerDb naive_db;
 	
 	pat_sizes.resize(kmc_file_list.size() + 1, 0);
-	kmc_file_list.resize(7);
+	kmc_file_list.resize(100);
 
 	std::chrono::duration<double> loadingTime, naiveTime, fastTime;
 
 	cout << "PROCESSING SAMPLES..." << endl;
 	
-	int n_threads = std::thread::hardware_concurrency();
+	n_threads = std::thread::hardware_concurrency();
 	std::vector<std::vector<uint64_t>> kmersCollections(n_threads);
 	std::vector<std::thread> readers(n_threads);
 

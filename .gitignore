@@ -4,3 +4,8 @@
 /kmer_db/.vs/kmer_db/v14/*.suo
 /kmer_db/kmer_db.VC.VC.opendb
 /kmer_db/kmer_db.VC.db
+*.ipch
+*.vspx
+*.db
+*.suo
+*.opendb
