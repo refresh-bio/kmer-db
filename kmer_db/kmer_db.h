@@ -4,6 +4,8 @@
 #include "hashmap_dh.h"
 #include "Array.h"
 
+#include <map>
+
 typedef uint16_t sample_id_t;
 typedef uint64_t kmer_t;
 typedef uint64_t pattern_id_t;
@@ -63,6 +65,8 @@ public:
 	virtual void mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const;
 
 	virtual void calculateSimilarityMatrix(Array<uint32_t>& matrix) const;
+
+	std::map<std::vector<sample_id_t>, size_t> getPatternsStatistics() const;
 };
 
 
@@ -99,5 +103,7 @@ public:
 	virtual void mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const;
 
 	virtual void calculateSimilarityMatrix(Array<uint32_t>& matrix) const;
+
+	std::map<std::vector<sample_id_t>, size_t> getPatternsStatistics() const;
 
 };

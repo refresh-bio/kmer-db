@@ -139,6 +139,15 @@ void NaiveKmerDb::calculateSimilarityMatrix(Array<uint32_t>& matrix) const {
 	}
 }
 
+std::map<std::vector<sample_id_t>, size_t> NaiveKmerDb::getPatternsStatistics() const {
+	std::map <std::vector<sample_id_t>, size_t> out;
+
+	for (const auto& p : patterns) {
+		++out[p];
+	}
+	return out;
+}
+
 
 /****************************************************************************************************************************************************/
 
@@ -300,7 +309,7 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 					// Wzorzec mozna po prostu rozszerzyæ, bo wszystkie wskazniki do niego beda rozszerzane (realokacja tablicy id próbek we wzorcu) 
 				//	mem_pattern_desc -= patterns[p_id].last_subpattern->getMem();
 					patterns[p_id].last_subpattern->expand(sampleId);
-					cout << "Expanding " << p_id << ": " << patterns[p_id].last_subpattern->toString() << endl;
+				//	cout << "Expanding " << p_id << ": " << patterns[p_id].last_subpattern->toString() << endl;
 					//	mem_pattern_desc += patterns[p_id].last_subpattern->getMem();
 				}
 				else
@@ -313,7 +322,7 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 					pattern_id_t local_pid = new_pid.fetch_add(1);
 
 					threadPatterns[tid].emplace_back(local_pid, pattern_t<sample_id_t>{ (uint32_t)pid_count, pat });
-					cout << "Creating " << local_pid << ": " << threadPatterns[tid].back().second.last_subpattern->toString() << endl;
+			//		cout << "Creating " << local_pid << ": " << threadPatterns[tid].back().second.last_subpattern->toString() << endl;
 
 					if (p_id) {
 						patterns[p_id].num_occ -= pid_count;
@@ -372,44 +381,22 @@ void FastKmerDb::calculateSimilarityMatrix(Array<uint32_t>& matrix) const {
 	matrix.resize(numSamples, numSamples);
 	matrix.clear();
 
-	for (auto it = kmers2patternIds.cbegin(); it < kmers2patternIds.cend(); ++it) {
-
-		if (kmers2patternIds.is_free(*it)) {
-			continue;
-		}
-
-		std::vector<sample_id_t> samples;
-		mapKmers2Samples(it->key, samples);
-
-		for (int i = 0; i < samples.size() - 1; ++i) {
-			auto& Si = samples[i];
-			for (int j = i + 1; j < samples.size(); ++j) {
-				auto& Sj = samples[j];
-				++matrix[Si][Sj];
-				++matrix[Sj][Si];
-			}
-		}
-	}
-
-
-	/*
 	for (const auto& pattern : patterns) {
 		auto subpattern = pattern.last_subpattern;
 
 		// iterate over subpatterns
 		while (subpattern) {
-			// iterate over elements in subpatterns
+			// iterate over elements in the subpattern
 			for (int i = subpattern->get_num_local_samples() - 1; i >= 0 ; --i) {
 				sample_id_t Si = subpattern->get_data()[i];
-
+				
+				// accumulate number of common kmers for elements in the current subpattern and all its parrents
 				auto temp = subpattern;
 				while (temp) {
-					for (int j = temp->get_num_local_samples() - 1; j >= 0; --j) {
+					for (int j = (temp == subpattern ? i - 1 : temp->get_num_local_samples() - 1); j >= 0; --j) {
 						sample_id_t Sj = temp->get_data()[j];
-						if (Si != Sj) {
-							matrix[Si][Sj] += pattern.num_occ;
-							matrix[Sj][Si] += pattern.num_occ;
-						}
+						matrix[Si][Sj] += pattern.num_occ;
+						matrix[Sj][Si] += pattern.num_occ;
 					}
 
 					temp = temp->get_parent();
@@ -419,5 +406,15 @@ void FastKmerDb::calculateSimilarityMatrix(Array<uint32_t>& matrix) const {
 			subpattern = subpattern->get_parent();
 		}
 	}
-	*/
+	
+}
+
+std::map<std::vector<sample_id_t>, size_t> FastKmerDb::getPatternsStatistics() const {
+	std::map <std::vector<sample_id_t>, size_t> out;
+
+	for (const auto& pattern : patterns) {
+		out[pattern.toSamplesVector()] += pattern.num_occ;
+	}
+
+	return out;
 }

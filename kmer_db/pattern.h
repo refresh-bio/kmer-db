@@ -208,4 +208,23 @@ public:
 	uint32_t num_occ;
 	subpattern_t<T> *last_subpattern;
 
+	std::vector<T> toSamplesVector() const {
+		std::vector<T> samples;
+
+		auto subpattern = last_subpattern;
+		samples.resize(subpattern->get_num_samples());
+		int j = samples.size() - 1;
+
+		// collect in reversed order
+		do {
+			for (int i = subpattern->get_num_local_samples() - 1; i >= 0; --i, --j) {
+				samples[j] = (*subpattern)[i];
+			}
+			subpattern = subpattern->get_parent();
+
+		} while (subpattern != nullptr);
+
+		return samples;
+	}
+
 };

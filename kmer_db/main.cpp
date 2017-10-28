@@ -14,10 +14,11 @@
 #include <sstream>
 #include <iomanip>
 #include <fstream>
+#include <iterator>
 
 using namespace std;
 
-#define COMPARE
+//#define COMPARE
 
 #ifndef WIN32
 #include <parallel/algorithm>
@@ -119,7 +120,7 @@ int main(int argc, char **argv)
 	NaiveKmerDb naive_db;
 	
 	pat_sizes.resize(kmc_file_list.size() + 1, 0);
-	kmc_file_list.resize(7);
+	//kmc_file_list.resize(50);
 
 	std::chrono::duration<double> loadingTime, naiveTime, fastTime;
 
@@ -222,40 +223,61 @@ int main(int argc, char **argv)
 	}
 	cout << "done" << endl;
 
-	std::ofstream ofs("d:/kmer-cmp.txt");
-
-	ofs << endl << "NAIVE distance matrix:" << endl;
+	std::ofstream fileNaive("d:/kmer-naive.txt");
+	
+	fileNaive << endl << "NAIVE" << endl << endl << "Distance matrix:" << endl;
 	Array<uint32_t> naiveMatrix;
 	naive_db.calculateSimilarityMatrix(naiveMatrix);
 	for (int i = 0; i < naiveMatrix.size(); ++i) {
 		for (int j = 0; j < naiveMatrix.size(); ++j) {
-			ofs << setw(10) << naiveMatrix[i][j];
+			fileNaive << setw(10) << naiveMatrix[i][j];
 		}
-		ofs << endl;
+		fileNaive << endl;
 	}
 
-	ofs << endl << "Fast distance matrix:" << endl;
+	fileNaive << endl << "Histogram: " << endl;
+	auto stats = naive_db.getPatternsStatistics();
+	for (auto s : stats) {
+		fileNaive << setw(10) << s.second << ": ";
+		copy(s.first.begin(), s.first.end(), ostream_iterator<sample_id_t>(fileNaive, ","));
+		fileNaive << endl;
+	}
+
+
+
+	std::ofstream fileFast("d:/kmer-fast.txt");
+
+	fileFast << endl << "FAST:" << endl << endl << "Distance matrix:" << endl;
 
 	Array<uint32_t> fastMatrix;
 	fast_db.calculateSimilarityMatrix(fastMatrix);
 	for (int i = 0; i < fastMatrix.size(); ++i) {
 		for (int j = 0; j < fastMatrix.size(); ++j) {
-			ofs << setw(10) << fastMatrix[i][j];
+			fileFast << setw(10) << fastMatrix[i][j];
 		}
-		ofs << endl;
+		fileFast << endl;
 	}
 
-	ofs << endl << "DIFF:" << endl;
+	fileFast << endl << "Histogram: " << endl;
+	auto statsFast = fast_db.getPatternsStatistics();
+	for (auto s : statsFast) {
+		fileFast << setw(10) << s.second << ": ";
+		copy(s.first.begin(), s.first.end(), ostream_iterator<sample_id_t>(fileFast, ","));
+		fileFast << endl;
+	}
+
+
+	fileFast << endl << "DIFF:" << endl;
 	Array<uint32_t> diffMatrix = fastMatrix - naiveMatrix;
 	for (int i = 0; i < diffMatrix.size(); ++i) {
 		for (int j = 0; j < diffMatrix.size(); ++j) {
-			ofs << setw(10) << diffMatrix[i][j];
+			fileFast << setw(10) << diffMatrix[i][j];
 		}
-		ofs << endl;
+		fileFast << endl;
 	}
 
-
 #endif
+
 
 	store_pat_sizes(1000000);
 
