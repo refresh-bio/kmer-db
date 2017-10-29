@@ -283,16 +283,18 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 			break;
 		}
 	}
-
+	std::vector<size_t> threadMemory(n_threads, 0);
 
 	for (int tid = 0; tid < n_threads; ++tid) {
-		threads[tid] = std::thread([this, tid, n_threads, &ranges, sampleId, &new_pid, n_kmers]() {
+		threads[tid] = std::thread([this, tid, n_threads, &ranges, sampleId, &new_pid, n_kmers, &threadMemory]() {
 			threadPatterns[tid].clear();
 			threadPatterns[tid].reserve(n_kmers);
 
 			size_t lo = ranges[tid];
 			size_t hi = ranges[tid + 1];
 			
+			size_t mem = 0;
+
 			for (size_t i = lo; i < hi;) {
 				size_t j;
 				auto p_id = samplePatterns[i].first;
@@ -307,23 +309,21 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 
 				if (patterns[p_id].num_occ == pid_count && !patterns[p_id].last_subpattern->get_is_parrent()) {
 					// Wzorzec mozna po prostu rozszerzyæ, bo wszystkie wskazniki do niego beda rozszerzane (realokacja tablicy id próbek we wzorcu) 
-				//	mem_pattern_desc -= patterns[p_id].last_subpattern->getMem();
+					mem -= patterns[p_id].last_subpattern->getMem();
 					patterns[p_id].last_subpattern->expand(sampleId);
-				//	cout << "Expanding " << p_id << ": " << patterns[p_id].last_subpattern->toString() << endl;
-					//	mem_pattern_desc += patterns[p_id].last_subpattern->getMem();
+					mem += patterns[p_id].last_subpattern->getMem();
 				}
 				else
 				{
 					// Trzeba wygenerowaæ nowy wzorzec (podczepiony pod wzorzec macierzysty)
 					auto *pat = new subpattern_t<sample_id_t>(*(patterns[p_id].last_subpattern), sampleId);
-					//	mem_pattern_desc += pat->getMem();
+					mem += pat->getMem();
 
 					//	patterns.push_back(pattern_t{ (uint32_t)pid_count, pat });
 					pattern_id_t local_pid = new_pid.fetch_add(1);
 
 					threadPatterns[tid].emplace_back(local_pid, pattern_t<sample_id_t>{ (uint32_t)pid_count, pat });
-			//		cout << "Creating " << local_pid << ": " << threadPatterns[tid].back().second.last_subpattern->toString() << endl;
-
+		
 					if (p_id) {
 						patterns[p_id].num_occ -= pid_count;
 					}
@@ -336,12 +336,15 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 
 				i = j;
 			}
+
+			threadMemory[tid] = mem;
 		});
 	}
 
 
 	for (int tid = 0; tid < threads.size(); ++tid) {
 		threads[tid].join();
+		mem_pattern_desc += threadMemory[tid];
 	}
 
 	patterns.resize(new_pid);
@@ -417,4 +420,10 @@ std::map<std::vector<sample_id_t>, size_t> FastKmerDb::getPatternsStatistics() c
 	}
 
 	return out;
+}
+
+void FastKmerDb::savePatterns(std::ofstream& patternFile) {
+	for (const auto& p : patterns) {
+		patternFile << p.toString() << endl;
+	}
 }

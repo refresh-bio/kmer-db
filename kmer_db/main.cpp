@@ -195,9 +195,14 @@ int main(int argc, char **argv)
 		<< "Naive processing: " << naiveTime.count() << endl
 		<< "Fast processing: " << fastTime.count() << endl;
 
-	// compare naive and fast implementation
+	
+	std::ofstream patternsFile("kmer-db-patterns.txt");
+	fast_db.savePatterns(patternsFile);
+	patternsFile.close();
+
 
 #ifdef COMPARE
+	// compare naive and fast implementation
 	cout << "Comparing naive and fast implementations" << endl;
 	std::vector<sample_id_t> samples;
 	int i = 0;

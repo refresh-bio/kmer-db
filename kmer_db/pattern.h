@@ -208,6 +208,10 @@ public:
 	uint32_t num_occ;
 	subpattern_t<T> *last_subpattern;
 
+	std::string toString() const {
+		return last_subpattern->toString();
+	}
+
 	std::vector<T> toSamplesVector() const {
 		std::vector<T> samples;
 

@@ -5,6 +5,7 @@
 #include "Array.h"
 
 #include <map>
+#include <fstream>
 
 typedef uint16_t sample_id_t;
 typedef uint64_t kmer_t;
@@ -105,5 +106,7 @@ public:
 	virtual void calculateSimilarityMatrix(Array<uint32_t>& matrix) const;
 
 	std::map<std::vector<sample_id_t>, size_t> getPatternsStatistics() const;
+
+	void savePatterns(std::ofstream& patternFile);
 
 };

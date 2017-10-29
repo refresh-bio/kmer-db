@@ -143,9 +143,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Text Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="Array.h" />
     <ClInclude Include="hashmap_dh.h" />
     <ClInclude Include="hashmap_lp.h" />
