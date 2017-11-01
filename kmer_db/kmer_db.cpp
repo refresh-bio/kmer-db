@@ -155,10 +155,13 @@ std::map<std::vector<sample_id_t>, size_t> NaiveKmerDb::getPatternsStatistics() 
 FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1, (unsigned long long) - 2) {
 
 	mem_pattern_desc = 0;
+	patterns.reserve(1024);
 	patterns.push_back(pattern_t<sample_id_t>{ 0, new subpattern_t<sample_id_t>() });
 	
 	threadPatterns.resize(std::thread::hardware_concurrency());
-	
+	for (auto & tp : threadPatterns) {
+		tp.reserve(1024);
+	}
 }
 
 
@@ -345,6 +348,11 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 	for (int tid = 0; tid < threads.size(); ++tid) {
 		threads[tid].join();
 		mem_pattern_desc += threadMemory[tid];
+	}
+
+	// extend by 1.5 on reallocation
+	if (patterns.capacity() < new_pid) {
+		patterns.reserve(new_pid * 3 / 2);
 	}
 
 	patterns.resize(new_pid);

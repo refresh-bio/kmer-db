@@ -6,8 +6,8 @@ class subpattern_t {
 
 	bool is_parent;			// informacja czy wêze³ jest rodzicem innego, tzn. czy jakiœ wêze³ jest zapisany jako rozszerzenie bie¿¹cego [true]
 	bool is_child;				// informacja czy wêze³ jest zapisany jako rozszerzenie innego [true] czy te¿ wprost (lista id genomów) [false]
-	size_t num_samples;				// liczba id genomów w wêŸle
-	size_t num_locally_allocated;	// liczba slotów zaalokowanych w wêŸle
+	size_t num_samples;				// liczba id próbek w wêŸle i jego rodzicach
+	size_t num_local_samples;	// liczba id próbek w wêŸle
 	T* data;					// tablica id genomów
 	subpattern_t<T>* parent;		// wskaŸnik do wêz³a rodzica
 
@@ -28,9 +28,7 @@ public:
 	const T* get_data() const { return data; }
 
 	size_t get_num_samples() const { return num_samples; }
-	size_t get_num_local_samples() const {
-		return num_samples - (parent != nullptr ? parent->num_samples : 0);
-	}
+	size_t get_num_local_samples() const { return num_local_samples; }
 
 	const T& operator[](size_t i) const { return data[i]; }
 	T& operator[](size_t i) { return data[i]; }
@@ -40,7 +38,7 @@ public:
 	subpattern_t* get_parent() { return parent; }
 	const subpattern_t* get_parent() const { return parent; }
 
-	subpattern_t() : num_samples(0), num_locally_allocated(0), data(nullptr), is_parent(false), is_child(false), parent(nullptr)
+	subpattern_t() : num_samples(0), num_local_samples(0), data(nullptr), is_parent(false), is_child(false), parent(nullptr)
 	{
 	}
 
@@ -49,7 +47,7 @@ public:
 		is_parent = false;
 		is_child = false;
 		num_samples = 1;
-		num_locally_allocated = round_count(1);
+		num_local_samples = 1;
 		data = nullptr;
 		parent = nullptr;
 
@@ -60,6 +58,7 @@ public:
 	subpattern_t(subpattern_t &v, T x)
 	{
 		num_samples = v.num_samples + 1;
+		num_local_samples = 1;
 		data = nullptr;
 
 		if (v.num_samples == 0)
@@ -77,8 +76,7 @@ public:
 			parent = &v;
 		}
 
-		num_locally_allocated = round_count(1);
-		data = new T[num_locally_allocated];	
+		data = new T[round_count(1)];
 		data[0] = x;
 	}
 
@@ -146,9 +144,7 @@ public:
 		if (v.parent != parent)
 			return false;
 
-		size_t to_compare = get_num_local_samples();
-
-		for (size_t i = 0; i < to_compare; ++i)
+		for (size_t i = 0; i < num_local_samples; ++i)
 			if (data[i] != v.data[i])
 				return false;
 
@@ -159,22 +155,22 @@ public:
 	void expand(const T x)
 	{
 		++num_samples;
-		size_t to_alloc = get_num_local_samples();
-
+		
 		// if no space left - reallocate and copy existing ids 
-		if (to_alloc > num_locally_allocated) {
+		if (num_local_samples + 1 > round_count(num_local_samples)) {
 			T* old_data = data;
-			num_locally_allocated = round_count(to_alloc);
-			data = new T[num_locally_allocated];
+		
+			data = new T[round_count(num_local_samples + 1)];
 			
-			for (int i = 0; i < to_alloc - 1; ++i) {
+			for (int i = 0; i < num_local_samples; ++i) {
 				data[i] = old_data[i];
 			}
 			
 			delete[] old_data;
 		}
 
-		data[to_alloc - 1] = x;
+		++num_local_samples;
+		data[num_local_samples - 1] = x;
 	}
 
 	size_t getMem(void)
@@ -182,7 +178,7 @@ public:
 		size_t r;
 
 		r = sizeof(subpattern_t);
-		r += sizeof(T) * num_locally_allocated;
+		r += sizeof(T) * round_count(num_local_samples);
 
 		return r;
 	}
@@ -193,7 +189,7 @@ public:
 			out += parent->toString() + " | ";
 		}
 		
-		for (int i = 0; i< get_num_local_samples(); ++i) {
+		for (int i = 0; i< num_local_samples; ++i) {
 			out += std::to_string(data[i]) + ", ";
 		}
 		return out;

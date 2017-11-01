@@ -18,7 +18,7 @@
 
 using namespace std;
 
-//#define COMPARE
+#define COMPARE
 
 #ifndef WIN32
 #include <parallel/algorithm>
@@ -33,6 +33,28 @@ vector<uint32_t> pat_sizes;						// rozmiar wzorca -> liczba wyst wzorcow z taki
 bool load_file_list(string file_list);
 void show_progress(const AbstractKmerDb &db);
 void store_pat_sizes(int num);
+
+
+std::string formatLargeNumber(uint64_t num) {
+	std::string out = "";
+
+	do {
+		uint64_t part = num % 1000LL;
+		num = num / 1000LL;
+
+		if (num > 0) {
+			ostringstream oss;
+			oss << "," << setw(3) << setfill('0') << part;
+			out = oss.str() + out;
+		}
+		else {
+			out = std::to_string(part) + out;
+		}
+
+	} while (num > 0);
+
+	return out;
+}
 
 // Wczytuje plik zawierajacy liste baz KMC do przetworzenia
 bool load_file_list(const string& file_list, vector<string>& kmc_file_list)
@@ -62,6 +84,7 @@ bool load_file_list(const string& file_list, vector<string>& kmc_file_list)
 }
 
 
+
 // Pokazuje stan
 void show_progress(const AbstractKmerDb &db)
 {
@@ -70,9 +93,9 @@ void show_progress(const AbstractKmerDb &db)
 
 	cout << "dict= " << db.getKmersCount()
 		<< " (" << db.getKmersCount() * 2 * sizeof(uint64_t) / (1ull << 20) << " MB)   "
-		<< "patterns= " << db.getPatternsCount()
-		<< " patterns mem= " << db.getPatternMem() / 1000000 << "MB"
-		<< " ht mem= " << db.getHashtableMem() / 1000000 << "MB"
+		<< "\t patterns= " << db.getPatternsCount()
+		<< "\t patterns mem= " << formatLargeNumber(db.getPatternMem()) 
+		<< "\t ht mem= " << formatLargeNumber(db.getHashtableMem())
 		<< endl;
 
 	fflush(stdout);
@@ -120,7 +143,7 @@ int main(int argc, char **argv)
 	NaiveKmerDb naive_db;
 	
 	pat_sizes.resize(kmc_file_list.size() + 1, 0);
-	//kmc_file_list.resize(50);
+	kmc_file_list.resize(50);
 
 	std::chrono::duration<double> loadingTime, naiveTime, fastTime;
 
