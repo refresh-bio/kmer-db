@@ -72,22 +72,12 @@ public:
 
 
 class FastKmerDb : public AbstractKmerDb {
-protected:
-	size_t mem_pattern_desc;		// iloœæ pamiêci zajmowana przez wszystkie wzorce
-	
-	// K-mer database structures
-	hash_map_dh<kmer_t, pattern_id_t> kmers2patternIds;
-
-	// liczba wystapien wzorca w kmer_dict, wektor id osobnikow zawierajacych k - mer)
-	std::vector<pattern_t<sample_id_t>> patterns;		
-
-	std::vector<std::vector<std::pair<pattern_id_t, pattern_t<sample_id_t>>>> threadPatterns;
-
-	// first element - pattern id, second element 
-	std::vector<std::pair<pattern_id_t, pattern_id_t*>> samplePatterns;
-
-	
 public:
+
+	std::chrono::duration<double> hashtableFindTime;
+	std::chrono::duration<double> hashtableAddTime;
+	std::chrono::duration<double> sortTime;
+	std::chrono::duration<double> extensionTime;
 
 	FastKmerDb();
 
@@ -95,7 +85,7 @@ public:
 
 	virtual const size_t getPatternsCount() const { return patterns.size(); }
 
-	virtual const size_t getPatternMem() const { return mem_pattern_desc; }
+	virtual const size_t getPatternMem() const { return patternBytes; }
 
 	virtual const size_t getHashtableMem() const { return kmers2patternIds.getMem(); };
 
@@ -105,8 +95,23 @@ public:
 
 	virtual void calculateSimilarityMatrix(Array<uint32_t>& matrix) const;
 
-	std::map<std::vector<sample_id_t>, size_t> getPatternsStatistics() const;
+//	std::map<std::vector<sample_id_t>, size_t> getPatternsStatistics() const;
 
-	void savePatterns(std::ofstream& patternFile);
+//	void savePatterns(std::ofstream& patternFile);
+
+protected:
+	size_t patternBytes;		// iloœæ pamiêci zajmowana przez wszystkie wzorce
+
+
+									// K-mer database structures
+	hash_map_dh<kmer_t, pattern_id_t> kmers2patternIds;
+
+	// liczba wystapien wzorca w kmer_dict, wektor id osobnikow zawierajacych k - mer)
+	std::vector<pattern_t<sample_id_t>> patterns;
+
+	std::vector<std::vector<std::pair<pattern_id_t, pattern_t<sample_id_t>>>> threadPatterns;
+
+	// first element - pattern id, second element 
+	std::vector<std::pair<pattern_id_t, pattern_id_t*>> samplePatterns;
 
 };

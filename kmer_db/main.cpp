@@ -128,6 +128,7 @@ void store_pat_sizes(int num)
 
 int main(int argc, char **argv)
 {
+
 	vector<string> kmc_file_list;
 	
 	if (argc < 2)
@@ -218,9 +219,16 @@ int main(int argc, char **argv)
 		<< "Naive processing: " << naiveTime.count() << endl
 		<< "Fast processing: " << fastTime.count() << endl;
 
+
+	cout << "DETAILED RESULTS:" << endl
+		<< "Hashtable find: " << fast_db.hashtableFindTime.count() << endl
+		<< "Hashatable add: " << fast_db.hashtableAddTime.count() << endl
+		<< "Sort time: " << fast_db.sortTime.count() << endl
+		<< "Pattern extension time: " << fast_db.extensionTime.count() << endl;
+
 	
 	std::ofstream patternsFile("kmer-db-patterns.txt");
-	fast_db.savePatterns(patternsFile);
+//	fast_db.savePatterns(patternsFile);
 	patternsFile.close();
 
 
@@ -272,7 +280,7 @@ int main(int argc, char **argv)
 	}
 
 
-
+/*
 	std::ofstream fileFast("d:/kmer-fast.txt");
 
 	fileFast << endl << "FAST:" << endl << endl << "Distance matrix:" << endl;
@@ -303,6 +311,8 @@ int main(int argc, char **argv)
 		}
 		fileFast << endl;
 	}
+
+	*/
 
 #endif
 
