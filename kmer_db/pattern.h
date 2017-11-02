@@ -4,14 +4,15 @@
 template<typename T>
 class subpattern_t {
 
-	bool is_parent;			// informacja czy wêze³ jest rodzicem innego, tzn. czy jakiœ wêze³ jest zapisany jako rozszerzenie bie¿¹cego [true]
-	bool is_child;				// informacja czy wêze³ jest zapisany jako rozszerzenie innego [true] czy te¿ wprost (lista id genomów) [false]
-	size_t num_samples;				// liczba id próbek w wêŸle i jego rodzicach
-	size_t num_local_samples;	// liczba id próbek w wêŸle
-	T* data;					// tablica id genomów
+	
+	uint16_t is_parent;			// informacja czy wêze³ jest rodzicem innego, tzn. czy jakiœ wêze³ jest zapisany jako rozszerzenie bie¿¹cego [true]
+	uint16_t is_child;			// informacja czy wêze³ jest zapisany jako rozszerzenie innego [true] czy te¿ wprost (lista id genomów) [false]
+	T num_samples;				// liczba id próbek w wêŸle i jego rodzicach (nie mo¿e byæ wiêksza od id próbki)
+	T num_local_samples;		// liczba id próbek w wêŸle (nie mo¿e byæ wiêksza od id próbki)
+	T* data;					// tablica id próbek
 	subpattern_t<T>* parent;		// wskaŸnik do wêz³a rodzica
-
-								
+	
+							
 	size_t round_count(size_t count)
 	{
 		size_t bytes = sizeof(T) * count;
