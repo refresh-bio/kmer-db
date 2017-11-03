@@ -23,9 +23,12 @@
 
 using namespace std;
 
+const size_t FastKmerDb::ioBufferBytes = (2 << 29); //512MB buffer 
+//const size_t FastKmerDb::ioBufferBytes = 16000000; //16MB buffer 
+
 /****************************************************************************************************************************************************/
 
-bool AbstractKmerDb::extractKmers(const string &filename, std::vector<kmer_t>& kmers) {
+bool AbstractKmerDb::loadKmers(const string &filename, std::vector<kmer_t>& kmers) {
 	CKMCFile kmc_file;
 	uint32_t counter;
 
@@ -101,7 +104,7 @@ void NaiveKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmer
 			patterns[*patternId].push_back(sampleId);
 		}
 
-		mem_pattern_desc += sizeof(sample_id_t);
+		patternBytes += sizeof(sample_id_t);
 	}
 }
 
@@ -320,7 +323,7 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 				}
 				size_t pid_count = j - i;
 
-				if (patterns[p_id].num_kmers == pid_count && !patterns[p_id].get_is_parrent()) {
+				if (patterns[p_id].get_num_kmers() == pid_count && !patterns[p_id].get_is_parrent()) {
 					// Wzorzec mozna po prostu rozszerzyæ, bo wszystkie wskazniki do niego beda rozszerzane (realokacja tablicy id próbek we wzorcu) 
 					mem -= patterns[p_id].get_bytes();
 					patterns[p_id].expand(sampleId);
@@ -339,7 +342,7 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 					mem += threadPatterns[tid].back().second.get_bytes();
 		
 					if (p_id) {
-						patterns[p_id].num_kmers -= pid_count;
+						patterns[p_id].set_num_kmers(patterns[p_id].get_num_kmers() - pid_count);
 					}
 
 					for (size_t k = i; k < j; ++k) {
@@ -406,51 +409,134 @@ void FastKmerDb::mapKmers2Samples(uint64_t kmer, std::vector<sample_id_t>& sampl
 }
 
 
+
+void FastKmerDb::serialize(std::ofstream& file) const {
+	// store hashmap
+	size_t elements = kmers2patternIds.get_size();
+	file.write(reinterpret_cast<char*>(&elements), sizeof(elements));
+
+	size_t numHastableElements = ioBufferBytes / sizeof(hash_map_dh<kmer_t, pattern_id_t>::item_t);
+	std::vector <hash_map_dh<kmer_t, pattern_id_t>::item_t> hastableBuffer(numHastableElements);
+
+	char* buffer = reinterpret_cast<char*>(hastableBuffer.data());
+
+	// write ht elements in portions
+	size_t bufpos = 0;
+	for (auto it = kmers2patternIds.cbegin(); it < kmers2patternIds.cend(); ++it) {
+		if (kmers2patternIds.is_free(*it)) {
+			continue;
+		}
+
+		hastableBuffer[bufpos++] = *it;
+		if (bufpos == numHastableElements) {
+			file.write(reinterpret_cast<char*>(&bufpos), sizeof(size_t));
+			file.write(buffer, bufpos * sizeof(hash_map_dh<kmer_t, pattern_id_t>::item_t));
+			bufpos = 0;
+		}
+	}
+	// write remaining ht elements
+	file.write(reinterpret_cast<char*>(&bufpos), sizeof(size_t));
+	file.write(buffer, bufpos * sizeof(hash_map_dh<kmer_t, pattern_id_t>::item_t));
+	
+	// write patterns in portions
+	elements = patterns.size();
+	file.write(reinterpret_cast<char*>(&elements), sizeof(elements));
+	
+	char * currentPtr = buffer;
+	for (int pid = 0; pid < patterns.size(); ++pid) {
+		if (currentPtr + patterns[pid].get_bytes() > buffer + ioBufferBytes) {
+			size_t blockSize = currentPtr - buffer;
+			file.write(reinterpret_cast<char*>(&blockSize), sizeof(size_t)); // write size of block to facilitate deserialization
+			file.write(buffer, blockSize);
+			currentPtr = buffer;
+		}
+
+		currentPtr = patterns[pid].pack(currentPtr);
+	}
+
+	// write remaining patterns
+	size_t blockSize = currentPtr - buffer;
+	file.write(reinterpret_cast<char*>(&blockSize), sizeof(size_t)); // write size of block to facilitate deserialization
+	file.write(buffer, blockSize);
+}
+
+
+
+void FastKmerDb::deserialize(std::ifstream& file) {
+	
+	size_t elements = kmers2patternIds.get_size();
+	file.read(reinterpret_cast<char*>(&elements), sizeof(elements));
+
+	kmers2patternIds.clear();
+	kmers2patternIds.reserve_for_additional(elements);
+
+	size_t numHastableElements = ioBufferBytes / sizeof(hash_map_dh<kmer_t, pattern_id_t>::item_t);
+	std::vector <hash_map_dh<kmer_t, pattern_id_t>::item_t> hastableBuffer(numHastableElements);
+	char* buffer = reinterpret_cast<char*>(hastableBuffer.data());
+
+	size_t readCount = 0;
+	while (readCount < elements) {
+		size_t portion = 0;
+		file.read(reinterpret_cast<char*>(&portion), sizeof(size_t));
+		file.read(buffer, portion * sizeof(hash_map_dh<kmer_t, pattern_id_t>::item_t));
+
+		for (size_t j = 0; j < portion; ++j) {
+			kmers2patternIds.insert(hastableBuffer[j].key, hastableBuffer[j].val);
+		}
+		readCount += portion;
+	}
+
+	// load patterns
+	file.read(reinterpret_cast<char*>(&elements), sizeof(elements));
+	patterns.clear();
+	patterns.resize(elements);
+	
+	size_t pid = 0;
+	while (pid < patterns.size()) {
+		size_t blockSize;
+		file.read(reinterpret_cast<char*>(&blockSize), sizeof(size_t));
+		file.read(buffer, blockSize);
+
+		char * currentPtr = buffer;
+		while (currentPtr < buffer + blockSize) {
+			currentPtr = patterns[pid].unpack(currentPtr);
+			++pid;
+		}
+	}
+}
+
+
 void FastKmerDb::calculateSimilarityMatrix(Array<uint32_t>& matrix) const {
-/*	matrix.resize(numSamples, numSamples);
+	matrix.resize(numSamples, numSamples);
 	matrix.clear();
 
-	for (const auto& pattern : patterns) {
-		auto subpattern = pattern.last_subpattern;
-
+	for (int pid = 1; pid < patterns.size(); ++pid) {
+		const auto& pattern = patterns[pid];
+			
 		// iterate over subpatterns
-		while (subpattern) {
+		int64_t major_id = pid;
+		while (major_id >= 0) {
+			const auto& major = patterns[major_id];
 			// iterate over elements in the subpattern
-			for (int i = subpattern->get_num_local_samples() - 1; i >= 0 ; --i) {
-				sample_id_t Si = subpattern->get_data()[i];
+			for (int i = major.get_num_local_samples() - 1; i >= 0 ; --i) {
+				sample_id_t Si = major.get_data()[i];
 				
 				// accumulate number of common kmers for elements in the current subpattern and all its parrents
-				auto temp = subpattern;
-				while (temp) {
-					for (int j = (temp == subpattern ? i - 1 : temp->get_num_local_samples() - 1); j >= 0; --j) {
-						sample_id_t Sj = temp->get_data()[j];
-						matrix[Si][Sj] += pattern.num_occ;
-						matrix[Sj][Si] += pattern.num_occ;
+				int64_t minor_id = major_id;
+				while (minor_id >= 0) {
+					const auto& minor = patterns[minor_id];
+					for (int j = (minor_id == major_id ? i - 1 : minor.get_num_local_samples() - 1); j >= 0; --j) {
+						sample_id_t Sj = minor.get_data()[j];
+						matrix[Si][Sj] += pattern.get_num_kmers();
+						matrix[Sj][Si] += pattern.get_num_kmers();
 					}
 
-					temp = temp->get_parent();
+					minor_id = minor.get_parent_id();
 				}
 			}
 			
-			subpattern = subpattern->get_parent();
+			major_id = major.get_parent_id();
 		}
 	}
-	*/
+	
 }
-/*
-std::map<std::vector<sample_id_t>, size_t> FastKmerDb::getPatternsStatistics() const {
-	std::map <std::vector<sample_id_t>, size_t> out;
-
-	for (const auto& pattern : patterns) {
-		out[pattern.toSamplesVector()] += pattern.num_occ;
-	}
-
-	return out;
-}
-
-void FastKmerDb::savePatterns(std::ofstream& patternFile) {
-	for (const auto& p : patterns) {
-		patternFile << p.toString() << endl;
-	}
-}
-*/

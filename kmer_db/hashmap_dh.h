@@ -49,11 +49,13 @@ inline size_t my_hasher_dh2<uint32_t>(uint32_t x)
 
 template <typename Key, typename Value>
 class hash_map_dh {
+public:
 	typedef struct {
 		Key key;
 		Value val;
 	} item_t;
 
+private:
 	Key empty_key;
 	Key erased_key;
 	double max_fill_factor;
@@ -140,7 +142,7 @@ public:
 			delete[] data;
 	}
 
-	size_t getMem() const {
+	size_t get_bytes() const {
 		return ht_memory;
 	}
 

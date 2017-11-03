@@ -6,10 +6,12 @@
 
 #include <map>
 #include <fstream>
+#include <chrono>
+#include <vector>
 
 typedef uint16_t sample_id_t;
 typedef uint64_t kmer_t;
-typedef uint64_t pattern_id_t;
+typedef int64_t pattern_id_t;
 
 
 class AbstractKmerDb {
@@ -26,11 +28,13 @@ public:
 
 	virtual const size_t getPatternsCount() const = 0;
 
-	virtual const size_t getPatternMem() const = 0;
+	virtual const size_t getPatternBytes() const = 0;
 
-	virtual const size_t getHashtableMem() const = 0;
+	virtual const size_t getHashtableBytes() const = 0;
 
-	virtual bool extractKmers(const std::string &filename, std::vector<kmer_t>& kmers);
+	virtual std::vector<kmer_t> getKmers() const = 0;
+
+	virtual bool loadKmers(const std::string &filename, std::vector<kmer_t>& kmers);
 
 	virtual void addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers) { ++numSamples; }
 
@@ -42,24 +46,29 @@ public:
 
 class NaiveKmerDb : public AbstractKmerDb {
 public:
-	size_t mem_pattern_desc = 0;		// iloœæ pamiêci zajmowana przez wszystkie wzorce
-	
-	hash_map<kmer_t, pattern_id_t> kmers2patternIds;
-
-	std::vector<std::vector<sample_id_t>> patterns;
-
-public:
 	NaiveKmerDb() : kmers2patternIds((unsigned long long) - 1, (unsigned long long) - 2) {
-		mem_pattern_desc = 0;
+		patternBytes = 0;
 	}
 
 	virtual const size_t getKmersCount() const { return kmers2patternIds.get_size(); }
 
 	virtual const size_t getPatternsCount() const { return kmers2patternIds.get_size(); }
 
-	virtual const size_t getPatternMem() const { return mem_pattern_desc; }
+	virtual const size_t getPatternBytes() const { return patternBytes; }
 
-	virtual const size_t getHashtableMem() const { return kmers2patternIds.getMem(); }
+	virtual const size_t getHashtableBytes() const { return kmers2patternIds.get_bytes(); }
+
+	virtual std::vector<kmer_t> getKmers() const {
+		std::vector<kmer_t> kmers(kmers2patternIds.get_size());
+		size_t i = 0;
+		for (auto it = kmers2patternIds.cbegin(); it < kmers2patternIds.cend(); ++it) {
+			if (kmers2patternIds.is_free(*it)) {
+				continue;
+			}
+			kmers[i++] = it->key;
+		}
+		return kmers;
+	}
 
 	virtual void addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers);
 
@@ -68,6 +77,13 @@ public:
 	virtual void calculateSimilarityMatrix(Array<uint32_t>& matrix) const;
 
 	std::map<std::vector<sample_id_t>, size_t> getPatternsStatistics() const;
+
+protected:
+	size_t patternBytes;		// iloœæ pamiêci zajmowana przez wszystkie wzorce
+
+	hash_map<kmer_t, pattern_id_t> kmers2patternIds;
+
+	std::vector<std::vector<sample_id_t>> patterns;
 };
 
 
@@ -85,9 +101,21 @@ public:
 
 	virtual const size_t getPatternsCount() const { return patterns.size(); }
 
-	virtual const size_t getPatternMem() const { return patternBytes; }
+	virtual const size_t getPatternBytes() const { return patternBytes; }
 
-	virtual const size_t getHashtableMem() const { return kmers2patternIds.getMem(); };
+	virtual const size_t getHashtableBytes() const { return kmers2patternIds.get_bytes(); };
+
+	virtual std::vector<kmer_t> getKmers() const {
+		std::vector<kmer_t> kmers(kmers2patternIds.get_size());
+		size_t i = 0;
+		for (auto it = kmers2patternIds.cbegin(); it < kmers2patternIds.cend(); ++it) {
+			if (kmers2patternIds.is_free(*it)) {
+				continue;
+			}
+			kmers[i++] = it->key;
+		}
+		return kmers;
+	}
 
 	virtual void addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers);
 
@@ -95,15 +123,15 @@ public:
 
 	virtual void calculateSimilarityMatrix(Array<uint32_t>& matrix) const;
 
-//	std::map<std::vector<sample_id_t>, size_t> getPatternsStatistics() const;
+	virtual void serialize(std::ofstream& file) const;
 
-//	void savePatterns(std::ofstream& patternFile);
+	virtual void deserialize(std::ifstream& file);
 
 protected:
-	size_t patternBytes;		// iloœæ pamiêci zajmowana przez wszystkie wzorce
-
-
-									// K-mer database structures
+	static const size_t ioBufferBytes;
+	
+	size_t patternBytes;		// iloœæ pamiêci zajmowana przez wBuszystkie wzorce
+								// K-mer database structures
 	hash_map_dh<kmer_t, pattern_id_t> kmers2patternIds;
 
 	// liczba wystapien wzorca w kmer_dict, wektor id osobnikow zawierajacych k - mer)

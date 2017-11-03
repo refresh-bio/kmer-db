@@ -34,6 +34,9 @@
     <ClInclude Include="Array.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="tests.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="kmer_db.cpp">
@@ -49,6 +52,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

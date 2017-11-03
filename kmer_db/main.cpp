@@ -18,13 +18,14 @@
 
 using namespace std;
 
-#define COMPARE
+//#define COMPARE
 
 #ifndef WIN32
 #include <parallel/algorithm>
 #endif
 
 #include "kmer_db.h"
+#include "tests.h"
 
 //map<uint32_t, uint32_t> pat_sizes;			// (rozmiar wzorca, liczba wyst wzorcow z takim rozmiarem)
 vector<uint32_t> pat_sizes;						// rozmiar wzorca -> liczba wyst wzorcow z takim rozmiarem
@@ -91,11 +92,11 @@ void show_progress(const AbstractKmerDb &db)
 	size_t tot_pat_size = 0;
 	size_t num_calc = 0;			// Liczba operacji przy wyznaczaniu macierzy podobieñstwa
 
-	cout << "dict= " << db.getKmersCount()
+	cout << "dict= " << formatLargeNumber(db.getKmersCount())
 		<< " (" << db.getKmersCount() * 2 * sizeof(uint64_t) / (1ull << 20) << " MB)   "
-		<< "\t patterns= " << db.getPatternsCount()
-		<< "\t patterns mem= " << formatLargeNumber(db.getPatternMem()) 
-		<< "\t ht mem= " << formatLargeNumber(db.getHashtableMem())
+		<< "\t patterns= " << formatLargeNumber(db.getPatternsCount())
+		<< "\t patterns mem= " << formatLargeNumber(db.getPatternBytes()) 
+		<< "\t ht mem= " << formatLargeNumber(db.getHashtableBytes())
 		<< endl;
 
 	fflush(stdout);
@@ -144,7 +145,7 @@ int main(int argc, char **argv)
 	NaiveKmerDb naive_db;
 	
 	pat_sizes.resize(kmc_file_list.size() + 1, 0);
-	kmc_file_list.resize(50);
+	//kmc_file_list.resize(50);
 
 	std::chrono::duration<double> loadingTime, naiveTime, fastTime;
 
@@ -167,7 +168,7 @@ int main(int argc, char **argv)
 				if (file_id < kmc_file_list.size()) {
 					std::ostringstream oss;
 					oss << kmc_file_list[file_id] << " (" << file_id + 1 << "/" << kmc_file_list.size() << ")...";
-					if (!fast_db.extractKmers(kmc_file_list[file_id], kmersCollections[tid])) {
+					if (!fast_db.loadKmers(kmc_file_list[file_id], kmersCollections[tid])) {
 						oss << "Error processing sample" << endl;
 					}
 					else {
@@ -226,93 +227,22 @@ int main(int argc, char **argv)
 		<< "Sort time: " << fast_db.sortTime.count() << endl
 		<< "Pattern extension time: " << fast_db.extensionTime.count() << endl;
 
-	
-	std::ofstream patternsFile("kmer-db-patterns.txt");
-//	fast_db.savePatterns(patternsFile);
-	patternsFile.close();
+
+	std::ofstream ofs("kmer.db", std::ios::binary);
+	fast_db.serialize(ofs);
+	ofs.close();
+
+	//Tests::testSerialization(fast_db);
+	//Tests::testDistanceMatrix(fast_db, "d:/distances-fast.txt");
 
 
 #ifdef COMPARE
 	// compare naive and fast implementation
-	cout << "Comparing naive and fast implementations" << endl;
-	std::vector<sample_id_t> samples;
-	int i = 0;
+	cout << "NAIVE COMPARISON" << endl;
 
-	for (auto it = naive_db.kmers2patternIds.begin(); it < naive_db.kmers2patternIds.end(); ++it, ++i) {
-		
-		if (naive_db.kmers2patternIds.is_free(*it)) {
-			continue;
-		}
-		
-		auto patternId = it->val;
-		auto& naiveSamples = naive_db.patterns[patternId];
-		
-		fast_db.mapKmers2Samples(it->key, samples);
-
-		bool eq = std::equal(naiveSamples.begin(), naiveSamples.end(), samples.begin(), samples.end());
-
-		if (!eq) {
-			cout << "k-mer: " << it->key << endl;
-
-		}
-
-	}
-	cout << "done" << endl;
-
-	std::ofstream fileNaive("d:/kmer-naive.txt");
+	Tests::comparePatterns(naive_db, fast_db, naive_db.getKmers());
+	Tests::testDistanceMatrix(fast_db, "d:/distances-naive.txt");
 	
-	fileNaive << endl << "NAIVE" << endl << endl << "Distance matrix:" << endl;
-	Array<uint32_t> naiveMatrix;
-	naive_db.calculateSimilarityMatrix(naiveMatrix);
-	for (int i = 0; i < naiveMatrix.size(); ++i) {
-		for (int j = 0; j < naiveMatrix.size(); ++j) {
-			fileNaive << setw(10) << naiveMatrix[i][j];
-		}
-		fileNaive << endl;
-	}
-
-	fileNaive << endl << "Histogram: " << endl;
-	auto stats = naive_db.getPatternsStatistics();
-	for (auto s : stats) {
-		fileNaive << setw(10) << s.second << ": ";
-		copy(s.first.begin(), s.first.end(), ostream_iterator<sample_id_t>(fileNaive, ","));
-		fileNaive << endl;
-	}
-
-
-/*
-	std::ofstream fileFast("d:/kmer-fast.txt");
-
-	fileFast << endl << "FAST:" << endl << endl << "Distance matrix:" << endl;
-
-	Array<uint32_t> fastMatrix;
-	fast_db.calculateSimilarityMatrix(fastMatrix);
-	for (int i = 0; i < fastMatrix.size(); ++i) {
-		for (int j = 0; j < fastMatrix.size(); ++j) {
-			fileFast << setw(10) << fastMatrix[i][j];
-		}
-		fileFast << endl;
-	}
-
-	fileFast << endl << "Histogram: " << endl;
-	auto statsFast = fast_db.getPatternsStatistics();
-	for (auto s : statsFast) {
-		fileFast << setw(10) << s.second << ": ";
-		copy(s.first.begin(), s.first.end(), ostream_iterator<sample_id_t>(fileFast, ","));
-		fileFast << endl;
-	}
-
-
-	fileFast << endl << "DIFF:" << endl;
-	Array<uint32_t> diffMatrix = fastMatrix - naiveMatrix;
-	for (int i = 0; i < diffMatrix.size(); ++i) {
-		for (int j = 0; j < diffMatrix.size(); ++j) {
-			fileFast << setw(10) << diffMatrix[i][j];
-		}
-		fileFast << endl;
-	}
-
-	*/
 
 #endif
 

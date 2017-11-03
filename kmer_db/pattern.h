@@ -1,19 +1,21 @@
 #pragma once
-
+#include <cstdint>
 
 template<typename T>
 class pattern_t {
 private:
-	bool is_parent;			// informacja czy wêze³ jest rodzicem innego, tzn. czy jakiœ wêze³ jest zapisany jako rozszerzenie bie¿¹cego [true]
 
-	T num_samples;				// liczba id próbek w wêŸle i jego rodzicach (nie mo¿e byæ wiêksza od id próbki)
-	T num_local_samples;		// liczba id próbek w wêŸle (nie mo¿e byæ wiêksza od id próbki)	
-	T* data;					// tablica id próbek
-
+	int64_t num_kmers;			// number of kmers with this pattern
 	int64_t parent_id;				// parrent pattern id
 
-							
-	size_t round_count(size_t count)
+	T* data;					// tablica id próbek
+	
+	T num_samples;				// liczba id próbek w wêŸle i jego rodzicach (nie mo¿e byæ wiêksza od id próbki)
+	T num_local_samples;		// liczba id próbek w wêŸle (nie mo¿e byæ wiêksza od id próbki)	
+	
+	bool is_parent;			// informacja czy wêze³ jest rodzicem innego, tzn. czy jakiœ wêze³ jest zapisany jako rozszerzenie bie¿¹cego [true]
+
+	size_t round_count(size_t count) const
 	{
 		size_t bytes = sizeof(T) * count;
 
@@ -26,13 +28,13 @@ private:
 
 public:
 
-	uint64_t num_kmers;			// number of kmers with this pattern
-
-
 	const T* get_data() const { return data; }
 
-	size_t get_num_samples() const { return num_samples; }
-	size_t get_num_local_samples() const { return num_local_samples; }
+	int64_t get_num_kmers() const { return num_kmers; }
+	void set_num_kmers(int64_t v) { num_kmers = v; }
+
+	T get_num_samples() const { return num_samples; }
+	T get_num_local_samples() const { return num_local_samples; }
 
 	const T& operator[](size_t i) const { return data[i]; }
 	T& operator[](size_t i) { return data[i]; }
@@ -153,7 +155,7 @@ public:
 		data[num_local_samples - 1] = x;
 	}
 
-	size_t get_bytes(void)
+	size_t get_bytes(void) const
 	{
 		size_t r;
 
@@ -163,50 +165,65 @@ public:
 		return r;
 	}
 
-	std::string toString() const {
-		std::string out;
-		if (parent) {
-			out += parent->toString() + " | ";
+	
+	char* pack(char* buffer) const {
+		// store members
+		*reinterpret_cast<decltype(num_kmers)*>(buffer) = num_kmers;
+		buffer += sizeof(decltype(num_kmers));
+
+		*reinterpret_cast<decltype(parent_id)*>(buffer) = parent_id;
+		buffer += sizeof(decltype(parent_id));
+
+		*reinterpret_cast<decltype(is_parent)*>(buffer) = is_parent;
+		buffer += sizeof(decltype(is_parent));
+
+		*reinterpret_cast<decltype(num_samples)*>(buffer) = num_samples;
+		buffer += sizeof(decltype(num_samples));
+
+		*reinterpret_cast<decltype(num_local_samples)*>(buffer) = num_local_samples;
+		buffer += sizeof(decltype(num_local_samples));
+		
+		T* samples = reinterpret_cast<T*>(buffer);
+		for (int i = 0; i < num_local_samples; ++i) {
+			samples[i] = data[i];
+		}
+
+		buffer += num_local_samples * sizeof(T);
+
+		return buffer;
+	}
+
+	char * unpack(char* buffer) {
+		if (num_local_samples) {
+			delete[] data;
 		}
 		
-		for (int i = 0; i< num_local_samples; ++i) {
-			out += std::to_string(data[i]) + ", ";
+		num_kmers = *reinterpret_cast<decltype(num_kmers)*>(buffer);
+		buffer += sizeof(decltype(num_kmers));
+
+		parent_id = *reinterpret_cast<decltype(parent_id)*>(buffer);
+		buffer += sizeof(decltype(parent_id));
+
+		is_parent = *reinterpret_cast<decltype(is_parent)*>(buffer);
+		buffer += sizeof(decltype(is_parent));
+
+		num_samples = *reinterpret_cast<decltype(num_samples)*>(buffer);
+		buffer += sizeof(decltype(num_samples));
+
+		num_local_samples = *reinterpret_cast<decltype(num_local_samples)*>(buffer);
+		buffer += sizeof(decltype(num_local_samples));
+		
+		data = new T[round_count(num_local_samples)];
+
+		sample_id_t* samples = reinterpret_cast<sample_id_t*>(buffer);
+		for (int i = 0; i < num_local_samples; ++i) {
+			data[i] = samples[i];
 		}
-		return out;
-	}
-};
 
+		buffer += num_local_samples * sizeof(T);
 
-/*
-template <class T>
-class pattern_t
-{
-public:
-	uint32_t num_occ;
-	subpattern_t<T> *last_subpattern;
-
-	std::string toString() const {
-		return last_subpattern->toString();
-	}
-
-	std::vector<T> toSamplesVector() const {
-		std::vector<T> samples;
-
-		auto subpattern = last_subpattern;
-		samples.resize(subpattern->get_num_samples());
-		int j = samples.size() - 1;
-
-		// collect in reversed order
-		do {
-			for (int i = subpattern->get_num_local_samples() - 1; i >= 0; --i, --j) {
-				samples[j] = (*subpattern)[i];
-			}
-			subpattern = subpattern->get_parent();
-
-		} while (subpattern != nullptr);
-
-		return samples;
+		return buffer;
 	}
 
 };
-*/
+
