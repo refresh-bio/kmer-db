@@ -20,7 +20,9 @@ using namespace std;
 
 //#define COMPARE
 
-#ifndef WIN32
+#ifdef WIN32
+#include <ppl.h>
+#else
 #include <parallel/algorithm>
 #endif
 

@@ -14,7 +14,9 @@
 #include <mutex>
 #include <atomic>
 
-#ifndef WIN32
+#ifdef WIN32
+#include <ppl.h>
+#else
 #include <parallel/algorithm>
 #endif
 
@@ -350,7 +352,7 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 	};
 		
 #ifdef WIN32
-	sort(samplePatterns.begin(), samplePatterns.end(), pid_comparer);
+	concurrency::parallel_sort(samplePatterns.begin(), samplePatterns.end(), pid_comparer);
 #else
 	__gnu_parallel::sort(samplePatterns.begin(), samplePatterns.end(), pid_comparer);
 #endif
