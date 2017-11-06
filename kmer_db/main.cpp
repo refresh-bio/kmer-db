@@ -14,7 +14,6 @@
 #include <sstream>
 #include <iomanip>
 #include <fstream>
-#include <iterator>
 
 using namespace std;
 
@@ -25,7 +24,6 @@ using namespace std;
 #endif
 
 #include "kmer_db.h"
-#include "tests.h"
 
 //map<uint32_t, uint32_t> pat_sizes;			// (rozmiar wzorca, liczba wyst wzorcow z takim rozmiarem)
 vector<uint32_t> pat_sizes;						// rozmiar wzorca -> liczba wyst wzorcow z takim rozmiarem
@@ -34,28 +32,6 @@ vector<uint32_t> pat_sizes;						// rozmiar wzorca -> liczba wyst wzorcow z taki
 bool load_file_list(string file_list);
 void show_progress(const AbstractKmerDb &db);
 void store_pat_sizes(int num);
-
-
-std::string formatLargeNumber(uint64_t num) {
-	std::string out = "";
-
-	do {
-		uint64_t part = num % 1000LL;
-		num = num / 1000LL;
-
-		if (num > 0) {
-			ostringstream oss;
-			oss << "," << setw(3) << setfill('0') << part;
-			out = oss.str() + out;
-		}
-		else {
-			out = std::to_string(part) + out;
-		}
-
-	} while (num > 0);
-
-	return out;
-}
 
 // Wczytuje plik zawierajacy liste baz KMC do przetworzenia
 bool load_file_list(const string& file_list, vector<string>& kmc_file_list)
@@ -85,18 +61,17 @@ bool load_file_list(const string& file_list, vector<string>& kmc_file_list)
 }
 
 
-
 // Pokazuje stan
 void show_progress(const AbstractKmerDb &db)
 {
 	size_t tot_pat_size = 0;
 	size_t num_calc = 0;			// Liczba operacji przy wyznaczaniu macierzy podobieñstwa
 
-	cout << "dict= " << formatLargeNumber(db.getKmersCount())
+	cout << "dict= " << db.getKmersCount()
 		<< " (" << db.getKmersCount() * 2 * sizeof(uint64_t) / (1ull << 20) << " MB)   "
-		<< "\t patterns= " << formatLargeNumber(db.getPatternsCount())
-		<< "\t patterns mem= " << formatLargeNumber(db.getPatternBytes()) 
-		<< "\t ht mem= " << formatLargeNumber(db.getHashtableBytes())
+		<< "patterns= " << db.getPatternsCount()
+		<< " patterns mem= " << db.getPatternMem() / 1000000 << "MB"
+		<< " ht mem= " << db.getHashtableMem() / 1000000 << "MB"
 		<< endl;
 
 	fflush(stdout);
@@ -129,6 +104,35 @@ void store_pat_sizes(int num)
 
 int main(int argc, char **argv)
 {
+	int n_threads = 48;
+
+	std::chrono::duration<double> dt;
+	auto start = std::chrono::high_resolution_clock::now();
+
+	std::vector<std::thread*> pthreads;
+	pthreads.reserve(n_threads);
+
+	for (int i = 0; i < 10; ++i)
+	{
+		for (int tid = 0; tid < n_threads; ++tid) {
+			pthreads.push_back(new std::thread([tid]() {
+				cout << tid << endl;
+			}));
+		}
+
+		for (int tid = 0; tid < n_threads; ++tid) {
+			pthreads[tid]->join();
+			delete pthreads[tid];
+		}
+
+		pthreads.clear();
+	}
+
+	dt = std::chrono::high_resolution_clock::now() - start;
+	cout << "Processed " << n_threads << " files in: " << dt.count() << endl;
+
+	getchar();
+
 
 	vector<string> kmc_file_list;
 	
@@ -145,13 +149,13 @@ int main(int argc, char **argv)
 	NaiveKmerDb naive_db;
 	
 	pat_sizes.resize(kmc_file_list.size() + 1, 0);
-	//kmc_file_list.resize(50);
+	kmc_file_list.resize(100);
 
 	std::chrono::duration<double> loadingTime, naiveTime, fastTime;
 
 	cout << "PROCESSING SAMPLES..." << endl;
 	
-	int n_threads = std::thread::hardware_concurrency();
+	n_threads = std::thread::hardware_concurrency();
 	std::vector<std::vector<uint64_t>> kmersCollections(n_threads);
 	std::vector<std::thread> readers(n_threads);
 
@@ -168,7 +172,7 @@ int main(int argc, char **argv)
 				if (file_id < kmc_file_list.size()) {
 					std::ostringstream oss;
 					oss << kmc_file_list[file_id] << " (" << file_id + 1 << "/" << kmc_file_list.size() << ")...";
-					if (!fast_db.loadKmers(kmc_file_list[file_id], kmersCollections[tid])) {
+					if (!fast_db.extractKmers(kmc_file_list[file_id], kmersCollections[tid])) {
 						oss << "Error processing sample" << endl;
 					}
 					else {
@@ -220,32 +224,68 @@ int main(int argc, char **argv)
 		<< "Naive processing: " << naiveTime.count() << endl
 		<< "Fast processing: " << fastTime.count() << endl;
 
-
-	cout << "DETAILED RESULTS:" << endl
-		<< "Hashtable find: " << fast_db.hashtableFindTime.count() << endl
-		<< "Hashatable add: " << fast_db.hashtableAddTime.count() << endl
-		<< "Sort time: " << fast_db.sortTime.count() << endl
-		<< "Pattern extension time: " << fast_db.extensionTime.count() << endl;
-
-
-	std::ofstream ofs("kmer.db", std::ios::binary);
-	fast_db.serialize(ofs);
-	ofs.close();
-
-	//Tests::testSerialization(fast_db);
-	//Tests::testDistanceMatrix(fast_db, "d:/distances-fast.txt");
-
+	// compare naive and fast implementation
 
 #ifdef COMPARE
-	// compare naive and fast implementation
-	cout << "NAIVE COMPARISON" << endl;
+	cout << "Comparing naive and fast implementations" << endl;
+	std::vector<sample_id_t> samples;
+	int i = 0;
 
-	Tests::comparePatterns(naive_db, fast_db, naive_db.getKmers());
-	Tests::testDistanceMatrix(fast_db, "d:/distances-naive.txt");
-	
+	for (auto it = naive_db.kmers2patternIds.begin(); it < naive_db.kmers2patternIds.end(); ++it, ++i) {
+		
+		if (naive_db.kmers2patternIds.is_free(*it)) {
+			continue;
+		}
+		
+		auto patternId = it->val;
+		auto& naiveSamples = naive_db.patterns[patternId];
+		
+		fast_db.mapKmers2Samples(it->key, samples);
+
+		bool eq = std::equal(naiveSamples.begin(), naiveSamples.end(), samples.begin(), samples.end());
+
+		if (!eq) {
+			cout << "k-mer: " << it->key << endl;
+
+		}
+
+	}
+	cout << "done" << endl;
+
+	std::ofstream ofs("d:/kmer-cmp.txt");
+
+	ofs << endl << "NAIVE distance matrix:" << endl;
+	Array<uint32_t> naiveMatrix;
+	naive_db.calculateSimilarityMatrix(naiveMatrix);
+	for (int i = 0; i < naiveMatrix.size(); ++i) {
+		for (int j = 0; j < naiveMatrix.size(); ++j) {
+			ofs << setw(10) << naiveMatrix[i][j];
+		}
+		ofs << endl;
+	}
+
+	ofs << endl << "Fast distance matrix:" << endl;
+
+	Array<uint32_t> fastMatrix;
+	fast_db.calculateSimilarityMatrix(fastMatrix);
+	for (int i = 0; i < fastMatrix.size(); ++i) {
+		for (int j = 0; j < fastMatrix.size(); ++j) {
+			ofs << setw(10) << fastMatrix[i][j];
+		}
+		ofs << endl;
+	}
+
+	ofs << endl << "DIFF:" << endl;
+	Array<uint32_t> diffMatrix = fastMatrix - naiveMatrix;
+	for (int i = 0; i < diffMatrix.size(); ++i) {
+		for (int j = 0; j < diffMatrix.size(); ++j) {
+			ofs << setw(10) << diffMatrix[i][j];
+		}
+		ofs << endl;
+	}
+
 
 #endif
-
 
 	store_pat_sizes(1000000);
 

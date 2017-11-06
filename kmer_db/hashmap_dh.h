@@ -49,15 +49,15 @@ inline size_t my_hasher_dh2<uint32_t>(uint32_t x)
 
 template <typename Key, typename Value>
 class hash_map_dh {
+public:
 	typedef struct {
 		Key key;
 		Value val;
 	} item_t;
 
+private:
 	Key empty_key;
-	Key erased_key;
 	double max_fill_factor;
-	double max_rest_factor;
 
 	size_t size;
 	size_t filled;
@@ -76,7 +76,7 @@ class hash_map_dh {
 		item_t *old_data = data;
 		size_t old_allocated = allocated;
 
-		if (filled > old_allocated * max_rest_factor)
+		if (filled > old_allocated * max_fill_factor)
 			allocated *= 2;
 
 		allocated_mask = allocated - 1;
@@ -90,7 +90,7 @@ class hash_map_dh {
 		//cout << "\n--- Realloc to: " << allocated << endl;
 
 		for (size_t i = 0; i < old_allocated; ++i)
-			if (old_data[i].key != empty_key && old_data[i].key != erased_key)
+			if (old_data[i].key != empty_key)
 				insert(old_data[i].key, old_data[i].val);
 
 		delete[] old_data;
@@ -107,11 +107,11 @@ public:
 	const item_t* cend() const { return data + allocated; }
 
 	bool is_free(const item_t& item) const {
-		return item.key == empty_key || item.key == erased_key;
+		return item.key == empty_key;
 	}
 
 
-	hash_map_dh(Key k_empty, Key k_erased)
+	hash_map_dh(Key k_empty)
 	{
 		ht_memory = 0;
 		ht_total = 0;
@@ -125,13 +125,12 @@ public:
 		filled = 0;
 		data = new item_t[allocated];
 		max_fill_factor = 0.8;
-		max_rest_factor = 0.6;
-
+		
 		ht_memory += allocated * sizeof(item_t);
 
 		size_when_restruct = (size_t)(allocated * max_fill_factor);
 
-		set_special_keys(k_empty, k_erased);
+		set_special_keys(k_empty);
 	}
 
 	~hash_map_dh()
@@ -140,15 +139,14 @@ public:
 			delete[] data;
 	}
 
-	size_t getMem() const {
+	size_t get_bytes() const {
 		return ht_memory;
 	}
 
-	void set_special_keys(Key k_empty, Key k_erased)
+	void set_special_keys(Key k_empty)
 	{
 		empty_key = k_empty;
-		erased_key = k_erased;
-
+		
 		clear();
 	}
 
@@ -168,7 +166,7 @@ public:
 
 		size_t h = my_hasher_dh1<Key>(k) & allocated_mask;
 
-		if (data[h].key != empty_key && data[h].key != erased_key)
+		if (data[h].key != empty_key)
 		{
 			size_t h_step = 2 * (my_hasher_dh2<Key>(k) & allocated_mask2) + 1;
 
@@ -176,7 +174,7 @@ public:
 			{
 				h += h_step;
 				h = h & allocated_mask;
-			} while (data[h].key != empty_key && data[h].key != erased_key);
+			} while (data[h].key != empty_key);
 		}
 
 		if (data[h].key == empty_key)
@@ -242,24 +240,6 @@ public:
 #endif
 	}
 
-	void erase(Key k)
-	{
-		// Poki co nie zaimplementowane, bo nie potrzebne w tym projekcie
-		/*
-		size_t h = my_hasher<Key>(k) & allocated_mask;
-
-		while (data[h].key != empty_key)
-			if (data[h].key == k)
-			{
-				data[h].key = erased_key;
-				data[h].val = Value();
-				--filled;
-				return;
-			}
-			else
-				h = (h + 1) & allocated_mask;*/
-	}
-
 	size_t get_size(void) const
 	{
 		return filled;
@@ -267,14 +247,14 @@ public:
 
 	void reserve_for_additional(size_t n_elems)
 	{
-		if (filled + n_elems <= allocated * max_rest_factor)
+		if (filled + n_elems <= allocated * max_fill_factor)
 			return;
 
 
 		item_t *old_data = data;
 		size_t old_allocated = allocated;
 
-		while (filled + n_elems > allocated * max_rest_factor)
+		while (filled + n_elems > allocated * max_fill_factor)
 			allocated *= 2;
 
 		allocated_mask = allocated - 1;
@@ -290,7 +270,7 @@ public:
 		cout << "done!" << endl;
 
 		for (size_t i = 0; i < old_allocated; ++i)
-			if (old_data[i].key != empty_key && old_data[i].key != erased_key)
+			if (old_data[i].key != empty_key)
 				insert(old_data[i].key, old_data[i].val);
 
 		delete[] old_data;

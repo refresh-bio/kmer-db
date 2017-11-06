@@ -121,7 +121,7 @@ public:
 			delete[] data;
 	}
 
-	size_t getMem() const {
+	size_t get_bytes() const {
 		return ht_memory;
 	}
 

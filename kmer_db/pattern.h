@@ -1,18 +1,21 @@
 #pragma once
-
+#include <cstdint>
 
 template<typename T>
-class subpattern_t {
+class pattern_t {
+private:
 
+	int64_t num_kmers;			// number of kmers with this pattern
+	int64_t parent_id;				// parrent pattern id
+
+	T* data;					// tablica id próbek
+	
+	T num_samples;				// liczba id próbek w wêŸle i jego rodzicach (nie mo¿e byæ wiêksza od id próbki)
+	T num_local_samples;		// liczba id próbek w wêŸle (nie mo¿e byæ wiêksza od id próbki)	
+	
 	bool is_parent;			// informacja czy wêze³ jest rodzicem innego, tzn. czy jakiœ wêze³ jest zapisany jako rozszerzenie bie¿¹cego [true]
-	bool is_child;				// informacja czy wêze³ jest zapisany jako rozszerzenie innego [true] czy te¿ wprost (lista id genomów) [false]
-	size_t num_samples;				// liczba id genomów w wêŸle
-	size_t num_locally_allocated;	// liczba slotów zaalokowanych w wêŸle
-	T* data;					// tablica id genomów
-	subpattern_t<T>* parent;		// wskaŸnik do wêz³a rodzica
 
-								
-	size_t round_count(size_t count)
+	size_t round_count(size_t count) const
 	{
 		size_t bytes = sizeof(T) * count;
 
@@ -27,107 +30,68 @@ public:
 
 	const T* get_data() const { return data; }
 
-	size_t get_num_samples() const { return num_samples; }
-	size_t get_num_local_samples() const {
-		return num_samples - (parent != nullptr ? parent->num_samples : 0);
-	}
+	int64_t get_num_kmers() const { return num_kmers; }
+	void set_num_kmers(int64_t v) { num_kmers = v; }
+
+	T get_num_samples() const { return num_samples; }
+	T get_num_local_samples() const { return num_local_samples; }
 
 	const T& operator[](size_t i) const { return data[i]; }
 	T& operator[](size_t i) { return data[i]; }
 
 	bool get_is_parrent() const { return is_parent; }
-	bool get_is_child() const { return is_child; }
-	subpattern_t* get_parent() { return parent; }
-	const subpattern_t* get_parent() const { return parent; }
+	int64_t get_parent_id() { return parent_id; }
+	const int64_t get_parent_id() const { return parent_id; }
 
-	subpattern_t() : num_samples(0), num_locally_allocated(0), data(nullptr), is_parent(false), is_child(false), parent(nullptr)
+	pattern_t() : num_samples(0), num_local_samples(0), data(nullptr), is_parent(false), parent_id(-1), num_kmers(0)
 	{
 	}
 
-	subpattern_t(T x)
+	pattern_t(T x, uint64_t num_kmers)
 	{
 		is_parent = false;
-		is_child = false;
 		num_samples = 1;
-		num_locally_allocated = round_count(1);
+		num_local_samples = 1;
 		data = nullptr;
-		parent = nullptr;
+		parent_id = -1;
+		this->num_kmers = num_kmers;
 
 		data = new T[round_count(1)];
 		data[0] = x;
 	}
 
-	subpattern_t(subpattern_t &v, T x)
+	pattern_t(pattern_t &v, int64_t parent_id, T x, uint64_t num_kmers)
 	{
 		num_samples = v.num_samples + 1;
+		num_local_samples = 1;
 		data = nullptr;
+		this->num_kmers = num_kmers;
 
 		if (v.num_samples == 0)
 		{
 			is_parent = false;
-			is_child = false;
 			v.is_parent = false;
-			parent = nullptr;
+			this->parent_id = -1;
 		}
 		else
 		{
 			is_parent = false;
-			is_child = true;
 			v.is_parent = true;
-			parent = &v;
+			this->parent_id = parent_id;
 		}
 
-		num_locally_allocated = round_count(1);
-		data = new T[num_locally_allocated];	
+		data = new T[round_count(1)];
 		data[0] = x;
 	}
 
-	subpattern_t(const subpattern_t &v) = delete;
-	/*{
-		is_parrent = v.is_parrent;
-		is_child = v.is_child;
-		no_ids = v.no_ids;
-		no_locally_allocated = v.no_locally_allocated;
-		data = nullptr;
-		parrent = v.parrent;
+	pattern_t(const pattern_t &v) = delete;
 
-		if (no_ids)
-		{
-			size_t to_copy = no_ids;
+	pattern_t(pattern_t &&v) 
+	{
+		*this = std::move(v);
+	}
 
-			if (parrent) {
-				to_copy -= parrent->no_ids;
-			}
-
-			data = new T[no_locally_allocated]
-			
-			for (int i = 0; i < to_copy; ++i) {
-				data[i] = v.data[i];
-			}
-
-			mem_pattern_desc += sizeof(T);
-			mem_os_pattern_desc += sizeof(T) * round_count(to_alloc);
-		}
-		else
-			data = nullptr;
-	}*/
-
-	subpattern_t(subpattern_t &&v) = delete;
-	/*{
-		is_parrent = v.is_parrent;
-		is_child = v.is_child;
-		no_ids = v.no_ids;
-		no_locally_allocated = v.no_locally_allocated;
-		data = v.data;
-		parrent = v.parrent;
-
-		v.data = nullptr;
-		v.parrent = nullptr;
-		v.no_ids = 0;
-		v.no_locally_allocated = 0;
-	}*/ 
-
-	~subpattern_t()
+	~pattern_t()
 	{
 		if (num_samples)
 		{
@@ -135,20 +99,34 @@ public:
 		}
 	}
 
-	subpattern_t<T>& operator=(const subpattern_t<T> &v) = delete;
-	subpattern_t<T>& operator=(subpattern_t<T> &&v) = delete;
+	pattern_t<T>& operator=(const pattern_t<T> &v) = delete;
+	
+	pattern_t<T>& operator=(pattern_t<T> &&v) {
+		is_parent = v.is_parent;
+		num_samples = v.num_samples;
+		num_local_samples = v.num_local_samples;
+		num_kmers = v.num_kmers;
+		data = v.data;
+		parent_id = v.parent_id;
+
+		v.data = nullptr;
+		v.parent_id = -1;
+		v.num_kmers = 0;
+		v.num_local_samples = 0;
+		v.num_samples = 0;
+
+		return *this;
+	}
 	
 
-	bool operator==(const subpattern_t<T> &v)
+	bool operator==(const pattern_t<T> &v)
 	{
 		if (v.num_samples != num_samples)
 			return false;
 		if (v.parent != parent)
 			return false;
 
-		size_t to_compare = get_num_local_samples();
-
-		for (size_t i = 0; i < to_compare; ++i)
+		for (size_t i = 0; i < num_local_samples; ++i)
 			if (data[i] != v.data[i])
 				return false;
 
@@ -159,53 +137,93 @@ public:
 	void expand(const T x)
 	{
 		++num_samples;
-		size_t to_alloc = get_num_local_samples();
-
+		
 		// if no space left - reallocate and copy existing ids 
-		if (to_alloc > num_locally_allocated) {
+		if (num_local_samples + 1 > round_count(num_local_samples)) {
 			T* old_data = data;
-			num_locally_allocated = round_count(to_alloc);
-			data = new T[num_locally_allocated];
+		
+			data = new T[round_count(num_local_samples + 1)];
 			
-			for (int i = 0; i < to_alloc - 1; ++i) {
+			for (int i = 0; i < num_local_samples; ++i) {
 				data[i] = old_data[i];
 			}
 			
 			delete[] old_data;
 		}
 
-		data[to_alloc - 1] = x;
+		++num_local_samples;
+		data[num_local_samples - 1] = x;
 	}
 
-	size_t getMem(void)
+	size_t get_bytes(void) const
 	{
 		size_t r;
 
-		r = sizeof(subpattern_t);
-		r += sizeof(T) * num_locally_allocated;
+		r = sizeof(pattern_t);
+		r += sizeof(T) * round_count(num_local_samples);
 
 		return r;
 	}
 
-	std::string toString() const {
-		std::string out;
-		if (parent) {
-			out += parent->toString() + " | ";
+	
+	char* pack(char* buffer) const {
+		// store members
+		*reinterpret_cast<decltype(num_kmers)*>(buffer) = num_kmers;
+		buffer += sizeof(decltype(num_kmers));
+
+		*reinterpret_cast<decltype(parent_id)*>(buffer) = parent_id;
+		buffer += sizeof(decltype(parent_id));
+
+		*reinterpret_cast<decltype(is_parent)*>(buffer) = is_parent;
+		buffer += sizeof(decltype(is_parent));
+
+		*reinterpret_cast<decltype(num_samples)*>(buffer) = num_samples;
+		buffer += sizeof(decltype(num_samples));
+
+		*reinterpret_cast<decltype(num_local_samples)*>(buffer) = num_local_samples;
+		buffer += sizeof(decltype(num_local_samples));
+		
+		T* samples = reinterpret_cast<T*>(buffer);
+		for (int i = 0; i < num_local_samples; ++i) {
+			samples[i] = data[i];
+		}
+
+		buffer += num_local_samples * sizeof(T);
+
+		return buffer;
+	}
+
+	char * unpack(char* buffer) {
+		if (num_local_samples) {
+			delete[] data;
 		}
 		
-		for (int i = 0; i< get_num_local_samples(); ++i) {
-			out += std::to_string(data[i]) + ", ";
+		num_kmers = *reinterpret_cast<decltype(num_kmers)*>(buffer);
+		buffer += sizeof(decltype(num_kmers));
+
+		parent_id = *reinterpret_cast<decltype(parent_id)*>(buffer);
+		buffer += sizeof(decltype(parent_id));
+
+		is_parent = *reinterpret_cast<decltype(is_parent)*>(buffer);
+		buffer += sizeof(decltype(is_parent));
+
+		num_samples = *reinterpret_cast<decltype(num_samples)*>(buffer);
+		buffer += sizeof(decltype(num_samples));
+
+		num_local_samples = *reinterpret_cast<decltype(num_local_samples)*>(buffer);
+		buffer += sizeof(decltype(num_local_samples));
+		
+		data = new T[round_count(num_local_samples)];
+
+		sample_id_t* samples = reinterpret_cast<sample_id_t*>(buffer);
+		for (int i = 0; i < num_local_samples; ++i) {
+			data[i] = samples[i];
 		}
-		return out;
+
+		buffer += num_local_samples * sizeof(T);
+
+		return buffer;
 	}
-};
-
-
-template <class T>
-class pattern_t
-{
-public:
-	uint32_t num_occ;
-	subpattern_t<T> *last_subpattern;
 
 };
+
