@@ -155,7 +155,7 @@ std::map<std::vector<sample_id_t>, size_t> NaiveKmerDb::getPatternsStatistics() 
 /****************************************************************************************************************************************************/
 
 
-FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1, (unsigned long long) - 2) {
+FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1), dictionarySearchQueue(1) {
 
 	patternBytes = 0;
 	patterns.reserve(1024);
@@ -165,6 +165,73 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1, (unsigned 
 	for (auto & tp : threadPatterns) {
 		tp.reserve(1024);
 	}
+
+	dictionarySearchWorkers.resize(std::thread::hardware_concurrency());
+
+	for (auto& t : dictionarySearchWorkers) {
+		t = std::thread([this]() {
+
+			while (!this->dictionarySearchQueue.IsCompleted()) {
+
+				DictionarySearchTask task;
+
+				if (this->dictionarySearchQueue.Pop(task)) {
+					const std::vector<kmer_t>& kmers = *(task.kmers);
+					std::vector<size_t>& num_existing_kmers = *(task.num_existing_kmers);
+
+					size_t n_kmers = kmers.size();
+					size_t block_size = n_kmers / task.num_blocks;
+					size_t lo = task.block_id * block_size;
+					size_t hi = (task.block_id == task.num_blocks - 1) ? n_kmers : lo + block_size;
+
+					size_t existing_id = lo;
+					size_t to_add_id = hi - 1;
+
+					kmer_t u_kmer;
+					kmer_t prefetch_kmer;
+					const size_t prefetch_dist = 48;
+
+					for (size_t i = lo; i < hi; ++i)
+					{
+						u_kmer = kmers[i];
+						if (i + prefetch_dist < hi)
+						{
+							prefetch_kmer = kmers[i + prefetch_dist];
+							kmers2patternIds.prefetch(prefetch_kmer);
+						}
+
+						// ***** Sprawdzanie w slowniku czy taki k-mer juz istnieje
+						auto i_kmer = kmers2patternIds.find(u_kmer);
+						pattern_id_t p_id;				// tu bedzie id wzorca (pattern), ktory aktualnie jest przypisany do tego k-mera
+
+						if (i_kmer == nullptr)
+						{
+							//i_kmer = kmers2patternIds.insert(u_kmer, 0);
+							//p_id = 0;						// Pierwsze wyst. k-mera, wiec przypisujemy taki sztuczny wzorzec 0
+
+							// do not add kmer to hashtable - just mark as to be added
+							samplePatterns[to_add_id].first = u_kmer;
+							--to_add_id;
+						}
+						else {
+							p_id = *i_kmer;
+
+							samplePatterns[existing_id].first = p_id;
+							samplePatterns[existing_id].second = i_kmer;
+							existing_id++;
+						}
+					}
+
+					num_existing_kmers[task.block_id] = existing_id;
+					//cout << "Thread " << tid << ", existing: " << existing_id - lo << ", to add: " << hi - existing_id << endl;
+
+					this->semaphore.dec();
+				}
+			}
+		});
+	}
+	
+
 }
 
 
@@ -177,7 +244,6 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 	// Musimy miec poprawne wskazniki do HT po wstawieniu do n_kmers elementow, a wiec nie moze sie w tym czasie zrobic restrukturyzacja
 	// Jesli jest ryzyko, to niech zrobi sie wczesniej, przed wstawianiem elementow
 	kmers2patternIds.reserve_for_additional(n_kmers);
-	std::mutex lock;
 	
 	samplePatterns.resize(n_kmers);
 	int n_threads = std::thread::hardware_concurrency();
@@ -186,62 +252,15 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 	auto start = std::chrono::high_resolution_clock::now();
 
 	std::vector<std::thread> threads(n_threads);
+	
+	// prepare tasks
 	for (int tid = 0; tid < n_threads; ++tid) {
-		threads[tid] = std::thread([this, &kmers, tid, n_threads, &num_existing_kmers]() {
-			
-			size_t n_kmers = kmers.size();
-			size_t block = n_kmers / n_threads;
-			size_t lo = tid * block;
-			size_t hi = (tid == n_threads - 1) ? n_kmers : lo + block;
-
-		
-			size_t existing_id = lo;
-			size_t to_add_id = hi - 1;
-
-			kmer_t u_kmer;
-			kmer_t prefetch_kmer;
-			const size_t prefetch_dist = 48;
-
-			for (size_t i = lo; i < hi; ++i)
-			{
-				u_kmer = kmers[i];
-				if (i + prefetch_dist < hi)
-				{
-					prefetch_kmer = kmers[i + prefetch_dist];
-					kmers2patternIds.prefetch(prefetch_kmer);
-				}
-
-				// ***** Sprawdzanie w slowniku czy taki k-mer juz istnieje
-				auto i_kmer = kmers2patternIds.find(u_kmer);
-				pattern_id_t p_id;				// tu bedzie id wzorca (pattern), ktory aktualnie jest przypisany do tego k-mera
-
-				if (i_kmer == nullptr)
-				{
-					//i_kmer = kmers2patternIds.insert(u_kmer, 0);
-					//p_id = 0;						// Pierwsze wyst. k-mera, wiec przypisujemy taki sztuczny wzorzec 0
-
-					// do not add kmer to hashtable - just mark as to be added
-					samplePatterns[to_add_id].first = u_kmer;
-					--to_add_id;
-				}
-				else {
-					p_id = *i_kmer;
-
-					samplePatterns[existing_id].first = p_id;
-					samplePatterns[existing_id].second = i_kmer;
-					existing_id++;
-				}
-			}
-			num_existing_kmers[tid] = existing_id;
-			//cout << "Thread " << tid << ", existing: " << existing_id - lo << ", to add: " << hi - existing_id << endl;
-		});
+		semaphore.inc();
+		dictionarySearchQueue.Push(DictionarySearchTask{ tid, n_threads, &kmers, &num_existing_kmers });
 	}
-
-	size_t n_patterns = 0;
-	for (int tid = 0; tid < threads.size(); ++tid) {
-		threads[tid].join();
-	}
-
+	// wait for the task to complete
+	semaphore.waitForZero();
+	
 	hashtableFindTime += std::chrono::high_resolution_clock::now() - start;
 	start = std::chrono::high_resolution_clock::now();
 

@@ -2,7 +2,8 @@
 #include "pattern.h"
 #include "hashmap_lp.h"
 #include "hashmap_dh.h"
-#include "Array.h"
+#include "array.h"
+#include "queue.h"
 
 #include <map>
 #include <fstream>
@@ -87,6 +88,16 @@ protected:
 };
 
 
+
+struct DictionarySearchTask {
+	int block_id;
+	int num_blocks;
+	const std::vector<kmer_t>* kmers;
+	std::vector<size_t>* num_existing_kmers;
+
+};
+
+
 class FastKmerDb : public AbstractKmerDb {
 public:
 
@@ -96,6 +107,13 @@ public:
 	std::chrono::duration<double> extensionTime;
 
 	FastKmerDb();
+
+	~FastKmerDb() {
+		dictionarySearchQueue.MarkCompleted();
+		for (auto& t : dictionarySearchWorkers) {
+			t.join();
+		}
+	}
 
 	virtual const size_t getKmersCount() const { return kmers2patternIds.get_size(); }
 
@@ -142,4 +160,11 @@ protected:
 	// first element - pattern id, second element 
 	std::vector<std::pair<pattern_id_t, pattern_id_t*>> samplePatterns;
 
+	CRegisteringQueue<DictionarySearchTask> dictionarySearchQueue;
+	
+	std::vector<std::thread> dictionarySearchWorkers;
+
+	Semaphore semaphore;
+
+	
 };

@@ -143,7 +143,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="Array.h" />
+    <ClInclude Include="array.h" />
     <ClInclude Include="hashmap_dh.h" />
     <ClInclude Include="hashmap_lp.h" />
     <ClInclude Include="kmer_db.h" />
@@ -152,6 +152,7 @@
     <ClInclude Include="kmc_api\kmer_defs.h" />
     <ClInclude Include="kmc_api\mmer.h" />
     <ClInclude Include="pattern.h" />
+    <ClInclude Include="queue.h" />
     <ClInclude Include="tests.h" />
   </ItemGroup>
   <ItemGroup>
@@ -160,6 +161,7 @@
     <ClCompile Include="kmc_api\mmer.cpp" />
     <ClCompile Include="kmer_db.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="queue.cpp" />
     <ClCompile Include="tests.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
