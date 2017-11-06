@@ -2,14 +2,42 @@
 #define _QUEUE_H
 // Generic multithreading queues
 
-//#include "../asm_common/defs.h"
 #include <queue>
 #include <list>
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <atomic>
 
 using namespace std;
+
+
+class Semaphore {
+protected:
+	int counter;
+	std::mutex mutex;
+	std::condition_variable cv;
+
+public:
+	Semaphore() : counter(0) {}
+
+	void inc() {
+		std::unique_lock<std::mutex> lk(mutex);
+		++counter;
+	}
+
+	void dec() {
+		std::unique_lock<std::mutex> lk(mutex);
+		--counter;
+		cv.notify_one();
+	}
+
+	void waitForZero() {
+		std::unique_lock<std::mutex> lk(mutex);
+		cv.wait(lk, [this] {return counter == 0; });
+	}
+};
+
 
 // ************************************************************************************
 // Multithreading queue with registering mechanism:
