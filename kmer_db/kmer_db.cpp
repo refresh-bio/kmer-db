@@ -155,7 +155,7 @@ std::map<std::vector<sample_id_t>, size_t> NaiveKmerDb::getPatternsStatistics() 
 /****************************************************************************************************************************************************/
 
 
-FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1), dictionarySearchQueue(1) {
+FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1), dictionarySearchQueue(1), patternExtensionQueue(1) {
 
 	patternBytes = 0;
 	patterns.reserve(1024);
@@ -167,18 +167,16 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1), dictionar
 	}
 
 	dictionarySearchWorkers.resize(std::thread::hardware_concurrency());
+	patternExtensionWorkers.resize(std::thread::hardware_concurrency());
 
 	for (auto& t : dictionarySearchWorkers) {
 		t = std::thread([this]() {
-
 			while (!this->dictionarySearchQueue.IsCompleted()) {
-
 				DictionarySearchTask task;
 
 				if (this->dictionarySearchQueue.Pop(task)) {
 					const std::vector<kmer_t>& kmers = *(task.kmers);
-					std::vector<size_t>& num_existing_kmers = *(task.num_existing_kmers);
-
+					
 					size_t n_kmers = kmers.size();
 					size_t block_size = n_kmers / task.num_blocks;
 					size_t lo = task.block_id * block_size;
@@ -222,7 +220,7 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1), dictionar
 						}
 					}
 
-					num_existing_kmers[task.block_id] = existing_id;
+					(*task.num_existing_kmers)[task.block_id] = existing_id;
 					//cout << "Thread " << tid << ", existing: " << existing_id - lo << ", to add: " << hi - existing_id << endl;
 
 					this->semaphore.dec();
@@ -231,6 +229,72 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1), dictionar
 		});
 	}
 	
+
+	for (auto& t : patternExtensionWorkers) {
+		t = std::thread([this]() {
+			while (!this->patternExtensionQueue.IsCompleted()) {
+				PatternExtensionTask task;
+
+				if (this->patternExtensionQueue.Pop(task)) {
+
+					threadPatterns[task.block_id].clear();
+					threadPatterns[task.block_id].reserve(task.ranges->back());
+
+					size_t lo = (*task.ranges)[task.block_id];
+					size_t hi = (*task.ranges)[task.block_id + 1];
+					size_t mem = 0;
+
+					for (size_t i = lo; i < hi;) {
+						size_t j;
+						auto p_id = samplePatterns[i].first;
+
+						// zliczamy odczyty z aktualnego pliku (osobnika) o tym samym wzorcu
+						for (j = i + 1; j < hi; ++j) {
+							if (p_id != samplePatterns[j].first) {
+								break;
+							}
+						}
+						size_t pid_count = j - i;
+
+						if (patterns[p_id].get_num_kmers() == pid_count && !patterns[p_id].get_is_parrent()) {
+							// Wzorzec mozna po prostu rozszerzyæ, bo wszystkie wskazniki do niego beda rozszerzane (realokacja tablicy id próbek we wzorcu) 
+							mem -= patterns[p_id].get_bytes();
+							patterns[p_id].expand(task.sample_id);
+							mem += patterns[p_id].get_bytes();
+						}
+						else
+						{
+							// Trzeba wygenerowaæ nowy wzorzec (podczepiony pod wzorzec macierzysty)
+							//auto *pat = new subpattern_t<sample_id_t>(*(patterns[p_id].last_subpattern), sampleId);
+							//mem += pat->getMem();
+
+							//	patterns.push_back(pattern_t{ (uint32_t)pid_count, pat });
+							pattern_id_t local_pid = task.new_pid->fetch_add(1);
+
+							threadPatterns[task.block_id].emplace_back(local_pid, pattern_t<sample_id_t>(patterns[p_id], p_id, task.sample_id, (uint32_t)pid_count));
+							mem += threadPatterns[task.block_id].back().second.get_bytes();
+
+							if (p_id) {
+								patterns[p_id].set_num_kmers(patterns[p_id].get_num_kmers() - pid_count);
+							}
+
+							for (size_t k = i; k < j; ++k) {
+								*(samplePatterns[k].second) = local_pid;
+							}
+
+						}
+
+						i = j;
+					}
+
+					(*task.threadBytes)[task.block_id] = mem;
+
+
+					this->semaphore.dec();
+				}
+			}
+		});
+	}
 
 }
 
@@ -303,6 +367,8 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 
 	auto currentIndex = block;
 
+	std::vector<size_t> threadBytes(n_threads, 0);
+
 	for (int tid = 0; tid < n_threads; ++tid) {
 		auto it = std::upper_bound(
 			samplePatterns.begin() + currentIndex,
@@ -311,76 +377,27 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 			pid_comparer);
 
 		size_t range = it - samplePatterns.begin();
+		
+	
 		ranges[tid + 1] = range;
 		currentIndex =  range + block;
-		
+
 		if (currentIndex >= samplePatterns.size()) {
 			break;
 		}
 	}
-	std::vector<size_t> threadMemory(n_threads, 0);
+	
 
 	for (int tid = 0; tid < n_threads; ++tid) {
-		threads[tid] = std::thread([this, tid, n_threads, &ranges, sampleId, &new_pid, n_kmers, &threadMemory]() {
-			threadPatterns[tid].clear();
-			threadPatterns[tid].reserve(n_kmers);
-
-			size_t lo = ranges[tid];
-			size_t hi = ranges[tid + 1];
-			
-			size_t mem = 0;
-
-			for (size_t i = lo; i < hi;) {
-				size_t j;
-				auto p_id = samplePatterns[i].first;
-
-				// zliczamy odczyty z aktualnego pliku (osobnika) o tym samym wzorcu
-				for (j = i + 1; j < hi; ++j) {
-					if (p_id != samplePatterns[j].first) {
-						break;
-					}
-				}
-				size_t pid_count = j - i;
-
-				if (patterns[p_id].get_num_kmers() == pid_count && !patterns[p_id].get_is_parrent()) {
-					// Wzorzec mozna po prostu rozszerzyæ, bo wszystkie wskazniki do niego beda rozszerzane (realokacja tablicy id próbek we wzorcu) 
-					mem -= patterns[p_id].get_bytes();
-					patterns[p_id].expand(sampleId);
-					mem += patterns[p_id].get_bytes();
-				}
-				else
-				{
-					// Trzeba wygenerowaæ nowy wzorzec (podczepiony pod wzorzec macierzysty)
-					//auto *pat = new subpattern_t<sample_id_t>(*(patterns[p_id].last_subpattern), sampleId);
-					//mem += pat->getMem();
-
-					//	patterns.push_back(pattern_t{ (uint32_t)pid_count, pat });
-					pattern_id_t local_pid = new_pid.fetch_add(1);
-
-					threadPatterns[tid].emplace_back(local_pid, pattern_t<sample_id_t>(patterns[p_id], p_id, sampleId, (uint32_t)pid_count));
-					mem += threadPatterns[tid].back().second.get_bytes();
-		
-					if (p_id) {
-						patterns[p_id].set_num_kmers(patterns[p_id].get_num_kmers() - pid_count);
-					}
-
-					for (size_t k = i; k < j; ++k) {
-						*(samplePatterns[k].second) = local_pid;
-					}
-					
-				}
-
-				i = j;
-			}
-
-			threadMemory[tid] = mem;
-		});
+		semaphore.inc();
+		patternExtensionQueue.Push(PatternExtensionTask{ tid, sampleId, &ranges, &new_pid, &threadBytes });
 	}
-
+		
+	// wait for the task to complete
+	semaphore.waitForZero();
 
 	for (int tid = 0; tid < threads.size(); ++tid) {
-		threads[tid].join();
-		patternBytes += threadMemory[tid];
+		patternBytes += threadBytes[tid];
 	}
 
 	extensionTime += std::chrono::high_resolution_clock::now() - start;

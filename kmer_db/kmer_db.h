@@ -97,6 +97,14 @@ struct DictionarySearchTask {
 
 };
 
+struct PatternExtensionTask {
+	int block_id;
+	size_t sample_id;
+	std::vector<size_t>* ranges;
+	std::atomic<size_t>* new_pid;
+	std::vector<size_t>* threadBytes;
+
+};
 
 class FastKmerDb : public AbstractKmerDb {
 public:
@@ -111,6 +119,11 @@ public:
 	~FastKmerDb() {
 		dictionarySearchQueue.MarkCompleted();
 		for (auto& t : dictionarySearchWorkers) {
+			t.join();
+		}
+
+		patternExtensionQueue.MarkCompleted();
+		for (auto& t : patternExtensionWorkers) {
 			t.join();
 		}
 	}
@@ -162,7 +175,11 @@ protected:
 
 	CRegisteringQueue<DictionarySearchTask> dictionarySearchQueue;
 	
+	CRegisteringQueue<PatternExtensionTask> patternExtensionQueue;
+
 	std::vector<std::thread> dictionarySearchWorkers;
+
+	std::vector<std::thread> patternExtensionWorkers;
 
 	Semaphore semaphore;
 
