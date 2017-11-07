@@ -274,8 +274,16 @@ public:
 		std::cout << "done!" << std::endl;
 
 		for (size_t i = 0; i < old_allocated; ++i)
+		{
 			if (old_data[i].key != empty_key)
 				insert(old_data[i].key, old_data[i].val);
+
+			if (i % (1 << 15) == 0)
+			{
+				cerr << "Inserted (restr.): " << i << endl;
+				fflush(stderr);
+			}
+		}
 
 		delete[] old_data;
 		ht_memory -= old_allocated * sizeof(item_t);
