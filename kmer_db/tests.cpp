@@ -19,7 +19,7 @@ void Tests::comparePatterns(const AbstractKmerDb& db1, const AbstractKmerDb& db2
 		db1.mapKmers2Samples(kmer, samples1);
 		db2.mapKmers2Samples(kmer, samples2);
 			
-		bool eq = std::equal(samples1.begin(), samples1.end(), samples2.begin(), samples2.end());
+		bool eq = (samples1 == samples2);
 
 		if (!eq) {
 			std::cout << "k-mer: " << kmer << std::endl;

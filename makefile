@@ -1,4 +1,4 @@
-all: kmer_db
+all: kmer-db-1.0
 
 KMER_DB_ROOT_DIR = .
 KMER_DB_MAIN_DIR = kmer_db
@@ -11,7 +11,7 @@ CLINK	= -lm -O3 -std=c++11 -lpthread -fabi-version=6
 .cpp.o:
 	$(CC) $(CFLAGS) -c $< -o $@
 
-kmer_db: $(KMER_DB_MAIN_DIR)/kmer_db.o \
+kmer-db-1.0: $(KMER_DB_MAIN_DIR)/kmer_db.o \
 	$(KMER_DB_MAIN_DIR)/main.o \
 	$(KMER_DB_MAIN_DIR)/queue.o \
 	$(KMER_DB_MAIN_DIR)/tests.o \
@@ -30,5 +30,5 @@ kmer_db: $(KMER_DB_MAIN_DIR)/kmer_db.o \
 clean:
 	-rm $(KMER_DB_MAIN_DIR)/*.o
 	-rm $(KMER_DB_LIBS_DIR)/*.o
-	-rm kmer_db
+	-rm kmer-db-1.0
 	
