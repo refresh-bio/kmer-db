@@ -132,7 +132,7 @@ int main(int argc, char **argv)
 		load_file_list(string(argv[2]), kmc_file_list);
 		std::ofstream ofs(argv[3], std::ios::binary);
 
-		kmc_file_list.resize(100);
+//		kmc_file_list.resize(100);
 
 		std::chrono::duration<double> loadingTime, fastTime;
 		cout << "PROCESSING SAMPLES..." << endl;
