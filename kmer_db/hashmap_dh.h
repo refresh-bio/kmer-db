@@ -158,7 +158,13 @@ public:
 		size = 0;
 		filled = 0;
 		for (size_t i = 0; i < allocated; ++i)
+		{
+			if (i % (1 << 15) == 0)
+			{
+				std::cout << "Clear: " << i << " from " << allocated << std::endl;	fflush(stdout);
+			}
 			data[i].key = empty_key;
+		}
 	}
 
 	// Mozna to przyspieszyc tak, zebyinsert wykorzystywal wiedze o tym gdzie skonczyl szukac find
@@ -253,25 +259,31 @@ public:
 		if (filled + n_elems <= allocated * max_fill_factor)
 			return;
 
-
 		item_t *old_data = data;
 		size_t old_allocated = allocated;
 
+		std::cout << "reserve_for_additional - in\n"; fflush(stdout);
 		while (filled + n_elems > allocated * max_fill_factor)
 			allocated *= 2;
+
+		std::cout << "reserve_for_additional - new_size: " << allocated << std::endl; fflush(stdout);
 
 		allocated_mask = allocated - 1ull;
 		allocated_mask2 = allocated_mask >> 1;
 		size_when_restruct = (size_t)(allocated * max_fill_factor);
 
 		std::cout << "\n--- Realloc to: " << allocated << "...";
+		fflush(stdout);
 
 		data = new item_t[allocated];
+		std::cout << "reserve_for_additional - after new: " << allocated << std::endl; fflush(stdout);
+
 		clear();
+		std::cout << "reserve_for_additional - after clear: " << allocated << std::endl; fflush(stdout);
 
 		ht_memory += allocated * sizeof(item_t);
 
-		std::cout << "done!" << std::endl;
+		std::cout << "done!" << std::endl; fflush(stdout);
 
 		for (size_t i = 0; i < old_allocated; ++i)
 		{
@@ -280,7 +292,7 @@ public:
 
 			if (i % (1 << 15) == 0)
 			{
-				std::cerr << "Inserted (restr.): " << i << std::endl;
+				std::cout << "Inserted (restr.): " << i << std::endl;
 				fflush(stderr);
 			}
 		}
