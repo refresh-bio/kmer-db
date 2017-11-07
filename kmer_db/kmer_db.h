@@ -109,6 +109,7 @@ struct PatternExtensionTask {
 class FastKmerDb : public AbstractKmerDb {
 public:
 
+	std::chrono::duration<double> hashtableResizeTime;
 	std::chrono::duration<double> hashtableFindTime;
 	std::chrono::duration<double> hashtableAddTime;
 	std::chrono::duration<double> sortTime;

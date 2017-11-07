@@ -22,6 +22,7 @@
 
 #include "kmc_api/kmc_file.h"
 #include "kmer_db.h"
+#include "log.h"
 
 using namespace std;
 
@@ -177,6 +178,7 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1), dictionar
 				DictionarySearchTask task;
 
 				if (this->dictionarySearchQueue.Pop(task)) {
+					LOG_DEBUG << "Block " << task.block_id << "started" << endl;
 					const std::vector<kmer_t>& kmers = *(task.kmers);
 					
 					size_t n_kmers = kmers.size();
@@ -225,6 +227,7 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1), dictionar
 					(*task.num_existing_kmers)[task.block_id] = existing_id;
 					//cout << "Thread " << tid << ", existing: " << existing_id - lo << ", to add: " << hi - existing_id << endl;
 
+					LOG_DEBUG << "Block " << task.block_id << "finished" << endl;
 					this->semaphore.dec();
 				}
 			}
@@ -238,7 +241,7 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1), dictionar
 				PatternExtensionTask task;
 
 				if (this->patternExtensionQueue.Pop(task)) {
-
+					LOG_DEBUG << "Block " << task.block_id << "started" << endl;
 					threadPatterns[task.block_id].clear();
 					threadPatterns[task.block_id].reserve(task.ranges->back());
 
@@ -291,7 +294,7 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1), dictionar
 
 					(*task.threadBytes)[task.block_id] = mem;
 
-
+					LOG_DEBUG << "Block " << task.block_id << "finished" << endl;
 					this->semaphore.dec();
 				}
 			}
@@ -307,6 +310,9 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 	AbstractKmerDb::addKmers(sampleId, kmers);
 	size_t n_kmers = kmers.size();
 	
+	LOG_DEBUG << "Restructurizing hashtable (serial)..." << endl;
+	auto start = std::chrono::high_resolution_clock::now();
+
 	// Musimy miec poprawne wskazniki do HT po wstawieniu do n_kmers elementow, a wiec nie moze sie w tym czasie zrobic restrukturyzacja
 	// Jesli jest ryzyko, to niech zrobi sie wczesniej, przed wstawianiem elementow
 	kmers2patternIds.reserve_for_additional(n_kmers);
@@ -314,23 +320,26 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 	samplePatterns.resize(n_kmers);
 	int n_threads = std::thread::hardware_concurrency();
 	std::vector<size_t> num_existing_kmers(n_threads);
-
-	auto start = std::chrono::high_resolution_clock::now();
-
-	std::vector<std::thread> threads(n_threads);
+	hashtableResizeTime += std::chrono::high_resolution_clock::now() - start;
 	
+	// find for kmers in parallel
+	LOG_DEBUG << "Finding kmers (parallel)..." << endl;
+	start = std::chrono::high_resolution_clock::now();
+	std::vector<std::thread> threads(n_threads);
 	// prepare tasks
 	for (int tid = 0; tid < n_threads; ++tid) {
 		semaphore.inc();
+		LOG_DEBUG << "Block " << tid << "scheduled" << endl;
 		dictionarySearchQueue.Push(DictionarySearchTask{ tid, n_threads, &kmers, &num_existing_kmers });
 	}
 	// wait for the task to complete
 	semaphore.waitForZero();
-	
 	hashtableFindTime += std::chrono::high_resolution_clock::now() - start;
+	
+	// add kmers to hashtable sequentially
+	LOG_DEBUG << "Adding kmers (serial)..." << endl;
 	start = std::chrono::high_resolution_clock::now();
 
-	// add kmers to hashtable sequentially
 	for (int tid = 0; tid < n_threads; ++tid) {
 		size_t n_kmers = kmers.size();
 		size_t block = n_kmers / n_threads;
@@ -345,8 +354,9 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 	}
 
 	hashtableAddTime += std::chrono::high_resolution_clock::now() - start;
+	
+	LOG_DEBUG << "Sorting (parallel)..." << endl;
 	start = std::chrono::high_resolution_clock::now();
-
 	auto pid_comparer = [](const std::pair<pattern_id_t, pattern_id_t*>& a, const std::pair<pattern_id_t, pattern_id_t*>& b)->bool {
 		return a.first < b.first;
 	};
@@ -358,8 +368,9 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 #endif
 
 	sortTime += std::chrono::high_resolution_clock::now() - start;
+	
+	LOG_DEBUG << "Extending kmers (parallel)..." << endl;
 	start = std::chrono::high_resolution_clock::now();
-
 	std::atomic<size_t> new_pid(patterns.size());
 
 	// calculate ranges
@@ -392,12 +403,14 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 
 	for (int tid = 0; tid < n_threads; ++tid) {
 		semaphore.inc();
+		LOG_DEBUG << "Block " << tid << "scheduled" << endl;
 		patternExtensionQueue.Push(PatternExtensionTask{ tid, sampleId, &ranges, &new_pid, &threadBytes });
 	}
 		
 	// wait for the task to complete
 	semaphore.waitForZero();
 
+	LOG_DEBUG << "Inserting kmers (serial)..." << endl;
 	for (int tid = 0; tid < threads.size(); ++tid) {
 		patternBytes += threadBytes[tid];
 	}

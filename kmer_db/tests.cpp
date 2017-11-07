@@ -3,8 +3,121 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
+#include <sstream>
 
 using namespace std;
+
+bool load_file_list(const string& file_list, vector<string>& kmc_file_list);
+void show_progress(const AbstractKmerDb &db);
+
+
+void Tests::compareWithNaive(const string& fname) {
+	vector<string> kmc_file_list;
+
+	load_file_list(fname, kmc_file_list);
+
+	FastKmerDb fast_db;
+	NaiveKmerDb naive_db;
+
+
+	//kmc_file_list.resize(100);
+
+	std::chrono::duration<double> loadingTime, naiveTime, fastTime;
+
+	cout << "PROCESSING SAMPLES..." << endl;
+
+	int n_threads = std::thread::hardware_concurrency();
+	std::vector<std::vector<uint64_t>> kmersCollections(n_threads);
+	std::vector<std::thread> readers(n_threads);
+
+
+	for (size_t i = 0; i < kmc_file_list.size(); i += n_threads)
+	{
+		std::chrono::duration<double> dt;
+		auto start = std::chrono::high_resolution_clock::now();
+
+		for (int tid = 0; tid < n_threads; ++tid) {
+			readers[tid] = std::thread([tid, i, n_threads, &kmersCollections, &kmc_file_list, &fast_db, &naive_db]() {
+				size_t file_id = i + tid;
+
+				if (file_id < kmc_file_list.size()) {
+					std::ostringstream oss;
+					oss << kmc_file_list[file_id] << " (" << file_id + 1 << "/" << kmc_file_list.size() << ")...";
+					if (!fast_db.loadKmers(kmc_file_list[file_id], kmersCollections[tid])) {
+						oss << "Error processing sample" << endl;
+					}
+					else {
+						oss << "done!" << endl;
+					}
+					cout << oss.str();
+				}
+			});
+		}
+
+
+		for (int tid = 0; tid < n_threads; ++tid) {
+			readers[tid].join();
+		}
+
+		dt = std::chrono::high_resolution_clock::now() - start;
+		cout << "Processed " << n_threads << " files in: " << dt.count() << endl;
+		loadingTime += dt;
+
+		for (int tid = 0; tid < n_threads; ++tid) {
+			size_t file_id = i + tid;
+
+			if (file_id < kmc_file_list.size()) {
+
+				start = std::chrono::high_resolution_clock::now();
+				naive_db.addKmers(file_id, kmersCollections[tid]);
+				dt = std::chrono::high_resolution_clock::now() - start;
+				cout << "Naive: time=" << dt.count() << ", ";
+				naiveTime += dt;
+				show_progress(naive_db);
+
+				start = std::chrono::high_resolution_clock::now();
+				fast_db.addKmers(file_id, kmersCollections[tid]);
+				dt = std::chrono::high_resolution_clock::now() - start;
+				cout << "Fast: time=" << dt.count() << ", ";
+				fastTime += dt;
+				show_progress(fast_db);
+
+				cout << endl;
+			}
+		}
+	}
+
+	cout << endl << "EXECUTION TIMES" << endl
+		<< "Loading k-mers: " << loadingTime.count() << endl
+		<< "Naive processing: " << naiveTime.count() << endl
+		<< "Fast processing: " << fastTime.count() << endl;
+
+
+	cout << "DETAILED RESULTS:" << endl
+		<< "Hashtable find: " << fast_db.hashtableFindTime.count() << endl
+		<< "Hashatable add: " << fast_db.hashtableAddTime.count() << endl
+		<< "Sort time: " << fast_db.sortTime.count() << endl
+		<< "Pattern extension time: " << fast_db.extensionTime.count() << endl;
+
+
+	std::ofstream ofs("kmer.db", std::ios::binary);
+	fast_db.serialize(ofs);
+	ofs.close();
+
+	//Tests::testSerialization(fast_db);
+	//Tests::testDistanceMatrix(fast_db, "d:/distances-fast.txt");
+
+
+	// compare naive and fast implementation
+	cout << "NAIVE COMPARISON" << endl;
+
+	Tests::comparePatterns(naive_db, fast_db, naive_db.getKmers());
+	Tests::testDistanceMatrix(fast_db, "d:/distances-naive.txt");
+
+}
+
+
+
 
 void Tests::comparePatterns(const AbstractKmerDb& db1, const AbstractKmerDb& db2, const std::vector<kmer_t>& kmers) {
 
