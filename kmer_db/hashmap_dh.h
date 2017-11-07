@@ -81,7 +81,8 @@ private:
 		if (filled > old_allocated * max_fill_factor)
 			allocated *= 2;
 
-		allocated_mask = allocated - 1;
+		allocated_mask = allocated - 1ull;
+		allocated_mask2 = allocated_mask >> 1;
 		size_when_restruct = (size_t)(allocated * max_fill_factor);
 
 		data = new item_t[allocated];
@@ -170,7 +171,7 @@ public:
 
 		if (data[h].key != empty_key)
 		{
-			size_t h_step = 2 * (my_hasher_dh2<Key>(k) & allocated_mask2) + 1;
+			size_t h_step = 2ull * (my_hasher_dh2<Key>(k) & allocated_mask2) + 1ull;
 
 			do
 			{
@@ -203,7 +204,7 @@ public:
 		if (data[h].key == empty_key)
 			return nullptr;
 
-		size_t h_step = 2 * (my_hasher_dh2<Key>(k) & allocated_mask2) + 1;
+		size_t h_step = 2ull * (my_hasher_dh2<Key>(k) & allocated_mask2) + 1ull;
 		h += h_step;
 		h = h & allocated_mask;
 
@@ -229,7 +230,7 @@ public:
 	void prefetch(Key k)
 	{
 		size_t h = my_hasher_dh1<Key>(k) & allocated_mask;
-		size_t h_step = 2 * (my_hasher_dh2<Key>(k) & allocated_mask2) + 1;
+		size_t h_step = 2ull * (my_hasher_dh2<Key>(k) & allocated_mask2) + 1ull;
 
 #ifdef WIN32
 		_mm_prefetch((const char*)(data + h), _MM_HINT_T0);
@@ -259,7 +260,8 @@ public:
 		while (filled + n_elems > allocated * max_fill_factor)
 			allocated *= 2;
 
-		allocated_mask = allocated - 1;
+		allocated_mask = allocated - 1ull;
+		allocated_mask2 = allocated_mask >> 1;
 		size_when_restruct = (size_t)(allocated * max_fill_factor);
 
 		std::cout << "\n--- Realloc to: " << allocated << "...";
