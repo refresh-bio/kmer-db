@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <cstddef>
+#include <utility>
 
 template<typename T>
 class pattern_t {
