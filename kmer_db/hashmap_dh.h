@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <xmmintrin.h>
 #include <iostream> 
+#include <cstddef>
 
 template<typename T>
 inline size_t my_hasher_dh1(T x)

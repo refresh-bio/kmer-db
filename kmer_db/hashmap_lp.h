@@ -4,7 +4,8 @@
 
 #include <mmintrin.h>
 #include <cstdint>
-
+#include <cstddef>
+#include <iostream>
 
 template<typename T>
 inline size_t my_hasher(T x)
@@ -232,14 +233,14 @@ public:
 		allocated_mask = allocated - 1;
 		size_when_restruct = (size_t)(allocated * max_fill_factor);
 
-		cout << "\n--- Realloc to: " << allocated << "...";
+		std::cout << "\n--- Realloc to: " << allocated << "...";
 
 		data = new item_t[allocated];
 		clear();
 
 		ht_memory += allocated * sizeof(item_t);
 
-		cout << "done!" << endl;
+		std::cout << "done!" << std::endl;
 
 		for (size_t i = 0; i < old_allocated; ++i)
 			if (old_data[i].key != empty_key && old_data[i].key != erased_key)
