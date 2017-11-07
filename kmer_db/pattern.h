@@ -123,7 +123,7 @@ public:
 	{
 		if (v.num_samples != num_samples)
 			return false;
-		if (v.parent != parent)
+		if (v.parent_id != parent_id)
 			return false;
 
 		for (size_t i = 0; i < num_local_samples; ++i)
@@ -215,7 +215,7 @@ public:
 		
 		data = new T[round_count(num_local_samples)];
 
-		sample_id_t* samples = reinterpret_cast<sample_id_t*>(buffer);
+		T* samples = reinterpret_cast<T*>(buffer);
 		for (int i = 0; i < num_local_samples; ++i) {
 			data[i] = samples[i];
 		}
