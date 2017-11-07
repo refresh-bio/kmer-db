@@ -178,7 +178,7 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1), dictionar
 				DictionarySearchTask task;
 
 				if (this->dictionarySearchQueue.Pop(task)) {
-					LOG_DEBUG << "Block " << task.block_id << "started" << endl;
+					LOG_DEBUG << "Block " << task.block_id << " started" << endl;
 					const std::vector<kmer_t>& kmers = *(task.kmers);
 					
 					size_t n_kmers = kmers.size();
@@ -227,7 +227,7 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1), dictionar
 					(*task.num_existing_kmers)[task.block_id] = existing_id;
 					//cout << "Thread " << tid << ", existing: " << existing_id - lo << ", to add: " << hi - existing_id << endl;
 
-					LOG_DEBUG << "Block " << task.block_id << "finished" << endl;
+					LOG_DEBUG << "Block " << task.block_id << " finished" << endl;
 					this->semaphore.dec();
 				}
 			}
@@ -241,7 +241,7 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1), dictionar
 				PatternExtensionTask task;
 
 				if (this->patternExtensionQueue.Pop(task)) {
-					LOG_DEBUG << "Block " << task.block_id << "started" << endl;
+					LOG_DEBUG << "Block " << task.block_id << " started" << endl;
 					threadPatterns[task.block_id].clear();
 					threadPatterns[task.block_id].reserve(task.ranges->back());
 
@@ -294,7 +294,7 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1), dictionar
 
 					(*task.threadBytes)[task.block_id] = mem;
 
-					LOG_DEBUG << "Block " << task.block_id << "finished" << endl;
+					LOG_DEBUG << "Block " << task.block_id << " finished" << endl;
 					this->semaphore.dec();
 				}
 			}
@@ -329,7 +329,7 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 	// prepare tasks
 	for (int tid = 0; tid < n_threads; ++tid) {
 		semaphore.inc();
-		LOG_DEBUG << "Block " << tid << "scheduled" << endl;
+		LOG_DEBUG << "Block " << tid << " scheduled" << endl;
 		dictionarySearchQueue.Push(DictionarySearchTask{ tid, n_threads, &kmers, &num_existing_kmers });
 	}
 	// wait for the task to complete
@@ -403,7 +403,7 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 
 	for (int tid = 0; tid < n_threads; ++tid) {
 		semaphore.inc();
-		LOG_DEBUG << "Block " << tid << "scheduled" << endl;
+		LOG_DEBUG << "Block " << tid << " scheduled" << endl;
 		patternExtensionQueue.Push(PatternExtensionTask{ tid, sampleId, &ranges, &new_pid, &threadBytes });
 	}
 		

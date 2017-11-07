@@ -1,4 +1,4 @@
-#include "Log.h"
+#include "log.h"
 
 const int Log::LEVEL_DEBUG = 0;
 const int Log::LEVEL_NORMAL = 1;
