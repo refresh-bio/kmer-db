@@ -100,8 +100,6 @@ private:
 		ht_memory -= old_allocated * sizeof(item_t);
 	}
 
-
-
 public:
 	// fixme: iterator-like functionality - change to iterator
 	item_t* begin() { return data; }
@@ -113,6 +111,8 @@ public:
 		return item.key == empty_key;
 	}
 
+
+	hash_map_dh() = delete;
 
 	hash_map_dh(Key k_empty)
 	{
