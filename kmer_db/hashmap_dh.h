@@ -280,7 +280,7 @@ public:
 
 			if (i % (1 << 15) == 0)
 			{
-				cerr << "Inserted (restr.): " << i << endl;
+				std::cerr << "Inserted (restr.): " << i << endl;
 				fflush(stderr);
 			}
 		}
