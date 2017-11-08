@@ -11,19 +11,30 @@ Log::Log()
 
 Log& Log::operator<< (std::ostream& (*pf)(std::ostream&))
 {
-	if (enabled) { *this->out << pf;  }
+	if (enabled) { 
+		*this->out << pf; 
+		out->flush();
+	}
 	return *this;
 }
 
 Log& Log::operator<< (std::ios& (*pf)(std::ios&))
 {
-	if (enabled) { *this->out << pf;  }
+	if (enabled) { 
+		*this->out << pf; 
+		out->flush();
+	}
+	
 	return *this;
 }
 
 Log& Log::operator<< (std::ios_base& (*pf)(std::ios_base&))
 {
-	if (enabled) { *this->out << pf;  }
+	if (enabled) { 
+		*this->out << pf;  
+		out->flush();
+	}
+
 	return *this;
 }
 

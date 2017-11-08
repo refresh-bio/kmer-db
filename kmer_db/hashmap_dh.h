@@ -7,6 +7,9 @@
 #include <xmmintrin.h>
 #include <iostream> 
 #include <cstddef>
+#include <thread>
+
+#include "log.h"
 
 template<typename T>
 inline size_t my_hasher_dh1(T x)
@@ -161,11 +164,46 @@ public:
 		{
 			if (i % (1 << 15) == 0)
 			{
-				std::cout << "Clear: " << i << " from " << allocated << std::endl;	fflush(stdout);
+				LOG_DEBUG << "Clear: " << i << " from " << allocated << std::endl;
 			}
 			data[i].key = empty_key;
 		}
 	}
+
+
+	void parallel_clear(void)
+	{
+		size = 0;
+		filled = 0;
+		
+		int n_threads = std::thread::hardware_concurrency();
+		std::vector<std::thread> threads(n_threads);
+
+		LOG_DEBUG << "Clearing hashtable (parallel)...";
+
+		for (int tid = 0; tid < n_threads; ++tid) {
+			threads[tid] = std::thread([tid, n_threads, this] {
+				size_t block = allocated / n_threads;
+				size_t lo = tid * block;
+				size_t hi = (tid == n_threads - 1) ? allocated : lo + block;
+
+				item_t * p = data + lo;
+				item_t * end = data + hi;
+
+				for (; p < end; ++p) {
+					p->key = empty_key;
+				}
+
+			});
+		}
+
+		for (auto& t : threads) {
+			t.join();
+		}
+
+		LOG_DEBUG << std::endl;
+	}
+
 
 	// Mozna to przyspieszyc tak, zebyinsert wykorzystywal wiedze o tym gdzie skonczyl szukac find
 	Value* insert(Key k, Value v)
@@ -262,28 +300,25 @@ public:
 		item_t *old_data = data;
 		size_t old_allocated = allocated;
 
-		std::cout << "reserve_for_additional - in\n"; fflush(stdout);
+		LOG_DEBUG << "reserve_for_additional - in\n"; 
 		while (filled + n_elems > allocated * max_fill_factor)
 			allocated *= 2;
 
-		std::cout << "reserve_for_additional - new_size: " << allocated << std::endl; fflush(stdout);
+		LOG_DEBUG << "reserve_for_additional - new_size: " << allocated << std::endl; 
 
 		allocated_mask = allocated - 1ull;
 		allocated_mask2 = allocated_mask >> 1;
 		size_when_restruct = (size_t)(allocated * max_fill_factor);
 
-		std::cout << "\n--- Realloc to: " << allocated << "...";
-		fflush(stdout);
+		LOG_NORMAL << "\n--- Realloc to: " << allocated << "..." << endl;
 
 		data = new item_t[allocated];
-		std::cout << "reserve_for_additional - after new: " << allocated << std::endl; fflush(stdout);
+		LOG_DEBUG << "reserve_for_additional - after new: " << allocated << std::endl; 
 
-		clear();
-		std::cout << "reserve_for_additional - after clear: " << allocated << std::endl; fflush(stdout);
+		parallel_clear();
+		LOG_DEBUG << "reserve_for_additional - after clear: " << allocated << std::endl;
 
 		ht_memory += allocated * sizeof(item_t);
-
-		std::cout << "done!" << std::endl; fflush(stdout);
 
 		for (size_t i = 0; i < old_allocated; ++i)
 		{
@@ -292,8 +327,7 @@ public:
 
 			if (i % (1 << 15) == 0)
 			{
-				std::cout << "Inserted (restr.): " << i << std::endl;
-				fflush(stderr);
+				LOG_DEBUG << "Inserted (restr.): " << i << std::endl;
 			}
 		}
 
