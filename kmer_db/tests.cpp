@@ -5,6 +5,8 @@
 #include <iomanip>
 #include <sstream>
 
+#include "console.h"
+
 using namespace std;
 
 bool load_file_list(const string& file_list, vector<string>& kmc_file_list);
@@ -14,7 +16,8 @@ void show_progress(const AbstractKmerDb &db);
 void Tests::compareWithNaive(const string& fname) {
 	vector<string> kmc_file_list;
 
-	load_file_list(fname, kmc_file_list);
+	Console console;
+	console.loadFileList(fname, kmc_file_list);
 
 	FastKmerDb fast_db;
 	NaiveKmerDb naive_db;
@@ -68,15 +71,22 @@ void Tests::compareWithNaive(const string& fname) {
 
 			if (file_id < kmc_file_list.size()) {
 
+				string sample = kmc_file_list[file_id];
+
+				size_t pos = sample.find_last_of("/\\");
+				if (pos != string::npos) {
+					sample = sample.substr(pos + 1);
+				}
+
 				start = std::chrono::high_resolution_clock::now();
-				naive_db.addKmers(file_id, kmersCollections[tid]);
+				naive_db.addKmers(sample, kmersCollections[tid]);
 				dt = std::chrono::high_resolution_clock::now() - start;
 				cout << "Naive: time=" << dt.count() << ", ";
 				naiveTime += dt;
 				show_progress(naive_db);
 
 				start = std::chrono::high_resolution_clock::now();
-				fast_db.addKmers(file_id, kmersCollections[tid]);
+				fast_db.addKmers(sample, kmersCollections[tid]);
 				dt = std::chrono::high_resolution_clock::now() - start;
 				cout << "Fast: time=" << dt.count() << ", ";
 				fastTime += dt;
@@ -173,7 +183,7 @@ void Tests::testSerialization(const FastKmerDb& db) {
 
 	 file << endl << "Distance matrix:" << endl;
 	 Array<uint32_t> matrix;
-	 db.calculateSimilarityMatrix(matrix);
+	 db.calculateSimilarity(matrix);
 	 cout << "Saving distance matrix...";
 	 for (int i = 0; i < matrix.size(); ++i) {
 		 for (int j = 0; j < matrix.size(); ++j) {

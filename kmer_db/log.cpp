@@ -1,5 +1,10 @@
 #include "log.h"
 
+#include <sstream>
+#include <iomanip>
+
+using namespace std;
+
 const int Log::LEVEL_DEBUG = 0;
 const int Log::LEVEL_NORMAL = 1;
 
@@ -38,3 +43,23 @@ Log& Log::operator<< (std::ios_base& (*pf)(std::ios_base&))
 	return *this;
 }
 
+std::string Log::formatLargeNumber(uint64_t num) {
+	std::string out = "";
+
+	do {
+		uint64_t part = num % 1000LL;
+		num = num / 1000LL;
+
+		if (num > 0) {
+			std::ostringstream oss;
+			oss << "," << std::setw(3) << std::setfill('0') << part;
+			out = oss.str() + out;
+		}
+		else {
+			out = std::to_string(part) + out;
+		}
+
+	} while (num > 0);
+
+	return out;
+}

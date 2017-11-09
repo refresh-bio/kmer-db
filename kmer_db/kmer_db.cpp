@@ -75,9 +75,9 @@ bool AbstractKmerDb::loadKmers(const string &filename, std::vector<kmer_t>& kmer
 
 /****************************************************************************************************************************************************/
 
-void NaiveKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers)
+sample_id_t NaiveKmerDb::addKmers(std::string sampleName, const std::vector<kmer_t>& kmers)
 {
-	AbstractKmerDb::addKmers(sampleId, kmers);
+	sample_id_t sampleId = AbstractKmerDb::addKmers(sampleName, kmers);
 	
 	uint64_t u_kmer;
 	uint64_t prefetch_kmer;
@@ -109,6 +109,8 @@ void NaiveKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmer
 
 		patternBytes += sizeof(sample_id_t);
 	}
+
+	return sampleId;
 }
 
 
@@ -122,8 +124,8 @@ void NaiveKmerDb::mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& sample
 }
 
 
-void NaiveKmerDb::calculateSimilarityMatrix(Array<uint32_t>& matrix) const {
-	matrix.resize(numSamples, numSamples);
+void NaiveKmerDb::calculateSimilarity(Array<uint32_t>& matrix) const {
+	matrix.resize(getSamplesCount(), getSamplesCount());
 	matrix.clear();
 
 	for (auto it = kmers2patternIds.cbegin(); it < kmers2patternIds.cend(); ++it) {
@@ -305,9 +307,10 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1), dictionar
 
 
 // Przetwarza pojedyncza baze KMC
-void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers)
+sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_t>& kmers)
 {
-	AbstractKmerDb::addKmers(sampleId, kmers);
+	sample_id_t sampleId = AbstractKmerDb::addKmers(sampleName, kmers);
+
 	size_t n_kmers = kmers.size();
 	
 	LOG_DEBUG << "Restructurizing hashtable (serial)..." << endl;
@@ -430,6 +433,7 @@ void FastKmerDb::addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers
 		}
 	}
 
+	return sampleId;
 }
 
 
@@ -462,15 +466,27 @@ void FastKmerDb::mapKmers2Samples(uint64_t kmer, std::vector<sample_id_t>& sampl
 
 
 void FastKmerDb::serialize(std::ofstream& file) const {
-	// store hashmap
-	size_t elements = kmers2patternIds.get_size();
-	file.write(reinterpret_cast<char*>(&elements), sizeof(elements));
-
+	
 	size_t numHastableElements = ioBufferBytes / sizeof(hash_map_dh<kmer_t, pattern_id_t>::item_t);
 	std::vector <hash_map_dh<kmer_t, pattern_id_t>::item_t> hastableBuffer(numHastableElements);
-
 	char* buffer = reinterpret_cast<char*>(hastableBuffer.data());
 
+	// store number of samples
+	size_t temp = getSamplesCount();
+	file.write(reinterpret_cast<const char*>(&temp), sizeof(temp));
+
+	// store sample names
+	for (const string& s : sampleNames) {
+		temp = s.size();
+		file.write(reinterpret_cast<const char*>(&temp), sizeof(temp));
+		file.write(s.data(), temp);
+	}
+
+
+	// store hashmap
+	temp = kmers2patternIds.get_size();
+	file.write(reinterpret_cast<char*>(&temp), sizeof(temp));
+	
 	// write ht elements in portions
 	size_t bufpos = 0;
 	for (auto it = kmers2patternIds.cbegin(); it < kmers2patternIds.cend(); ++it) {
@@ -490,8 +506,8 @@ void FastKmerDb::serialize(std::ofstream& file) const {
 	file.write(buffer, bufpos * sizeof(hash_map_dh<kmer_t, pattern_id_t>::item_t));
 	
 	// write patterns in portions
-	elements = patterns.size();
-	file.write(reinterpret_cast<char*>(&elements), sizeof(elements));
+	temp = patterns.size();
+	file.write(reinterpret_cast<char*>(&temp), sizeof(temp));
 	
 	char * currentPtr = buffer;
 	for (int pid = 0; pid < patterns.size(); ++pid) {
@@ -513,20 +529,36 @@ void FastKmerDb::serialize(std::ofstream& file) const {
 
 
 
-void FastKmerDb::deserialize(std::ifstream& file) {
+bool FastKmerDb::deserialize(std::ifstream& file) {
 	
-	size_t elements = kmers2patternIds.get_size();
-	file.read(reinterpret_cast<char*>(&elements), sizeof(elements));
-
-	kmers2patternIds.clear();
-	kmers2patternIds.reserve_for_additional(elements);
-
 	size_t numHastableElements = ioBufferBytes / sizeof(hash_map_dh<kmer_t, pattern_id_t>::item_t);
 	std::vector <hash_map_dh<kmer_t, pattern_id_t>::item_t> hastableBuffer(numHastableElements);
 	char* buffer = reinterpret_cast<char*>(hastableBuffer.data());
 
+	// load sample names
+	size_t temp;
+	file.read(reinterpret_cast<char*>(&temp), sizeof(temp));
+	sampleNames.resize(temp);
+
+	for (string& s : sampleNames) {
+		file.read(reinterpret_cast<char*>(&temp), sizeof(temp));
+		file.read(buffer, temp);
+		s.assign(buffer, temp);
+	}
+
+	if (!file) {
+		return false;
+	}
+
+	// load hashtable
+	temp = kmers2patternIds.get_size();
+	file.read(reinterpret_cast<char*>(&temp), sizeof(temp));
+
+	kmers2patternIds.clear();
+	kmers2patternIds.reserve_for_additional(temp);
+
 	size_t readCount = 0;
-	while (readCount < elements) {
+	while (readCount < temp) {
 		size_t portion = 0;
 		file.read(reinterpret_cast<char*>(&portion), sizeof(size_t));
 		file.read(buffer, portion * sizeof(hash_map_dh<kmer_t, pattern_id_t>::item_t));
@@ -537,10 +569,14 @@ void FastKmerDb::deserialize(std::ifstream& file) {
 		readCount += portion;
 	}
 
+	if (!file) {
+		return false;
+	}
+
 	// load patterns
-	file.read(reinterpret_cast<char*>(&elements), sizeof(elements));
+	file.read(reinterpret_cast<char*>(&temp), sizeof(temp));
 	patterns.clear();
-	patterns.resize(elements);
+	patterns.resize(temp);
 	
 	size_t pid = 0;
 	while (pid < patterns.size()) {
@@ -554,11 +590,17 @@ void FastKmerDb::deserialize(std::ifstream& file) {
 			++pid;
 		}
 	}
+
+	if (!file) {
+		return false;
+	}
+
+	return true;
 }
 
 
-void FastKmerDb::calculateSimilarityMatrix(Array<uint32_t>& matrix) const {
-	matrix.resize(numSamples, numSamples);
+void FastKmerDb::calculateSimilarity(Array<uint32_t>& matrix) const {
+	matrix.resize(getSamplesCount(), getSamplesCount());
 	matrix.clear();
 
 	for (int pid = 1; pid < patterns.size(); ++pid) {
@@ -589,5 +631,33 @@ void FastKmerDb::calculateSimilarityMatrix(Array<uint32_t>& matrix) const {
 			major_id = major.get_parent_id();
 		}
 	}
-	
 }
+
+void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<uint32_t>& similarities) const {
+		similarities.resize(this->getSamplesCount());
+
+		// iterate over kmers in analyzed sample
+		for (auto it = sampleDb.kmers2patternIds.cbegin(); it < sampleDb.kmers2patternIds.cend(); ++it) {
+			if (sampleDb.kmers2patternIds.is_free(*it)) {
+				continue;
+			}
+
+			// check if kmer exists in a database
+			auto entry = kmers2patternIds.find(it->key);
+
+			if (entry != nullptr) {
+				auto pid = *entry;
+				while (pid >= 0) {
+					const auto& pat = patterns[pid];
+
+					// iterate over elements in the subpattern
+					for (int i = pat.get_num_local_samples() - 1; i >= 0; --i) {
+						sample_id_t Si = pat.get_data()[i];
+						++similarities[Si];
+					}
+
+					pid = pat.get_parent_id();
+				}
+			}
+		}
+	}

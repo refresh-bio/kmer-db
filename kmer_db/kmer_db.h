@@ -9,6 +9,7 @@
 #include <fstream>
 #include <chrono>
 #include <vector>
+#include <map>
 
 typedef uint16_t sample_id_t;
 typedef uint64_t kmer_t;
@@ -17,13 +18,15 @@ typedef int64_t pattern_id_t;
 
 class AbstractKmerDb {
 protected:
-	size_t numSamples;
+	std::vector<string> sampleNames;
 
 public:
 
-	AbstractKmerDb() : numSamples(0) {}
+	AbstractKmerDb() {}
 
-	const size_t getNumSamples() const { return numSamples; }
+	const size_t getSamplesCount() const { return sampleNames.size(); }
+
+	const std::vector<string> getSampleNames() const { return sampleNames; }
 
 	virtual const size_t getKmersCount() const = 0;
 
@@ -37,11 +40,16 @@ public:
 
 	virtual bool loadKmers(const std::string &filename, std::vector<kmer_t>& kmers);
 
-	virtual void addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers) { ++numSamples; }
+	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers) {
+		sample_id_t newId = sampleNames.size();
+		sampleNames.push_back(sampleName);
+		return newId;
+
+	}
 
 	virtual void mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const = 0;
 
-	virtual void calculateSimilarityMatrix(Array<uint32_t>& matrix) const = 0;
+	virtual void calculateSimilarity(Array<uint32_t>& matrix) const = 0;
 };
 
 
@@ -71,11 +79,11 @@ public:
 		return kmers;
 	}
 
-	virtual void addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers);
+	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers);
 
 	virtual void mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const;
 
-	virtual void calculateSimilarityMatrix(Array<uint32_t>& matrix) const;
+	virtual void calculateSimilarity(Array<uint32_t>& matrix) const;
 
 	std::map<std::vector<sample_id_t>, size_t> getPatternsStatistics() const;
 
@@ -149,15 +157,17 @@ public:
 		return kmers;
 	}
 
-	virtual void addKmers(sample_id_t sampleId, const std::vector<kmer_t>& kmers);
+	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers);
 
 	virtual void mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const;
 
-	virtual void calculateSimilarityMatrix(Array<uint32_t>& matrix) const;
+	virtual void calculateSimilarity(Array<uint32_t>& matrix) const;
+
+	virtual void calculateSimilarity(const FastKmerDb& sampleDb, std::vector<uint32_t>& vector) const;
 
 	virtual void serialize(std::ofstream& file) const;
 
-	virtual void deserialize(std::ifstream& file);
+	virtual bool deserialize(std::ifstream& file);
 
 protected:
 	static const size_t ioBufferBytes;

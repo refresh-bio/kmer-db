@@ -144,6 +144,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="array.h" />
+    <ClInclude Include="console.h" />
     <ClInclude Include="hashmap_dh.h" />
     <ClInclude Include="hashmap_lp.h" />
     <ClInclude Include="kmer_db.h" />
@@ -157,6 +158,7 @@
     <ClInclude Include="tests.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="console.cpp" />
     <ClCompile Include="kmc_api\kmc_file.cpp" />
     <ClCompile Include="kmc_api\kmer_api.cpp" />
     <ClCompile Include="kmc_api\mmer.cpp" />

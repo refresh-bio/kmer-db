@@ -47,6 +47,15 @@ public:
 	T* operator[](const int row) { return v.data() + row * width; }
 	const T* operator[](const int row) const { return v.data() + row * width; }
 
+	void save(std::ofstream & file) {
+		for (int i = 0; i < size(); ++i) {
+			for (int j = 0; j < size(); ++j) {
+				file  << (*this)[i][j] << ',';
+			}
+			file << endl;
+		}
+	}
+
 
 protected:
 	int width;
