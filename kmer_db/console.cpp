@@ -36,14 +36,18 @@ void show_progress(const AbstractKmerDb &db)
 
 int Console::parse(int argc, char** argv) {
 
+	cout << "kmer-db version 1.0" << endl;
 	
 	if (argc == 4 && string(argv[1]) == "--build") {
+		cout << "Database building mode" << endl;
 		return runBuildDatabase(argv[2], argv[3]);
 	}
 	else if (argc == 4 && string(argv[1]) == "--all2all") {
+		cout << "All versus all comparison" << endl;
 		return runAllVsAll(argv[2], argv[3]);
 	}
 	else if (argc == 5 && string(argv[1]) == "--one2all") {
+		cout << "One versus all comparison" << endl;
 		return runOneVsAll(argv[2], argv[3], argv[4]);
 	}
 	else {
@@ -162,9 +166,7 @@ int Console::runAllVsAll(const std::string dbFilename, const std::string& simila
 	cout << "OK" << endl;
 
 	cout << "Storing similarity matrix in " << similarityFile << "...";
-	//std::copy(db.getSampleNames().begin(), db.getSampleNames().end(), ostream_iterator<string>(ofs, ","));
-	//ofs << endl;
-	for (const auto n : db.getSampleNames()) { ofs << n << ","; }
+	std::copy(db.getSampleNames().begin(), db.getSampleNames().end(), ostream_iterator<string>(ofs, ","));
 	ofs << endl;
 	
 	matrix.save(ofs);
@@ -208,13 +210,10 @@ int Console::runOneVsAll(const std::string dbFilename, const std::string& single
 
 	cout << "Storing similarity vector in " << similarityFile << "...";
 	std::ofstream ofs(similarityFile);
-	for (const auto n : db.getSampleNames()) { ofs << n << ","; }
+	
+	std::copy(db.getSampleNames().cbegin(), db.getSampleNames().cend(), ostream_iterator<string>(ofs, ","));
 	ofs << endl;
-	for (const auto v : sims) { ofs << v << ","; }
-
-	//std::copy(db.getSampleNames().cbegin(), db.getSampleNames().cend(), ostream_iterator<string>(ofs, ","));
-	//ofs << endl;
-	//std::copy(sims.begin(), sims.end(), ostream_iterator<uint32_t>(ofs, ","));
+	std::copy(sims.begin(), sims.end(), ostream_iterator<uint32_t>(ofs, ","));
 
 	ofs.close();
 	cout << "OK" << endl;
@@ -238,8 +237,7 @@ bool Console::loadFileList(const std::string& multipleKmcSamples, std::vector<st
 }
 
 void Console::showInstructions() {
-	cout << "kmer-db version 1.0" << endl
-		<< "USAGE" << endl
+	cout	<< "USAGE" << endl
 
 		<< "Building k-mer database:" << endl
 		<< "\t kmer_db --build <sample_list> <database>" << endl

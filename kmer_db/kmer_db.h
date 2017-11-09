@@ -26,7 +26,7 @@ public:
 
 	const size_t getSamplesCount() const { return sampleNames.size(); }
 
-	const std::vector<string> getSampleNames() const { return sampleNames; }
+	const std::vector<string>& getSampleNames() const { return sampleNames; }
 
 	virtual const size_t getKmersCount() const = 0;
 
