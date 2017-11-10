@@ -36,7 +36,7 @@ public:
 	Log& operator<< (std::ios& (*pf)(std::ios&));
 	Log& operator<< (std::ios_base& (*pf)(std::ios_base&));
 
-	static std::string Log::formatLargeNumber(uint64_t num);
+	static std::string formatLargeNumber(uint64_t num);
 
 protected:
 	bool enabled;

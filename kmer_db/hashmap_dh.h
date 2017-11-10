@@ -93,7 +93,7 @@ private:
 
 		ht_memory += allocated * sizeof(item_t);
 
-		//cout << "\n--- Realloc to: " << allocated << endl;
+		//cout << "\n--- Realloc to: " << allocated << std::endl;
 
 		for (size_t i = 0; i < old_allocated; ++i)
 			if (old_data[i].key != empty_key)
@@ -310,7 +310,7 @@ public:
 		allocated_mask2 = allocated_mask >> 1;
 		size_when_restruct = (size_t)(allocated * max_fill_factor);
 
-		LOG_NORMAL << "\n--- Realloc to: " << allocated << "..." << endl;
+		LOG_NORMAL << "\n--- Realloc to: " << allocated << "..." << std::endl;
 
 		data = new item_t[allocated];
 		LOG_DEBUG << "reserve_for_additional - after new: " << allocated << std::endl; 

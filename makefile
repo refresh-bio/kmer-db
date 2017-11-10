@@ -4,7 +4,7 @@ KMER_DB_ROOT_DIR = .
 KMER_DB_MAIN_DIR = kmer_db
 KMER_DB_LIBS_DIR = kmer_db/kmc_api
 
-CC 	= g++
+CC 	= /usr/local/gcc62/bin/g++
 CFLAGS	= -Wall -O3 -m64 -std=c++11 -fopenmp -pthread -I $(KMER_DB_LIBS_DIR)
 CLINK	= -lm -O3 -std=c++11 -lpthread -fopenmp -static -fabi-version=6 
 
