@@ -14,6 +14,7 @@
 #include <mutex>
 #include <atomic>
 
+
 #ifdef WIN32
 #include <ppl.h>
 #else
@@ -23,6 +24,10 @@
 #include "kmc_api/kmc_file.h"
 #include "kmer_db.h"
 #include "log.h"
+
+#ifdef USE_RADULS
+#include "raduls/raduls.h"
+#endif
 
 using namespace std;
 
@@ -321,6 +326,10 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 	kmers2patternIds.reserve_for_additional(n_kmers);
 	
 	samplePatterns.resize(n_kmers);
+#ifdef RADULS
+	tmp_samplePatterns.resize(n_kmers);
+#endif
+
 	int n_threads = std::thread::hardware_concurrency();
 	std::vector<size_t> num_existing_kmers(n_threads);
 	hashtableResizeTime += std::chrono::high_resolution_clock::now() - start;
@@ -363,15 +372,22 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 	auto pid_comparer = [](const std::pair<pattern_id_t, pattern_id_t*>& a, const std::pair<pattern_id_t, pattern_id_t*>& b)->bool {
 		return a.first < b.first;
 	};
-		
+#ifdef USE_RADULS
+	raduls::RadixSortMSD(reinterpret_cast<uint8_t*>(samplePatterns.data()), reinterpret_cast<uint8_t*>(tmp_samplePatterns.data()), 
+//		samplePatterns.size(), sizeof(std::pair<pattern_id_t, pattern_id_t*>), sizeof(size_t), std::thread::hardware_concurrency());
+		samplePatterns.size(), sizeof(std::pair<pattern_id_t, pattern_id_t*>), 5, 12);
+#else
 #ifdef WIN32
 	concurrency::parallel_sort(samplePatterns.begin(), samplePatterns.end(), pid_comparer);
 #else
 	__gnu_parallel::sort(samplePatterns.begin(), samplePatterns.end(), pid_comparer);
 #endif
+#endif
 
 	sortTime += std::chrono::high_resolution_clock::now() - start;
-	
+	std::cout << "sort time: " << sortTime.count() << "  " << samplePatterns.size() << endl;
+
+
 	LOG_DEBUG << "Extending kmers (parallel)..." << endl;
 	start = std::chrono::high_resolution_clock::now();
 	std::atomic<size_t> new_pid(patterns.size());
@@ -467,8 +483,8 @@ void FastKmerDb::mapKmers2Samples(uint64_t kmer, std::vector<sample_id_t>& sampl
 
 void FastKmerDb::serialize(std::ofstream& file) const {
 	
-	size_t numHastableElements = ioBufferBytes / sizeof(hash_map_dh<kmer_t, pattern_id_t>::item_t);
-	std::vector <hash_map_dh<kmer_t, pattern_id_t>::item_t> hastableBuffer(numHastableElements);
+	size_t numHastableElements = ioBufferBytes / sizeof(hash_map_lp<kmer_t, pattern_id_t>::item_t);
+	std::vector <hash_map_lp<kmer_t, pattern_id_t>::item_t> hastableBuffer(numHastableElements);
 	char* buffer = reinterpret_cast<char*>(hastableBuffer.data());
 
 	// store number of samples
@@ -497,13 +513,13 @@ void FastKmerDb::serialize(std::ofstream& file) const {
 		hastableBuffer[bufpos++] = *it;
 		if (bufpos == numHastableElements) {
 			file.write(reinterpret_cast<char*>(&bufpos), sizeof(size_t));
-			file.write(buffer, bufpos * sizeof(hash_map_dh<kmer_t, pattern_id_t>::item_t));
+			file.write(buffer, bufpos * sizeof(hash_map_lp<kmer_t, pattern_id_t>::item_t));
 			bufpos = 0;
 		}
 	}
 	// write remaining ht elements
 	file.write(reinterpret_cast<char*>(&bufpos), sizeof(size_t));
-	file.write(buffer, bufpos * sizeof(hash_map_dh<kmer_t, pattern_id_t>::item_t));
+	file.write(buffer, bufpos * sizeof(hash_map_lp<kmer_t, pattern_id_t>::item_t));
 	
 	// write patterns in portions
 	temp = patterns.size();
@@ -531,8 +547,8 @@ void FastKmerDb::serialize(std::ofstream& file) const {
 
 bool FastKmerDb::deserialize(std::ifstream& file) {
 	
-	size_t numHastableElements = ioBufferBytes / sizeof(hash_map_dh<kmer_t, pattern_id_t>::item_t);
-	std::vector <hash_map_dh<kmer_t, pattern_id_t>::item_t> hastableBuffer(numHastableElements);
+	size_t numHastableElements = ioBufferBytes / sizeof(hash_map_lp<kmer_t, pattern_id_t>::item_t);
+	std::vector <hash_map_lp<kmer_t, pattern_id_t>::item_t> hastableBuffer(numHastableElements);
 	char* buffer = reinterpret_cast<char*>(hastableBuffer.data());
 
 	// load sample names
@@ -561,7 +577,7 @@ bool FastKmerDb::deserialize(std::ifstream& file) {
 	while (readCount < temp) {
 		size_t portion = 0;
 		file.read(reinterpret_cast<char*>(&portion), sizeof(size_t));
-		file.read(buffer, portion * sizeof(hash_map_dh<kmer_t, pattern_id_t>::item_t));
+		file.read(buffer, portion * sizeof(hash_map_lp<kmer_t, pattern_id_t>::item_t));
 
 		for (size_t j = 0; j < portion; ++j) {
 			kmers2patternIds.insert(hastableBuffer[j].key, hastableBuffer[j].val);

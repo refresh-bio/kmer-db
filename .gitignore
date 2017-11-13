@@ -7,3 +7,6 @@
 *.txt
 *.db
 *.stat
+*.ipch
+*.vspx
+*.psess

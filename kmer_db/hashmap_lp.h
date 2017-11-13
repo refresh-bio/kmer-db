@@ -4,41 +4,45 @@
 
 #include <mmintrin.h>
 #include <cstdint>
+#include <xmmintrin.h>
+#include <iostream> 
 #include <cstddef>
-#include <iostream>
+#include <thread>
+
+#include "log.h"
 
 template<typename T>
-inline size_t my_hasher(T x)
+inline size_t my_hasher_lp(T x)
 {
 	return 0;			// !!! Fake impl.
 }
 
 
 template<>
-inline size_t my_hasher<uint64_t>(uint64_t x)
+inline size_t my_hasher_lp<uint64_t>(uint64_t x)
 {
 	return x * 0xc70f6907ull;
 }
 
 
 template<>
-inline size_t my_hasher<uint32_t>(uint32_t x)
+inline size_t my_hasher_lp<uint32_t>(uint32_t x)
 {
 	return x * 0xc70f6907ul;
 }
 
 
 template <typename Key, typename Value>
-class hash_map {
+class hash_map_lp {
+public:
 	typedef struct {
 		Key key;
 		Value val;
 	} item_t;
-	
+
+private:
 	Key empty_key;
-	Key erased_key;
 	double max_fill_factor;
-	double max_rest_factor;
 
 	size_t size;
 	size_t filled;
@@ -46,6 +50,7 @@ class hash_map {
 	size_t allocated;
 	size_t size_when_restruct;
 	size_t allocated_mask;
+	size_t allocated_mask2;
 
 	size_t ht_memory;
 	size_t ht_total;
@@ -56,10 +61,11 @@ class hash_map {
 		item_t *old_data = data;
 		size_t old_allocated = allocated;
 
-		if(filled > old_allocated * max_rest_factor)
+		if (filled > old_allocated * max_fill_factor)
 			allocated *= 2;
 
-		allocated_mask = allocated - 1;
+		allocated_mask = allocated - 1ull;
+		allocated_mask2 = allocated_mask >> 1;
 		size_when_restruct = (size_t)(allocated * max_fill_factor);
 
 		data = new item_t[allocated];
@@ -67,18 +73,16 @@ class hash_map {
 
 		ht_memory += allocated * sizeof(item_t);
 
-		//cout << "\n--- Realloc to: " << allocated << endl;
+		//cout << "\n--- Realloc to: " << allocated << std::endl;
 
 		for (size_t i = 0; i < old_allocated; ++i)
-			if (old_data[i].key != empty_key && old_data[i].key != erased_key)
+			if (old_data[i].key != empty_key)
 				insert(old_data[i].key, old_data[i].val);
 
 		delete[] old_data;
-		ht_memory -= old_allocated  * sizeof(item_t);
+		ht_memory -= old_allocated * sizeof(item_t);
 	}
 
-	
-	
 public:
 	// fixme: iterator-like functionality - change to iterator
 	item_t* begin() { return data; }
@@ -87,36 +91,35 @@ public:
 	const item_t* cend() const { return data + allocated; }
 
 	bool is_free(const item_t& item) const {
-		return item.key == empty_key || item.key == erased_key;
+		return item.key == empty_key;
 	}
 
 
-	hash_map(Key k_empty, Key k_erased)
+	hash_map_lp() = delete;
+
+	hash_map_lp(Key k_empty)
 	{
 		ht_memory = 0;
 		ht_total = 0;
 		ht_match = 0;
-		
+
 		allocated = 16;
 		allocated_mask = allocated - 1;
+		allocated_mask2 = allocated_mask >> 1;
 
 		size = 0;
 		filled = 0;
 		data = new item_t[allocated];
-		max_fill_factor = 0.45;
-		max_rest_factor = 0.35;
+		max_fill_factor = 0.8;
 
 		ht_memory += allocated * sizeof(item_t);
 
 		size_when_restruct = (size_t)(allocated * max_fill_factor);
 
-		empty_key = k_empty;
-		erased_key = k_erased;
-
-		clear();
+		set_special_keys(k_empty);
 	}
 
-	~hash_map()
+	~hash_map_lp()
 	{
 		if (data)
 			delete[] data;
@@ -126,13 +129,61 @@ public:
 		return ht_memory;
 	}
 
+	void set_special_keys(Key k_empty)
+	{
+		empty_key = k_empty;
+
+		clear();
+	}
+
 	void clear(void)
 	{
 		size = 0;
 		filled = 0;
 		for (size_t i = 0; i < allocated; ++i)
+		{
+			if (i % (1 << 15) == 0)
+			{
+				LOG_DEBUG << "Clear: " << i << " from " << allocated << std::endl;
+			}
 			data[i].key = empty_key;
+		}
 	}
+
+
+	void parallel_clear(void)
+	{
+		size = 0;
+		filled = 0;
+
+		int n_threads = std::thread::hardware_concurrency();
+		std::vector<std::thread> threads(n_threads);
+
+		LOG_DEBUG << "Clearing hashtable (parallel)...";
+
+		for (int tid = 0; tid < n_threads; ++tid) {
+			threads[tid] = std::thread([tid, n_threads, this] {
+				size_t block = allocated / n_threads;
+				size_t lo = tid * block;
+				size_t hi = (tid == n_threads - 1) ? allocated : lo + block;
+
+				item_t * p = data + lo;
+				item_t * end = data + hi;
+
+				for (; p < end; ++p) {
+					p->key = empty_key;
+				}
+
+			});
+		}
+
+		for (auto& t : threads) {
+			t.join();
+		}
+
+		LOG_DEBUG << std::endl;
+	}
+
 
 	// Mozna to przyspieszyc tak, zebyinsert wykorzystywal wiedze o tym gdzie skonczyl szukac find
 	Value* insert(Key k, Value v)
@@ -140,10 +191,15 @@ public:
 		if (size >= size_when_restruct)
 			restruct();
 
-		size_t h = my_hasher<Key>(k) & allocated_mask;
+		size_t h = my_hasher_lp<Key>(k) & allocated_mask;
 
-		while (data[h].key != empty_key && data[h].key != erased_key)
-			h = (h + 1) & allocated_mask;
+		if (data[h].key != empty_key)
+		{
+			do
+			{
+				h = (h + 1) & allocated_mask;
+			} while (data[h].key != empty_key);
+		}
 
 		if (data[h].key == empty_key)
 			++size;
@@ -162,55 +218,42 @@ public:
 
 	Value* find(Key k) const
 	{
-		size_t h = my_hasher<Key>(k) & allocated_mask;
+		size_t h = my_hasher_lp<Key>(k) & allocated_mask;
+		if (data[h].key == k)
+			return &(data[h].val);
 
-//		++ht_total;
+		if (data[h].key == empty_key)
+			return nullptr;
+
+		h = (h + 1) & allocated_mask;
+
+		//		++ht_total;
 		while (data[h].key != empty_key)
 		{
 			if (data[h].key == k)
 			{
-//				++ht_match;
+				//				++ht_match;
 				return &(data[h].val);
 			}
 			else
-				if (h == allocated_mask)
-					h = 0;
-				else
-					++h;
-			//				h = (h + 1) & allocated_mask;
-
-//			++ht_total;
+			{
+				h = (h + 1) & allocated_mask;
+			}
 		}
 
 		return nullptr;
 	}
 
-//	__declspec(noinline) 
+	//	__declspec(noinline) 
 	void prefetch(Key k)
 	{
-		size_t h = my_hasher<Key>(k) & allocated_mask;
+		size_t h = my_hasher_lp<Key>(k) & allocated_mask;
 
 #ifdef WIN32
-		_mm_prefetch((const char*) (data + h), _MM_HINT_T0);
+		_mm_prefetch((const char*)(data + h), _MM_HINT_T0);
 #else
 		__builtin_prefetch(data + h);
 #endif
-	}
-		
-	void erase(Key k)
-	{
-		size_t h = my_hasher<Key>(k) & allocated_mask;
-
-		while (data[h].key != empty_key)
-			if (data[h].key == k)
-			{
-				data[h].key = erased_key;
-				data[h].val = Value();
-				--filled;
-				return;
-			}
-			else
-				h = (h + 1) & allocated_mask;
 	}
 
 	size_t get_size(void) const
@@ -220,34 +263,44 @@ public:
 
 	void reserve_for_additional(size_t n_elems)
 	{
-		if (filled + n_elems <= allocated * max_rest_factor)
+		if (filled + n_elems <= allocated * max_fill_factor)
 			return;
-
 
 		item_t *old_data = data;
 		size_t old_allocated = allocated;
 
-		while (filled + n_elems > allocated * max_rest_factor)
+		LOG_DEBUG << "reserve_for_additional - in\n";
+		while (filled + n_elems > allocated * max_fill_factor)
 			allocated *= 2;
 
-		allocated_mask = allocated - 1;
+		LOG_DEBUG << "reserve_for_additional - new_size: " << allocated << std::endl;
+
+		allocated_mask = allocated - 1ull;
+		allocated_mask2 = allocated_mask >> 1;
 		size_when_restruct = (size_t)(allocated * max_fill_factor);
 
-		std::cout << "\n--- Realloc to: " << allocated << "...";
+		LOG_NORMAL << "\n--- Realloc to: " << allocated << "..." << std::endl;
 
 		data = new item_t[allocated];
-		clear();
+		LOG_DEBUG << "reserve_for_additional - after new: " << allocated << std::endl;
+
+		parallel_clear();
+		LOG_DEBUG << "reserve_for_additional - after clear: " << allocated << std::endl;
 
 		ht_memory += allocated * sizeof(item_t);
 
-		std::cout << "done!" << std::endl;
-
 		for (size_t i = 0; i < old_allocated; ++i)
-			if (old_data[i].key != empty_key && old_data[i].key != erased_key)
+		{
+			if (old_data[i].key != empty_key)
 				insert(old_data[i].key, old_data[i].val);
 
-		delete[] old_data;
-		ht_memory -= old_allocated  * sizeof(item_t);
-	}
+			if (i % (1 << 15) == 0)
+			{
+				LOG_DEBUG << "Inserted (restr.): " << i << std::endl;
+			}
+		}
 
+		delete[] old_data;
+		ht_memory -= old_allocated * sizeof(item_t);
+	}
 };

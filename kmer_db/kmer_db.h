@@ -4,12 +4,16 @@
 #include "hashmap_dh.h"
 #include "array.h"
 #include "queue.h"
+#include "aligned_vector.h"
 
 #include <map>
 #include <fstream>
 #include <chrono>
 #include <vector>
 #include <map>
+
+//#define USE_RADULS
+
 
 typedef uint16_t sample_id_t;
 typedef uint64_t kmer_t;
@@ -55,7 +59,7 @@ public:
 
 class NaiveKmerDb : public AbstractKmerDb {
 public:
-	NaiveKmerDb() : kmers2patternIds((unsigned long long) - 1, (unsigned long long) - 2) {
+	NaiveKmerDb() : kmers2patternIds((unsigned long long) - 1) {
 		patternBytes = 0;
 	}
 
@@ -90,7 +94,7 @@ public:
 protected:
 	size_t patternBytes;		// iloœæ pamiêci zajmowana przez wszystkie wzorce
 
-	hash_map<kmer_t, pattern_id_t> kmers2patternIds;
+	hash_map_lp<kmer_t, pattern_id_t> kmers2patternIds;
 
 	std::vector<std::vector<sample_id_t>> patterns;
 };
@@ -174,7 +178,7 @@ protected:
 	
 	size_t patternBytes;		// iloœæ pamiêci zajmowana przez wBuszystkie wzorce
 								// K-mer database structures
-	hash_map_dh<kmer_t, pattern_id_t> kmers2patternIds;
+	hash_map_lp<kmer_t, pattern_id_t> kmers2patternIds;
 
 	// liczba wystapien wzorca w kmer_dict, wektor id osobnikow zawierajacych k - mer)
 	std::vector<pattern_t<sample_id_t>> patterns;
@@ -182,7 +186,11 @@ protected:
 	std::vector<std::vector<std::pair<pattern_id_t, pattern_t<sample_id_t>>>> threadPatterns;
 
 	// first element - pattern id, second element 
-	std::vector<std::pair<pattern_id_t, pattern_id_t*>> samplePatterns;
+//	std::vector<std::pair<pattern_id_t, pattern_id_t*>> samplePatterns;
+	aligned_vector<std::pair<pattern_id_t, pattern_id_t*>> samplePatterns;
+#ifdef USE_RADULS
+	aligned_vector<std::pair<pattern_id_t, pattern_id_t*>> tmp_samplePatterns;
+#endif
 
 	CRegisteringQueue<DictionarySearchTask> dictionarySearchQueue;
 	

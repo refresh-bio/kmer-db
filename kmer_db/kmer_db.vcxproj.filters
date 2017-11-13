@@ -5,6 +5,9 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
+    <Filter Include="raduls">
+      <UniqueIdentifier>{d4a023d3-f434-4e51-b960-378654884003}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="kmc_api\kmc_file.h">
@@ -46,6 +49,30 @@
     <ClInclude Include="console.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="raduls\comp_and_swap.h">
+      <Filter>raduls</Filter>
+    </ClInclude>
+    <ClInclude Include="raduls\defs.h">
+      <Filter>raduls</Filter>
+    </ClInclude>
+    <ClInclude Include="raduls\exceptions.h">
+      <Filter>raduls</Filter>
+    </ClInclude>
+    <ClInclude Include="raduls\raduls.h">
+      <Filter>raduls</Filter>
+    </ClInclude>
+    <ClInclude Include="raduls\record.h">
+      <Filter>raduls</Filter>
+    </ClInclude>
+    <ClInclude Include="raduls\small_sort.h">
+      <Filter>raduls</Filter>
+    </ClInclude>
+    <ClInclude Include="raduls\sorting_network.h">
+      <Filter>raduls</Filter>
+    </ClInclude>
+    <ClInclude Include="aligned_vector.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="kmer_db.cpp">
@@ -74,6 +101,9 @@
     </ClCompile>
     <ClCompile Include="console.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="raduls\sorting_network.cpp">
+      <Filter>raduls</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
