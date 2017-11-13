@@ -38,7 +38,7 @@ int Console::parse(int argc, char** argv) {
 
 	cout << "kmer-db version 1.0" << endl;
 	
-	if (argc == 4 && string(argv[1]) == "--build") {
+		if (argc == 4 && string(argv[1]) == "--build") {
 		cout << "Database building mode" << endl;
 		return runBuildDatabase(argv[2], argv[3]);
 	}
@@ -49,6 +49,10 @@ int Console::parse(int argc, char** argv) {
 	else if (argc == 5 && string(argv[1]) == "--one2all") {
 		cout << "One versus all comparison" << endl;
 		return runOneVsAll(argv[2], argv[3], argv[4]);
+	}
+	else if (argc == 4 && string(argv[1]) == "--list-patterns") {
+		cout << "Listing all patterns" << endl;
+		return runListPatterns(argv[2], argv[3]);
 	}
 	else {
 		showInstructions();
@@ -145,7 +149,7 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 
 /****************************************************************************************************************************************************/
 
-int Console::runAllVsAll(const std::string dbFilename, const std::string& similarityFile) {
+int Console::runAllVsAll(const std::string& dbFilename, const std::string& similarityFile) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
 	std::ofstream ofs(similarityFile);
 	FastKmerDb db;
@@ -176,7 +180,7 @@ int Console::runAllVsAll(const std::string dbFilename, const std::string& simila
 
 /****************************************************************************************************************************************************/
 
-int Console::runOneVsAll(const std::string dbFilename, const std::string& singleKmcSample, const std::string& similarityFile) {
+int Console::runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFile) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
 	FastKmerDb db;
 
@@ -221,6 +225,28 @@ int Console::runOneVsAll(const std::string dbFilename, const std::string& single
 
 /****************************************************************************************************************************************************/
 
+int Console::runListPatterns(const std::string& dbFilename, const std::string& patternFile) {
+	std::ifstream dbFile(dbFilename, std::ios::binary);
+	FastKmerDb db;
+
+	cout << "Loading k-mer database " << dbFilename << "...";
+	if (!dbFile || !db.deserialize(dbFile)) {
+		cout << "FAILED";
+		return -1;
+	}
+	cout << "OK" << endl
+		<< "Number of samples: " << db.getSamplesCount() << endl
+		<< "Number of patterns: " << db.getPatternsCount() << endl
+		<< "Number of k-mers: " << db.getKmersCount() << endl;
+
+	cout << "Storing patterns in in " << patternFile << "...";
+	std::ofstream ofs(patternFile);
+	db.savePatterns(ofs);
+	ofs.close();
+}
+
+/****************************************************************************************************************************************************/
+
 bool Console::loadFileList(const std::string& multipleKmcSamples, std::vector<std::string>& kmcFileList) {
 
 	std::ifstream ifs(multipleKmcSamples);
@@ -236,6 +262,7 @@ bool Console::loadFileList(const std::string& multipleKmcSamples, std::vector<st
 	return !kmcFileList.empty();
 }
 
+/****************************************************************************************************************************************************/
 void Console::showInstructions() {
 	cout	<< "USAGE" << endl
 
@@ -255,3 +282,4 @@ void Console::showInstructions() {
 		<< "\t   database - k-mer database file (input)" << endl
 		<< "\t   similarity_matrix - file with similarity matrix (output)" << endl;
 }
+

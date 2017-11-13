@@ -173,6 +173,8 @@ public:
 
 	virtual bool deserialize(std::ifstream& file);
 
+	virtual void savePatterns(std::ofstream& file) const;
+
 protected:
 	static const size_t ioBufferBytes;
 	

@@ -13,6 +13,7 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
+#include <iterator>
 
 
 #ifdef WIN32
@@ -614,6 +615,17 @@ bool FastKmerDb::deserialize(std::ifstream& file) {
 	return true;
 }
 
+
+
+void FastKmerDb::savePatterns(std::ofstream& file) const {
+	for (int i = 0; i < patterns.size(); ++i) {
+		const auto& p = patterns[i];
+		file << i << ": " << p.get_parent_id() << " | ";
+		std::copy(p.get_data(), p.get_data() + p.get_num_local_samples(), std::ostream_iterator<sample_id_t>(file, " "));
+		file << endl;
+	}
+
+}
 
 void FastKmerDb::calculateSimilarity(Array<uint32_t>& matrix) const {
 	matrix.resize(getSamplesCount(), getSamplesCount());
