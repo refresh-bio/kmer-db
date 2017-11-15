@@ -52,47 +52,30 @@ public:
 	int64_t get_parent_id() { return parent_id; }
 	const int64_t get_parent_id() const { return parent_id; }
 
-	pattern_t() : num_samples(0), num_local_samples(0), data(nullptr), is_parent(false), parent_id(-1), num_kmers(0), num_bits(0), last_sample_id(0)
+	pattern_t() : 
+		num_samples(0), num_local_samples(0), last_sample_id(0),
+		parent_id(-1), num_kmers(0), num_bits(0),
+		data(nullptr), is_parent(false)
 	{
 	}
 
-	pattern_t(T x, uint64_t num_kmers) : last_sample_id(0), num_bits(0)
+	pattern_t(T x, uint64_t num_kmers) : 
+		num_samples(1), num_local_samples(1), last_sample_id(x),
+		parent_id(-1), num_kmers(num_kmers), num_bits(0),
+		data(nullptr), is_parent(false)
+		
 	{
-		is_parent = false;
-		num_samples = 1;
-		num_local_samples = 1;
-		data = nullptr;
-		parent_id = -1;
-		this->num_kmers = num_kmers;
-
-		//data = new T[round_count(1)];
-		//data[0] = x;
-		last_sample_id = x;
 	}
 
-	pattern_t(pattern_t &v, int64_t parent_id, T x, uint64_t num_kmers) : last_sample_id(0), num_bits(0)
+	pattern_t(pattern_t &v, int64_t parent_id, T x, uint64_t num_kmers) : 
+		num_samples(v.num_samples + 1), num_local_samples(1), last_sample_id(x),
+		parent_id(-1), num_kmers(num_kmers), num_bits(0),
+		data(nullptr), is_parent(false)	
 	{
-		num_samples = v.num_samples + 1;
-		num_local_samples = 1;
-		data = nullptr;
-		this->num_kmers = num_kmers;
-
-		if (v.num_samples == 0)
-		{
-			is_parent = false;
-			v.is_parent = false;
-			this->parent_id = -1;
-		}
-		else
-		{
-			is_parent = false;
+		if (v.num_samples > 0)  {
 			v.is_parent = true;
 			this->parent_id = parent_id;
 		}
-
-		//data = new T[round_count(1)];
-		//data[0] = x;
-		last_sample_id = x;
 	}
 
 	pattern_t(const pattern_t &v) = delete;

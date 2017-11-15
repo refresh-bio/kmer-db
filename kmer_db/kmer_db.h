@@ -204,5 +204,5 @@ protected:
 
 	Semaphore semaphore;
 
-	
+	int num_threads;
 };
