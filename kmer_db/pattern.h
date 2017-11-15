@@ -87,7 +87,7 @@ public:
 
 	~pattern_t()
 	{
-		if (num_samples)
+		if (data)
 		{
 			delete[] data;
 		}
@@ -131,26 +131,20 @@ public:
 		return true;
 	}
 
+	void release() {
+		if (data)
+		{
+			delete[] data;
+			data = nullptr;
+		}
+	}
+
 	// rozszerza listê genomów o now¹ pozycjê
 	void expand(const T x)
 	{
 		++num_samples;
-		
-		// if no space left - reallocate and copy existing ids 
-/*		if (num_local_samples + 1 > round_count(num_local_samples)) {
-			T* old_data = data;
-		
-			data = new T[round_count(num_local_samples + 1)];
-			
-			for (int i = 0; i < num_local_samples; ++i) {
-				data[i] = old_data[i];
-			}
-			
-			delete[] old_data;
-		}
-*/
 		++num_local_samples;
-//		data[num_local_samples - 1] = x;
+
 		uint32_t delta = x - last_sample_id;
 		elias.Encode(delta, data, num_bits);
 		last_sample_id = x;

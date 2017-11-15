@@ -657,8 +657,18 @@ void FastKmerDb::calculateSimilarity(Array<uint32_t>& matrix) const {
 
 			for (int j = i + 1; j < pattern.get_num_samples(); ++j) {
 				sample_id_t Sj = rawData[j];
-				matrix[Si][Sj] += pattern.get_num_kmers();
-				matrix[Sj][Si] += pattern.get_num_kmers();
+				sample_id_t first, last;
+				if (Si < Sj) {
+					first = Si;
+					last = Sj;
+				}
+				else {
+					first = Sj;
+					last = Si;
+				}
+
+				matrix[first][last] += pattern.get_num_kmers();
+				//matrix[Sj][Si] += pattern.get_num_kmers();
 			}
 		}
 	}

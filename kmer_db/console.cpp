@@ -152,29 +152,42 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 int Console::runAllVsAll(const std::string& dbFilename, const std::string& similarityFile) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
 	std::ofstream ofs(similarityFile);
-	FastKmerDb db;
+	FastKmerDb* db = new FastKmerDb();;
 
+	std::chrono::duration<double> dt;
 	cout << "Loading k-mer database " << dbFilename << "...";
-	if (!dbFile || !db.deserialize(dbFile)) {
+	auto start = std::chrono::high_resolution_clock::now();
+	if (!dbFile || !db->deserialize(dbFile)) {
 		cout << "FAILED";
 		return -1;
 	}
-	cout << "OK" << endl
-		<< "Number of samples: " << db.getSamplesCount() << endl
-		<< "Number of patterns: " << db.getPatternsCount() << endl
-		<< "Number of k-mers: " << db.getKmersCount() << endl;
+	dt = std::chrono::high_resolution_clock::now() - start;
+	cout << "OK (" << dt.count() << " seconds)" << endl
+		<< "Number of samples: " << db->getSamplesCount() << endl
+		<< "Number of patterns: " << db->getPatternsCount() << endl
+		<< "Number of k-mers: " << db->getKmersCount() << endl;
+
 
 	cout << "Calculating similarity matrix...";
+	start = std::chrono::high_resolution_clock::now();
 	Array<uint32_t> matrix;
-	db.calculateSimilarity(matrix);
-	cout << "OK" << endl;
+	db->calculateSimilarity(matrix);
+	dt = std::chrono::high_resolution_clock::now() - start;
+	cout << "OK (" << dt.count() << " seconds)" << endl;
 
 	cout << "Storing similarity matrix in " << similarityFile << "...";
-	std::copy(db.getSampleNames().begin(), db.getSampleNames().end(), ostream_iterator<string>(ofs, ","));
+	start = std::chrono::high_resolution_clock::now();
+	std::copy(db->getSampleNames().begin(), db->getSampleNames().end(), ostream_iterator<string>(ofs, ","));
 	ofs << endl;
-	
 	matrix.save(ofs);
-	cout << "OK" << endl;
+	dt = std::chrono::high_resolution_clock::now() - start;
+	cout << "OK (" << dt.count() << " seconds)" << endl;
+
+	cout << "Releasing memory...";
+	start = std::chrono::high_resolution_clock::now();
+	delete db;
+	dt = std::chrono::high_resolution_clock::now() - start;
+	cout << "OK (" << dt.count() << " seconds)" << endl;
 }
 
 

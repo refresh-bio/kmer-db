@@ -139,6 +139,9 @@ public:
 		for (auto& t : patternExtensionWorkers) {
 			t.join();
 		}
+
+		// 
+
 	}
 
 	virtual const size_t getKmersCount() const { return kmers2patternIds.get_size(); }
