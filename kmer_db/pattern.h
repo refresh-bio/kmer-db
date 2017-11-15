@@ -184,7 +184,7 @@ public:
 		
 		size_t data_bytes = get_data_bytes();
 		if (data_bytes) {
-			std::memcpy(buffer, reinterpret_cast<char*>(data), data_bytes);
+			memcpy(buffer, reinterpret_cast<char*>(data), data_bytes);
 			buffer += data_bytes;
 		}
 
