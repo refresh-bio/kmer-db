@@ -46,6 +46,14 @@ public:
 		free();
 	}
 
+	void swap(aligned_vector<T, ALIGNMENT> &x)
+	{
+		::swap(data_aligned, x.data_aligned);
+		::swap(data_raw, x.data_raw);
+		::swap(data_size, x.data_size);
+		::swap(data_allocated, x.data_allocated);
+	}
+
 	size_t size()
 	{
 		return data_size;
