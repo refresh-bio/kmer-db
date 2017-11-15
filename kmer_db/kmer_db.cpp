@@ -15,7 +15,6 @@
 #include <atomic>
 #include <iterator>
 
-
 #ifdef WIN32
 #include <ppl.h>
 #else
@@ -29,6 +28,8 @@
 #ifdef USE_RADULS
 #include "raduls/raduls.h"
 #endif
+
+#define USE_PREFETCH
 
 using namespace std;
 
@@ -86,8 +87,10 @@ sample_id_t NaiveKmerDb::addKmers(std::string sampleName, const std::vector<kmer
 	sample_id_t sampleId = AbstractKmerDb::addKmers(sampleName, kmers);
 	
 	uint64_t u_kmer;
+#ifdef USE_PREFETCH
 	uint64_t prefetch_kmer;
 	const size_t prefetch_dist = 48;
+#endif
 	auto n_kmers = kmers.size();
 	
 	// Musimy miec poprawne wskazniki do HT po wstawieniu do n_kmers elementow, a wiec nie moze sie w tym czasie zrobic restrukturyzacja
@@ -97,10 +100,12 @@ sample_id_t NaiveKmerDb::addKmers(std::string sampleName, const std::vector<kmer
 
 	for (size_t i = 0; i < n_kmers; ++i) {
 		u_kmer = kmers[i];
+#ifdef USE_PREFETCH
 		if (i + prefetch_dist < n_kmers) {
 			prefetch_kmer = kmers[i + prefetch_dist];
 			kmers2patternIds.prefetch(prefetch_kmer);
 		}
+#endif
 
 		// ***** Sprawdzanie w slowniku czy taki k-mer juz istnieje
 		auto patternId = kmers2patternIds.find(u_kmer);
@@ -199,17 +204,21 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1), dictionar
 					size_t to_add_id = hi - 1;
 
 					kmer_t u_kmer;
+#ifdef USE_PREFETCH
 					kmer_t prefetch_kmer;
 					const size_t prefetch_dist = 48;
+#endif
 
 					for (size_t i = lo; i < hi; ++i)
 					{
 						u_kmer = kmers[i];
+#ifdef USE_PREFETCH
 						if (i + prefetch_dist < hi)
 						{
 							prefetch_kmer = kmers[i + prefetch_dist];
 							kmers2patternIds.prefetch(prefetch_kmer);
 						}
+#endif
 
 						// ***** Sprawdzanie w slowniku czy taki k-mer juz istnieje
 						auto i_kmer = kmers2patternIds.find(u_kmer);
@@ -350,6 +359,9 @@ FastKmerDb::~FastKmerDb() {
 // Przetwarza pojedyncza baze KMC
 sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_t>& kmers)
 {
+#ifdef USE_PREFETCH
+	const size_t prefetch_dist = 48;
+#endif
 	sample_id_t sampleId = AbstractKmerDb::addKmers(sampleName, kmers);
 
 	size_t n_kmers = kmers.size();
@@ -362,7 +374,7 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 	kmers2patternIds.reserve_for_additional(n_kmers);
 	
 	samplePatterns.resize(n_kmers);
-#ifdef RADULS
+#ifdef USE_RADULS
 	tmp_samplePatterns.resize(n_kmers);
 #endif
 
@@ -387,7 +399,7 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 	LOG_DEBUG << "Adding kmers (serial)..." << endl;
 	start = std::chrono::high_resolution_clock::now();
 
-	for (int tid = 0; tid < num_threads; ++tid) {
+/*	for (int tid = 0; tid < num_threads; ++tid) {
 		size_t n_kmers = kmers.size();
 		size_t block = n_kmers / num_threads;
 		size_t lo = tid * block;
@@ -398,6 +410,35 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 			samplePatterns[i].first = 0;
 			samplePatterns[i].second = i_kmer;
 		}
+	}*/
+
+	kmers_to_add_to_HT.clear();
+	for (int tid = 0; tid < num_threads; ++tid) {
+		size_t n_kmers = kmers.size();
+		size_t block = n_kmers / num_threads;
+		size_t lo = tid * block;
+		size_t hi = (tid == num_threads - 1) ? n_kmers : lo + block;
+
+		for (size_t i = num_existing_kmers[tid]; i < hi; ++i)
+			kmers_to_add_to_HT.push_back(i);
+	}
+
+	size_t n_kmers_to_add = kmers_to_add_to_HT.size();
+#ifdef USE_PREFETCH
+	uint64_t prefetch_kmer;
+#endif
+	for (int j = 0; j < n_kmers_to_add; ++j)
+	{
+#ifdef USE_PREFETCH
+		if (j + prefetch_dist < n_kmers_to_add) {
+			prefetch_kmer = samplePatterns[kmers_to_add_to_HT[j + prefetch_dist]].first;
+			kmers2patternIds.prefetch(prefetch_kmer);
+		}
+#endif
+		int i = kmers_to_add_to_HT[j];
+		auto i_kmer = kmers2patternIds.insert(samplePatterns[i].first, 0); // Pierwsze wyst. k-mera, wiec przypisujemy taki sztuczny wzorzec 0
+		samplePatterns[i].first = 0;
+		samplePatterns[i].second = i_kmer;
 	}
 
 	hashtableAddTime += std::chrono::high_resolution_clock::now() - start;
@@ -408,9 +449,15 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 		return a.first < b.first;
 	};
 #ifdef USE_RADULS
-	raduls::RadixSortMSD(reinterpret_cast<uint8_t*>(samplePatterns.data()), reinterpret_cast<uint8_t*>(tmp_samplePatterns.data()), 
-//		samplePatterns.size(), sizeof(std::pair<pattern_id_t, pattern_id_t*>), sizeof(size_t), std::thread::hardware_concurrency());
-		samplePatterns.size(), sizeof(std::pair<pattern_id_t, pattern_id_t*>), 5, 12);
+	uint32_t raduls_key_size;
+	size_t raduls_tmp = patterns.size();
+	for (raduls_key_size = 1; raduls_tmp >= 256; raduls_tmp >>= 8)
+		++raduls_key_size;
+
+	raduls::RadixSortMSD(reinterpret_cast<uint8_t*>(samplePatterns.data()), reinterpret_cast<uint8_t*>(tmp_samplePatterns.data()),
+		samplePatterns.size(), sizeof(std::pair<pattern_id_t, pattern_id_t*>), raduls_key_size, std::thread::hardware_concurrency());
+	if (raduls_key_size & 1)
+		samplePatterns.swap(tmp_samplePatterns); 
 #else
 #ifdef WIN32
 	concurrency::parallel_sort(samplePatterns.begin(), samplePatterns.end(), pid_comparer);

@@ -6,8 +6,8 @@
     <LocalDebuggerWorkingDirectory>..</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommandArguments>--list-patterns d:\kmer.db d:\patterns.txt</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>..</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>--build fl_1000.txt 1000.db</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>H:\100k-pathogens</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

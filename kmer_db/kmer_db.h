@@ -14,7 +14,6 @@
 
 //#define USE_RADULS
 
-
 typedef uint16_t sample_id_t;
 typedef uint64_t kmer_t;
 typedef int64_t pattern_id_t;
@@ -97,6 +96,8 @@ protected:
 	hash_map_lp<kmer_t, pattern_id_t> kmers2patternIds;
 
 	std::vector<std::vector<sample_id_t>> patterns;
+
+
 };
 
 
@@ -191,6 +192,8 @@ protected:
 	std::vector<std::thread> dictionarySearchWorkers;
 
 	std::vector<std::thread> patternExtensionWorkers;
+
+	std::vector<int> kmers_to_add_to_HT;
 
 	Semaphore semaphore;
 
