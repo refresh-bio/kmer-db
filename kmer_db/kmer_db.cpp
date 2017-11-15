@@ -313,6 +313,40 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1), dictionar
 }
 
 
+FastKmerDb::~FastKmerDb() {
+	dictionarySearchQueue.MarkCompleted();
+	for (auto& t : dictionarySearchWorkers) {
+		t.join();
+	}
+
+	patternExtensionQueue.MarkCompleted();
+	for (auto& t : patternExtensionWorkers) {
+		t.join();
+	}
+
+	std::vector<std::thread> workers(num_threads);
+	for (int tid = 0; tid < num_threads; ++tid) {
+		workers[tid] = std::thread([this, tid]() {
+			size_t n_patterns = patterns.size();
+			size_t block_size = n_patterns / num_threads;
+			size_t lo = tid * block_size;
+			size_t hi = (tid == num_threads - 1) ? n_patterns : lo + block_size;
+
+			for (size_t i = lo; i < hi; ++i) {
+				patterns[i].release();
+			}
+		});
+	}
+
+	for (auto& t : workers) {
+		t.join();
+	}
+}
+
+
+
+
+
 // Przetwarza pojedyncza baze KMC
 sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_t>& kmers)
 {

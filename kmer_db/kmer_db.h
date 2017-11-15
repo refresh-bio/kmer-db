@@ -129,20 +129,7 @@ public:
 
 	FastKmerDb();
 
-	~FastKmerDb() {
-		dictionarySearchQueue.MarkCompleted();
-		for (auto& t : dictionarySearchWorkers) {
-			t.join();
-		}
-
-		patternExtensionQueue.MarkCompleted();
-		for (auto& t : patternExtensionWorkers) {
-			t.join();
-		}
-
-		// 
-
-	}
+	~FastKmerDb();
 
 	virtual const size_t getKmersCount() const { return kmers2patternIds.get_size(); }
 
