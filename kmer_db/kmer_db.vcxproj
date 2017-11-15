@@ -148,6 +148,7 @@
     <ClInclude Include="aligned_vector.h" />
     <ClInclude Include="array.h" />
     <ClInclude Include="console.h" />
+    <ClInclude Include="elias_gamma.h" />
     <ClInclude Include="hashmap_dh.h" />
     <ClInclude Include="hashmap_lp.h" />
     <ClInclude Include="kmer_db.h" />

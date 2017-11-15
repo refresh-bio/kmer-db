@@ -618,10 +618,14 @@ bool FastKmerDb::deserialize(std::ifstream& file) {
 
 
 void FastKmerDb::savePatterns(std::ofstream& file) const {
+	
+	std::vector<uint32_t> aux(getSamplesCount());
+	
 	for (int i = 0; i < patterns.size(); ++i) {
 		const auto& p = patterns[i];
 		file << i << ": " << p.get_parent_id() << " | ";
-		std::copy(p.get_data(), p.get_data() + p.get_num_local_samples(), std::ostream_iterator<sample_id_t>(file, " "));
+		p.decodeSamples(aux.data());
+		std::copy(aux.begin(), aux.begin() + p.get_num_local_samples(), std::ostream_iterator<uint32_t>(file, " "));
 		file << endl;
 	}
 

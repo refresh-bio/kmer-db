@@ -73,6 +73,9 @@
     <ClInclude Include="aligned_vector.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="elias_gamma.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="kmer_db.cpp">

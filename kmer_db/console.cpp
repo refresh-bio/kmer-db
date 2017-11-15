@@ -70,7 +70,7 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 	loadFileList(multipleKmcSamples, kmc_file_list);
 	std::ofstream ofs(dbFilename, std::ios::binary);
 
-	//		kmc_file_list.resize(100);
+	//kmc_file_list.resize(10);
 
 	std::chrono::duration<double> loadingTime, fastTime;
 	cout << "PROCESSING SAMPLES..." << endl;
@@ -243,6 +243,8 @@ int Console::runListPatterns(const std::string& dbFilename, const std::string& p
 	std::ofstream ofs(patternFile);
 	db.savePatterns(ofs);
 	ofs.close();
+
+	return 0;
 }
 
 /****************************************************************************************************************************************************/
