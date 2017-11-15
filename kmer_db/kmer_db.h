@@ -12,7 +12,7 @@
 #include <vector>
 #include <map>
 
-#define USE_RADULS
+//#define USE_RADULS
 
 typedef uint16_t sample_id_t;
 typedef uint64_t kmer_t;
