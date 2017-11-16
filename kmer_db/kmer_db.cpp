@@ -721,36 +721,44 @@ void FastKmerDb::calculateSimilarity(Array<uint32_t>& matrix) const {
 	std::vector<std::thread> workers(num_threads);
 	
 	for (int tid = 0; tid < num_threads; ++tid) {
-		 
-	}
-	
-	
-	std::vector<uint32_t> rawData(getSamplesCount());
-	
-	for (int pid = 1; pid < patterns.size(); ++pid) {
-		const auto& pattern = patterns[pid];
-		uint32_t* out = rawData.data() + pattern.get_num_samples(); // start from the end
+		workers[tid] = std::thread([this, tid, &matrix]() {
+		
+			std::vector<uint32_t> rawData(getSamplesCount());
 
-		// decode all samples
-		int64_t current_id = pid;
-		while (current_id >= 0) {
-			const auto& cur = patterns[current_id];
-			out -= cur.get_num_local_samples();
-			cur.decodeSamples(out);
-			
-			current_id = cur.get_parent_id();
-		}
+			for (int pid = 1; pid < patterns.size(); ++pid) {
+				const auto& pattern = patterns[pid];
+				uint32_t* out = rawData.data() + pattern.get_num_samples(); // start from the end
+														// decode all samples
+				int64_t current_id = pid;
+				while (current_id >= 0) {
+					const auto& cur = patterns[current_id];
+					out -= cur.get_num_local_samples();
+					cur.decodeSamples(out);
 
-		for (int i = 0; i < pattern.get_num_samples() - 1; ++i) {
-			sample_id_t Si = rawData[i];
+					current_id = cur.get_parent_id();
+				}
 
-			for (int j = i + 1; j < pattern.get_num_samples(); ++j) {
-				sample_id_t Sj = rawData[j];
-				matrix[Si][Sj] += pattern.get_num_kmers();
-				//matrix[Sj][Si] += pattern.get_num_kmers();
+				for (int i = 0; i < pattern.get_num_samples() - 1; ++i) {
+					sample_id_t Si = rawData[i];
+
+					int key = Si % (2 * num_threads);
+
+					if (key == tid || key == (2 * num_threads - 1 - tid)) {
+
+						for (int j = i + 1; j < pattern.get_num_samples(); ++j) {
+							sample_id_t Sj = rawData[j];
+							matrix[Si][Sj] += pattern.get_num_kmers();
+						}
+					}
+				}
 			}
-		}
+		});
 	}
+	
+	for (auto & w : workers) {
+		w.join();
+	}
+	
 }
 
 void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<uint32_t>& similarities) const {
