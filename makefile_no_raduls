@@ -10,7 +10,7 @@ CFLAGS	= -Wall -O3 -m64 -std=c++14 -fopenmp -pthread -I $(KMER_DB_LIBS_DIR)
 CLINK	= -lm -O3 -std=c++14 -lpthread -fopenmp -static -fabi-version=6 
 
 $(KMER_DB_MAIN_DIR)/parallel_sorter.o: $(KMER_DB_MAIN_DIR)/parallel_sorter.cpp
-	$(CC) -O3 -mavx -m64 -std=c++14 -pthread -c $< -o $@
+	$(CC) -O3 -mavx -m64 -std=c++14 -pthread -fopenmp -c $< -o $@
 
 %.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@

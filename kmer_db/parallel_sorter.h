@@ -3,7 +3,7 @@
 #include <utility>
 #include "pattern.h"
 
-#define USE_RADULS
+//#define USE_RADULS
 
 using namespace std;
 
