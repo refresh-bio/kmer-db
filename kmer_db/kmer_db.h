@@ -5,6 +5,7 @@
 #include "array.h"
 #include "queue.h"
 #include "aligned_vector.h"
+#include "parallel_sorter.h"
 
 #include <map>
 #include <fstream>
@@ -12,11 +13,9 @@
 #include <vector>
 #include <map>
 
-//#define USE_RADULS
 
 typedef uint16_t sample_id_t;
 typedef uint64_t kmer_t;
-typedef int64_t pattern_id_t;
 
 
 class AbstractKmerDb {

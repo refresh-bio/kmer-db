@@ -6,6 +6,7 @@
 #include <cstring>
 #include <utility>
 
+typedef int64_t pattern_id_t;
 
 template<typename T>
 class pattern_t {
