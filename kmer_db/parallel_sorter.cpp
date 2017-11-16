@@ -23,7 +23,7 @@ void ParallelSort(pair<pattern_id_t, pattern_id_t*> *arr, size_t arr_size, pair<
 	concurrency::parallel_sort(arr, arr + arr_size, pid_comparer);
 	//std::stable_sort(samplePatterns.begin(), samplePatterns.end(), pid_comparer);
 #else
-	__gnu_parallel::sort(arr, arr + size, pid_comparer);
+	__gnu_parallel::sort(arr, arr + arr_size, pid_comparer);
 #endif
 #endif
 }
