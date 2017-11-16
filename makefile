@@ -7,13 +7,13 @@ KMER_DB_RADULS_DIR = kmer_db/raduls
 
 CC 	= /usr/local/gcc62/bin/g++
 CFLAGS	= -Wall -O3 -m64 -std=c++14 -fopenmp -pthread -I $(KMER_DB_LIBS_DIR)
-CLINK	= -lm -O3 -std=c++11 -lpthread -fopenmp -static -fabi-version=6 
+CLINK	= -lm -O3 -std=c++14 -lpthread -fopenmp -static -fabi-version=6 
 
-raduls/sorting_network.o : raduls/sorting_network.cpp
+$(KMER_DB_RADULS_DIR)/sorting_network.o: $(KMER_DB_RADULS_DIR)/sorting_network.cpp
 	$(CC) -O1 -m64 -std=c++14 -mavx -pthread -c $< -o $@
 
-parallel_sorter.o : parallel_sorter.cpp
-	$(CC) -mavx -fno-ipa-ra -fno-tree-vrp -fno-tree-pre -c $< -o $@
+$(KMER_DB_MAIN_DIR)/parallel_sorter.o: $(KMER_DB_MAIN_DIR)/parallel_sorter.cpp
+	$(CC) -O3 -mavx -fno-ipa-ra -fno-tree-vrp -fno-tree-pre -c $< -o $@
 
 %.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -28,7 +28,7 @@ kmer-db-1.0: $(KMER_DB_MAIN_DIR)/kmer_db.o \
 	$(KMER_DB_LIBS_DIR)/kmc_file.o \
 	$(KMER_DB_LIBS_DIR)/kmer_api.o \
 	$(KMER_DB_LIBS_DIR)/mmer.o \
-	$(KMER_DB_RADUKS_DIR)/sorting_network.o
+	$(KMER_DB_RADULS_DIR)/sorting_network.o
 	$(CC) $(CLINK) -o $(KMER_DB_ROOT_DIR)/$@  \
 	$(KMER_DB_MAIN_DIR)/kmer_db.o \
 	$(KMER_DB_MAIN_DIR)/console.o \
@@ -39,7 +39,8 @@ kmer-db-1.0: $(KMER_DB_MAIN_DIR)/kmer_db.o \
 	$(KMER_DB_MAIN_DIR)/tests.o \
 	$(KMER_DB_LIBS_DIR)/kmc_file.o \
 	$(KMER_DB_LIBS_DIR)/kmer_api.o \
-	$(KMER_DB_RADUKS_DIR)/sorting_network.o
+	$(KMER_DB_LIBS_DIR)/mmer.o \
+	$(KMER_DB_RADULS_DIR)/sorting_network.o
 	
 
 clean:
