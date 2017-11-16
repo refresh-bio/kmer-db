@@ -1,7 +1,7 @@
 #include "parallel_sorter.h"
 
 #ifdef USE_RADULS
-#include "raduls\raduls.h"
+#include "raduls/raduls.h"
 #else
 #ifdef WIN32
 #include <ppl.h>
