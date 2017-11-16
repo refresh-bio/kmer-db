@@ -938,7 +938,7 @@ namespace raduls
 					data_ptr += n;
 				}
 
-				sort(big_bins.begin(), big_bins.end(), [](const auto& x, const auto& y) {return std::get<2>(x) > std::get<2>(y); });
+				std::sort(big_bins.begin(), big_bins.end(), [](const auto& x, const auto& y) {return std::get<2>(x) > std::get<2>(y); });
 
 				auto n_threads_for_big_bins = std::min(n_threads, static_cast<uint32>(ceil(n_threads * n_recs_in_big_bins * 5.0 / (4 * n_total_recs))));
 
