@@ -65,7 +65,7 @@ int Console::parse(int argc, char** argv) {
 
 int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::string dbFilename) {
 
-	FastKmerDb db;
+	FastKmerDb* db = new FastKmerDb();;
 	vector<string> kmc_file_list;
 	loadFileList(multipleKmcSamples, kmc_file_list);
 	std::ofstream ofs(dbFilename, std::ios::binary);
@@ -91,7 +91,7 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 				if (file_id < kmc_file_list.size()) {
 					std::ostringstream oss;
 					oss << kmc_file_list[file_id] << " (" << file_id + 1 << "/" << kmc_file_list.size() << ")...";
-					if (!db.loadKmers(kmc_file_list[file_id], kmersCollections[tid])) {
+					if (!db->loadKmers(kmc_file_list[file_id], kmersCollections[tid])) {
 						oss << "Error processing sample" << endl;
 					}
 					else {
@@ -122,11 +122,11 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 				}
 
 				start = std::chrono::high_resolution_clock::now();
-				db.addKmers(sample, kmersCollections[tid]);
+				db->addKmers(sample, kmersCollections[tid]);
 				dt = std::chrono::high_resolution_clock::now() - start;
 				cout << "Fast: time=" << dt.count() << ", ";
 				fastTime += dt;
-				show_progress(db);
+				show_progress(*db);
 				cout << endl;
 			}
 		}
@@ -135,14 +135,26 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 	cout << endl << "EXECUTION TIMES" << endl
 		<< "Loading k-mers: " << loadingTime.count() << endl
 		<< "Total processing time: " << fastTime.count() << endl
-		<< "\tHashatable resizing (serial): " << db.hashtableResizeTime.count() << endl
-		<< "\tHashtable searching (parallel): " << db.hashtableFindTime.count() << endl
-		<< "\tHashatable insertion (serial): " << db.hashtableAddTime.count() << endl
-		<< "\tSort time (parallel): " << db.sortTime.count() << endl
-		<< "\tPattern extension time (serial): " << db.extensionTime.count() << endl;
+		<< "\tHashatable resizing (serial): " << db->hashtableResizeTime.count() << endl
+		<< "\tHashtable searching (parallel): " << db->hashtableFindTime.count() << endl
+		<< "\tHashatable insertion (serial): " << db->hashtableAddTime.count() << endl
+		<< "\tSort time (parallel): " << db->sortTime.count() << endl
+		<< "\tPattern extension time (serial): " << db->extensionTime.count() << endl;
 
-	db.serialize(ofs);
+	std::chrono::duration<double> dt;
+
+	cout << "Serializing database...";
+	auto start = std::chrono::high_resolution_clock::now();
+	db->serialize(ofs);
 	ofs.close();
+	dt = std::chrono::high_resolution_clock::now() - start;
+	cout << "OK (" << dt.count() << " seconds)" << endl;
+
+	cout << "Releasing memory...";
+	start = std::chrono::high_resolution_clock::now();
+	delete db;
+	dt = std::chrono::high_resolution_clock::now() - start;
+	cout << "OK (" << dt.count() << " seconds)" << endl;
 
 	return 0;
 }

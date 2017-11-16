@@ -332,7 +332,7 @@ FastKmerDb::~FastKmerDb() {
 	for (auto& t : patternExtensionWorkers) {
 		t.join();
 	}
-
+/*
 	std::vector<std::thread> workers(num_threads);
 	for (int tid = 0; tid < num_threads; ++tid) {
 		workers[tid] = std::thread([this, tid]() {
@@ -350,6 +350,7 @@ FastKmerDb::~FastKmerDb() {
 	for (auto& t : workers) {
 		t.join();
 	}
+	*/
 }
 
 
@@ -717,19 +718,26 @@ void FastKmerDb::calculateSimilarity(Array<uint32_t>& matrix) const {
 	matrix.resize(getSamplesCount(), getSamplesCount());
 	matrix.clear();
 
+	std::vector<std::thread> workers(num_threads);
+	
+	for (int tid = 0; tid < num_threads; ++tid) {
+		 
+	}
+	
+	
 	std::vector<uint32_t> rawData(getSamplesCount());
 	
 	for (int pid = 1; pid < patterns.size(); ++pid) {
 		const auto& pattern = patterns[pid];
-		uint32_t* pos = rawData.data();
+		uint32_t* out = rawData.data() + pattern.get_num_samples(); // start from the end
 
 		// decode all samples
 		int64_t current_id = pid;
 		while (current_id >= 0) {
 			const auto& cur = patterns[current_id];
-			cur.decodeSamples(pos);
-			pos += cur.get_num_local_samples();
-
+			out -= cur.get_num_local_samples();
+			cur.decodeSamples(out);
+			
 			current_id = cur.get_parent_id();
 		}
 
@@ -738,17 +746,7 @@ void FastKmerDb::calculateSimilarity(Array<uint32_t>& matrix) const {
 
 			for (int j = i + 1; j < pattern.get_num_samples(); ++j) {
 				sample_id_t Sj = rawData[j];
-				sample_id_t first, last;
-				if (Si < Sj) {
-					first = Si;
-					last = Sj;
-				}
-				else {
-					first = Sj;
-					last = Si;
-				}
-
-				matrix[first][last] += pattern.get_num_kmers();
+				matrix[Si][Sj] += pattern.get_num_kmers();
 				//matrix[Sj][Si] += pattern.get_num_kmers();
 			}
 		}
