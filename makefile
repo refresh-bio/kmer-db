@@ -13,7 +13,7 @@ $(KMER_DB_RADULS_DIR)/sorting_network.o: $(KMER_DB_RADULS_DIR)/sorting_network.c
 	$(CC) -O1 -m64 -std=c++14 -mavx -pthread -c $< -o $@
 
 $(KMER_DB_MAIN_DIR)/parallel_sorter.o: $(KMER_DB_MAIN_DIR)/parallel_sorter.cpp
-	$(CC) -O3 -mavx -fno-ipa-ra -fno-tree-vrp -fno-tree-pre -c $< -o $@
+	$(CC) -O3 -mavx -m64 -std=c++14 -pthread -fno-ipa-ra -fno-tree-vrp -fno-tree-pre -c $< -o $@
 
 %.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
