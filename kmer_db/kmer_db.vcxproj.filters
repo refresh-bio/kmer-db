@@ -76,6 +76,10 @@
     <ClInclude Include="elias_gamma.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="parallel_sorter.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+  </ItemGroup>
     <ClInclude Include="loader.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -111,6 +115,10 @@
     <ClCompile Include="raduls\sorting_network.cpp">
       <Filter>raduls</Filter>
     </ClCompile>
+    <ClCompile Include="parallel_sorter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
     <ClCompile Include="loader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

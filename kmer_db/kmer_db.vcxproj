@@ -158,6 +158,7 @@
     <ClInclude Include="kmc_api\mmer.h" />
     <ClInclude Include="loader.h" />
     <ClInclude Include="log.h" />
+    <ClInclude Include="parallel_sorter.h" />
     <ClInclude Include="pattern.h" />
     <ClInclude Include="queue.h" />
     <ClInclude Include="raduls\comp_and_swap.h" />
@@ -178,6 +179,7 @@
     <ClCompile Include="loader.cpp" />
     <ClCompile Include="log.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="parallel_sorter.cpp" />
     <ClCompile Include="queue.cpp" />
     <ClCompile Include="raduls\sorting_network.cpp" />
     <ClCompile Include="tests.cpp" />

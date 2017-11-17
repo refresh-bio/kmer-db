@@ -15,19 +15,9 @@
 #include <atomic>
 #include <iterator>
 
-#ifdef WIN32
-#include <ppl.h>
-#else
-#include <parallel/algorithm>
-#endif
-
 #include "kmc_api/kmc_file.h"
 #include "kmer_db.h"
 #include "log.h"
-
-#ifdef USE_RADULS
-#include "raduls/raduls.h"
-#endif
 
 #define USE_PREFETCH
 
@@ -406,28 +396,22 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 	
 	LOG_DEBUG << "Sorting (parallel)..." << endl;
 	start = std::chrono::high_resolution_clock::now();
-	auto pid_comparer = [](const std::pair<pattern_id_t, pattern_id_t*>& a, const std::pair<pattern_id_t, pattern_id_t*>& b)->bool {
-		return a.first < b.first;
-	};
+
 #ifdef USE_RADULS
 	uint32_t raduls_key_size;
 	size_t raduls_tmp = patterns.size();
 	for (raduls_key_size = 1; raduls_tmp >= 256; raduls_tmp >>= 8)
 		++raduls_key_size;
 
-	raduls::RadixSortMSD(reinterpret_cast<uint8_t*>(samplePatterns.data()), reinterpret_cast<uint8_t*>(tmp_samplePatterns.data()),
-		samplePatterns.size(), sizeof(std::pair<pattern_id_t, pattern_id_t*>), raduls_key_size, std::thread::hardware_concurrency());
+	ParallelSort(samplePatterns.data(), samplePatterns.size(), tmp_samplePatterns.data(), sizeof(std::pair<pattern_id_t, pattern_id_t*>), raduls_key_size, std::thread::hardware_concurrency());
+//	raduls::RadixSortMSD(reinterpret_cast<uint8_t*>(samplePatterns.data()), reinterpret_cast<uint8_t*>(tmp_samplePatterns.data()),
+//		samplePatterns.size(), sizeof(std::pair<pattern_id_t, pattern_id_t*>), raduls_key_size, std::thread::hardware_concurrency());
 	if (raduls_key_size & 1)
 		samplePatterns.swap(tmp_samplePatterns); 
 #else
-#ifdef WIN32
-	concurrency::parallel_sort(samplePatterns.begin(), samplePatterns.end(), pid_comparer);
-	//std::stable_sort(samplePatterns.begin(), samplePatterns.end(), pid_comparer);
-#else
-	__gnu_parallel::sort(samplePatterns.begin(), samplePatterns.end(), pid_comparer);
+	ParallelSort(samplePatterns.data(), samplePatterns.size(), nullptr, 0, 0, std::thread::hardware_concurrency());
 #endif
-#endif
-
+	
 	sortTime += std::chrono::high_resolution_clock::now() - start;
 	std::cout << "sort time: " << sortTime.count() << "  " << samplePatterns.size() << endl;
 
@@ -444,6 +428,9 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 	auto currentIndex = block;
 
 	std::vector<size_t> threadBytes(num_threads, 0);
+	auto pid_comparer = [](const std::pair<pattern_id_t, pattern_id_t*>& a, const std::pair<pattern_id_t, pattern_id_t*>& b)->bool {
+		return a.first < b.first;
+	};
 
 	for (int tid = 0; tid < num_threads; ++tid) {
 		auto it = std::upper_bound(

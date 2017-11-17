@@ -7,6 +7,7 @@
 #include <cmath>
 #include <vector>
 #include <functional>
+#include <algorithm>
 
 namespace raduls
 {
