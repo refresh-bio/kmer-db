@@ -67,57 +67,49 @@ int Console::parse(int argc, char** argv) {
 
 int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::string dbFilename) {
 
-	FastKmerDb* db = new FastKmerDb();;
-	vector<string> kmc_file_list;
+	cout << "Processing samples..." << endl;
 	
+	LOG_DEBUG << "Creating FastKmerDb object" << endl;
+	FastKmerDb* db = new FastKmerDb();
 	std::ofstream ofs(dbFilename, std::ios::binary);
 
-	//kmc_file_list.resize(10);
-
-	std::chrono::duration<double> loadingTime, fastTime;
-	cout << "PROCESSING SAMPLES..." << endl;
-
+	std::chrono::duration<double> loadingTime, processingTime;
 	
-	Loader loader(multipleKmcSamples);
+	LOG_DEBUG << "Creating Loader object..." << endl;
+	Loader loader;
+	loader.configure(multipleKmcSamples);
 
 	loader.initPrefetch();
 
-	for (;;)
-	{
-		std::chrono::duration<double> dt;
-		auto start = std::chrono::high_resolution_clock::now();
+	LOG_DEBUG << "Starting loop..." << endl;
 
+	for (;;) {
+		auto start = std::chrono::high_resolution_clock::now();
 		loader.waitForPrefetch();
 		loader.initLoad();
 		loader.waitForLoad();
-
-		dt = std::chrono::high_resolution_clock::now() - start;
-		loadingTime += dt;
-
+		loadingTime += std::chrono::high_resolution_clock::now() - start;
+		
+		start = std::chrono::high_resolution_clock::now();
 		loader.initPrefetch();
-
-		if (loader.getLoadedTasks().size()) {
-			for (const auto& entry : loader.getLoadedTasks()) {
-				auto task = entry.second;
-				start = std::chrono::high_resolution_clock::now();
-				db->addKmers(task->sampleName, *task->kmers);
-				dt = std::chrono::high_resolution_clock::now() - start;
-				cout << "Fast: time=" << dt.count() << ", ";
-				fastTime += dt;
-				show_progress(*db);
-				cout << endl;
-			}
-		}
-		else {
+		if (!loader.getLoadedTasks().size()) {
 			break;
 		}
-
+		
+		for (const auto& entry : loader.getLoadedTasks()) {
+			auto task = entry.second;
+			db->addKmers(task->sampleName, *task->kmers);
+			show_progress(*db);
+			cout << endl;
+		}
+		
 		loader.getLoadedTasks().clear();
+		processingTime += std::chrono::high_resolution_clock::now() - start;
 	}
 
 	cout << endl << "EXECUTION TIMES" << endl
 		<< "Loading k-mers: " << loadingTime.count() << endl
-		<< "Total processing time: " << fastTime.count() << endl
+		<< "Processing time: " << processingTime.count() << endl
 		<< "\tHashatable resizing (serial): " << db->hashtableResizeTime.count() << endl
 		<< "\tHashtable searching (parallel): " << db->hashtableFindTime.count() << endl
 		<< "\tHashatable insertion (serial): " << db->hashtableAddTime.count() << endl

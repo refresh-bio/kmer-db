@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <iostream>
+#include <fstream>
 using namespace std;
 
 template <class T>
@@ -54,7 +55,7 @@ public:
 			for (int j = 0; j < size(); ++j) {
 				file  << (*this)[i][j] << ',';
 			}
-//			file << std::endl;
+			file << std::endl;
 		}
 	}
 

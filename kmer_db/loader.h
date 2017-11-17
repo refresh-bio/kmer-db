@@ -23,8 +23,7 @@ struct Task {
 
 class Loader {
 public:
-	Loader() : prefetcherQueue(1), intermediateQueue(1), readerQueue(1), currentFileId(0) {}
-	Loader(const std::string& multipleKmcSamples);
+	Loader();
 	~Loader() {
 		readerQueue.MarkCompleted();
 		prefetcherQueue.MarkCompleted();
@@ -37,6 +36,7 @@ public:
 		prefetcher.join();
 	}
 
+	void configure(const std::string& multipleKmcSamples);
 	void initPrefetch();
 	void waitForPrefetch() { prefetcherSemaphore.waitForZero();  }
 	void initLoad();

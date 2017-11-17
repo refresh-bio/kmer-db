@@ -6,18 +6,13 @@
 using namespace std;
 
 /****************************************************************************************************************************************************/
-Loader::Loader(const std::string& multipleKmcSamples) : Loader() {
-	std::ifstream ifs(multipleKmcSamples);
+Loader::Loader() : 
+	prefetcherQueue(1), 
+	intermediateQueue(1),
+	readerQueue(1), 
+	currentFileId(0), 
+	numThreads(std::thread::hardware_concurrency()) {
 
-	string fname;
-	while (ifs >> fname) {
-		kmcFileList.push_back(fname);
-	}
-
-	sort(kmcFileList.begin(), kmcFileList.end());
-	kmcFileList.erase(unique(kmcFileList.begin(), kmcFileList.end()), kmcFileList.end());
-
-	numThreads = std::thread::hardware_concurrency();
 	kmersCollections.resize(numThreads);
 
 	// generate preloader thread
@@ -59,7 +54,20 @@ Loader::Loader(const std::string& multipleKmcSamples) : Loader() {
 			}
 		});
 	}
+}
 
+
+/****************************************************************************************************************************************************/
+void Loader::configure(const std::string& multipleKmcSamples) {
+	std::ifstream ifs(multipleKmcSamples);
+
+	string fname;
+	while (ifs >> fname) {
+		kmcFileList.push_back(fname);
+	}
+
+	sort(kmcFileList.begin(), kmcFileList.end());
+	kmcFileList.erase(unique(kmcFileList.begin(), kmcFileList.end()), kmcFileList.end());
 }
 
 /****************************************************************************************************************************************************/
