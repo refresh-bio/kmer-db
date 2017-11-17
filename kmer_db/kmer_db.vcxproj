@@ -156,6 +156,7 @@
     <ClInclude Include="kmc_api\kmer_api.h" />
     <ClInclude Include="kmc_api\kmer_defs.h" />
     <ClInclude Include="kmc_api\mmer.h" />
+    <ClInclude Include="loader.h" />
     <ClInclude Include="log.h" />
     <ClInclude Include="pattern.h" />
     <ClInclude Include="queue.h" />
@@ -174,6 +175,7 @@
     <ClCompile Include="kmc_api\kmer_api.cpp" />
     <ClCompile Include="kmc_api\mmer.cpp" />
     <ClCompile Include="kmer_db.cpp" />
+    <ClCompile Include="loader.cpp" />
     <ClCompile Include="log.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="queue.cpp" />

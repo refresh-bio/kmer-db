@@ -41,8 +41,6 @@ public:
 
 	virtual std::vector<kmer_t> getKmers() const = 0;
 
-	virtual bool loadKmers(const std::string &filename, std::vector<kmer_t>& kmers);
-
 	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers) {
 		sample_id_t newId = sampleNames.size();
 		sampleNames.push_back(sampleName);

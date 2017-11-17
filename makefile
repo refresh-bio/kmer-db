@@ -13,6 +13,7 @@ CLINK	= -lm -O3 -std=c++11 -lpthread -fopenmp -static -fabi-version=6
 
 kmer-db-1.0: $(KMER_DB_MAIN_DIR)/kmer_db.o \
 	$(KMER_DB_MAIN_DIR)/console.o \
+	$(KMER_DB_MAIN_DIR)/loader.o \
 	$(KMER_DB_MAIN_DIR)/log.o \
 	$(KMER_DB_MAIN_DIR)/main.o \
 	$(KMER_DB_MAIN_DIR)/queue.o \
@@ -23,6 +24,7 @@ kmer-db-1.0: $(KMER_DB_MAIN_DIR)/kmer_db.o \
 	$(CC) $(CLINK) -o $(KMER_DB_ROOT_DIR)/$@  \
 	$(KMER_DB_MAIN_DIR)/kmer_db.o \
 	$(KMER_DB_MAIN_DIR)/console.o \
+	$(KMER_DB_MAIN_DIR)/loader.o \
 	$(KMER_DB_MAIN_DIR)/log.o \
 	$(KMER_DB_MAIN_DIR)/main.o \
 	$(KMER_DB_MAIN_DIR)/queue.o \

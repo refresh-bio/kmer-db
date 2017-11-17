@@ -4,7 +4,8 @@ class Console
 {
 public:
 	int parse(int argc, char** argv);
-	bool loadFileList(const std::string& multipleKmcSamples, std::vector<std::string>& kmcFileList);
+
+
 
 
 protected:

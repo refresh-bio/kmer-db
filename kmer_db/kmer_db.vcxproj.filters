@@ -76,6 +76,9 @@
     <ClInclude Include="elias_gamma.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="loader.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="kmer_db.cpp">
@@ -107,6 +110,9 @@
     </ClCompile>
     <ClCompile Include="raduls\sorting_network.cpp">
       <Filter>raduls</Filter>
+    </ClCompile>
+    <ClCompile Include="loader.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

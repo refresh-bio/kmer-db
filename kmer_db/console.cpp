@@ -12,6 +12,8 @@
 
 #include "console.h"
 #include "kmer_db.h"
+#include "loader.h"
+
 
 using namespace std;
 
@@ -67,7 +69,7 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 
 	FastKmerDb* db = new FastKmerDb();;
 	vector<string> kmc_file_list;
-	loadFileList(multipleKmcSamples, kmc_file_list);
+	
 	std::ofstream ofs(dbFilename, std::ios::binary);
 
 	//kmc_file_list.resize(10);
@@ -75,54 +77,30 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 	std::chrono::duration<double> loadingTime, fastTime;
 	cout << "PROCESSING SAMPLES..." << endl;
 
-	int n_threads = std::thread::hardware_concurrency();
-	std::vector<std::vector<uint64_t>> kmersCollections(n_threads);
-	std::vector<std::thread> readers(n_threads);
+	
+	Loader loader(multipleKmcSamples);
 
-	for (size_t i = 0; i < kmc_file_list.size(); i += n_threads)
+	loader.initPrefetch();
+
+	for (;;)
 	{
 		std::chrono::duration<double> dt;
 		auto start = std::chrono::high_resolution_clock::now();
 
-		for (int tid = 0; tid < n_threads; ++tid) {
-			readers[tid] = std::thread([tid, i, n_threads, &kmersCollections, &kmc_file_list, &db]() {
-				size_t file_id = i + tid;
-
-				if (file_id < kmc_file_list.size()) {
-					std::ostringstream oss;
-					oss << kmc_file_list[file_id] << " (" << file_id + 1 << "/" << kmc_file_list.size() << ")...";
-					if (!db->loadKmers(kmc_file_list[file_id], kmersCollections[tid])) {
-						oss << "Error processing sample" << endl;
-					}
-					else {
-						oss << "done!" << endl;
-					}
-					cout << oss.str();
-				}
-			});
-		}
-
-		for (int tid = 0; tid < n_threads; ++tid) {
-			readers[tid].join();
-		}
+		loader.waitForPrefetch();
+		loader.initLoad();
+		loader.waitForLoad();
 
 		dt = std::chrono::high_resolution_clock::now() - start;
-		cout << "Processed " << n_threads << " files in: " << dt.count() << endl;
 		loadingTime += dt;
 
-		for (int tid = 0; tid < n_threads; ++tid) {
-			size_t file_id = i + tid;
+		loader.initPrefetch();
 
-			if (file_id < kmc_file_list.size()) {
-				string sample = kmc_file_list[file_id];
-
-				size_t pos = sample.find_last_of("/\\");
-				if (pos != string::npos) {
-					sample = sample.substr(pos + 1);
-				}
-
+		if (loader.getLoadedTasks().size()) {
+			for (const auto& entry : loader.getLoadedTasks()) {
+				auto task = entry.second;
 				start = std::chrono::high_resolution_clock::now();
-				db->addKmers(sample, kmersCollections[tid]);
+				db->addKmers(task->sampleName, *task->kmers);
 				dt = std::chrono::high_resolution_clock::now() - start;
 				cout << "Fast: time=" << dt.count() << ", ";
 				fastTime += dt;
@@ -130,6 +108,11 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 				cout << endl;
 			}
 		}
+		else {
+			break;
+		}
+
+		loader.getLoadedTasks().clear();
 	}
 
 	cout << endl << "EXECUTION TIMES" << endl
@@ -212,8 +195,9 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 
 	cout << "Loading sample kmers...";
 	FastKmerDb sampleDb;
+	Loader loader;
 	std::vector<kmer_t> kmers;
-	if (!sampleDb.loadKmers(singleKmcSample, kmers)) {
+	if (!loader.loadKmers(singleKmcSample, kmers)) {
 		cout << "FAILED";
 		return -1;
 	}
@@ -272,22 +256,6 @@ int Console::runListPatterns(const std::string& dbFilename, const std::string& p
 	return 0;
 }
 
-/****************************************************************************************************************************************************/
-
-bool Console::loadFileList(const std::string& multipleKmcSamples, std::vector<std::string>& kmcFileList) {
-
-	std::ifstream ifs(multipleKmcSamples);
-
-	string fname;
-	while (ifs >> fname) {
-		kmcFileList.push_back(fname);
-	}
-
-	sort(kmcFileList.begin(), kmcFileList.end());
-	kmcFileList.erase(unique(kmcFileList.begin(), kmcFileList.end()), kmcFileList.end());
-
-	return !kmcFileList.empty();
-}
 
 /****************************************************************************************************************************************************/
 void Console::showInstructions() {

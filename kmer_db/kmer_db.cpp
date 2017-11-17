@@ -38,46 +38,6 @@ const size_t FastKmerDb::ioBufferBytes = (2 << 29); //512MB buffer
 
 /****************************************************************************************************************************************************/
 
-bool AbstractKmerDb::loadKmers(const string &filename, std::vector<kmer_t>& kmers) {
-	CKMCFile kmc_file;
-	uint32_t counter;
-
-	if (!kmc_file.OpenForListing(filename))
-		return false;
-
-	uint32 _kmer_length;
-	uint32 _mode;
-	uint32 _counter_size;
-	uint32 _lut_prefix_length;
-	uint32 _signature_len;
-	uint32 _min_count;
-	uint64 _max_count;
-	uint64 _total_kmers;
-
-	kmc_file.Info(_kmer_length, _mode, _counter_size, _lut_prefix_length, _signature_len, _min_count, _max_count, _total_kmers);
-
-	CKmerAPI kmer(_kmer_length);
-
-	uint64_t u_kmer;
-	vector<uint64> tmp;
-
-	// Wczytuje wszystkie k-mery z pliku do wektora, zeby pozniej moc robic prefetcha
-	kmers.clear();
-	
-	while (!kmc_file.Eof())
-	{
-		if (!kmc_file.ReadNextKmer(kmer, counter))
-			break;
-		kmer.to_long(tmp);
-		u_kmer = tmp.front();
-
-		kmers.push_back(u_kmer);
-	}
-
-	kmc_file.Close();
-
-	return true;
-}
 
 
 /****************************************************************************************************************************************************/

@@ -12,7 +12,7 @@ using namespace std;
 bool load_file_list(const string& file_list, vector<string>& kmc_file_list);
 void show_progress(const AbstractKmerDb &db);
 
-
+/*
 void Tests::compareWithNaive(const string& fname) {
 	vector<string> kmc_file_list;
 
@@ -21,7 +21,7 @@ void Tests::compareWithNaive(const string& fname) {
 
 	FastKmerDb fast_db;
 	NaiveKmerDb naive_db;
-
+	
 
 	//kmc_file_list.resize(100);
 
@@ -126,7 +126,7 @@ void Tests::compareWithNaive(const string& fname) {
 
 }
 
-
+*/
 
 
 void Tests::comparePatterns(const AbstractKmerDb& db1, const AbstractKmerDb& db2, const std::vector<kmer_t>& kmers) {
