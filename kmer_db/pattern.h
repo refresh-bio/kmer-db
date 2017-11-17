@@ -153,7 +153,7 @@ public:
 	}
 
 	size_t get_data_bytes() const { 
-		return (num_bits == 0) ? 0 : (num_bits + 127) / 8; 
+		return (num_bits == 0) ? 0 : ((num_bits + 127) / 128) * 16; 
 	}
 
 	size_t get_bytes(void) const { 

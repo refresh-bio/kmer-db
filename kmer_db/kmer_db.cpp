@@ -25,6 +25,7 @@ using namespace std;
 
 const size_t FastKmerDb::ioBufferBytes = (2 << 29); //512MB buffer 
 //const size_t FastKmerDb::ioBufferBytes = 16000000; //16MB buffer 
+//const size_t FastKmerDb::ioBufferBytes = 100000; //100KB buffer 
 
 /****************************************************************************************************************************************************/
 
@@ -566,6 +567,10 @@ void FastKmerDb::serialize(std::ofstream& file) const {
 		}
 
 		currentPtr = patterns[pid].pack(currentPtr);
+		// this should never happen
+		if (currentPtr > buffer + ioBufferBytes) {
+			throw std::runtime_error("Buffer overflow when saving patterns!");
+		}
 	}
 
 	// write remaining patterns
@@ -641,7 +646,7 @@ bool FastKmerDb::deserialize(std::ifstream& file) {
 	if (!file) {
 		return false;
 	}
-
+	
 	return true;
 }
 

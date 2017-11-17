@@ -68,6 +68,8 @@ void Loader::configure(const std::string& multipleKmcSamples) {
 
 	sort(kmcFileList.begin(), kmcFileList.end());
 	kmcFileList.erase(unique(kmcFileList.begin(), kmcFileList.end()), kmcFileList.end());
+
+	//kmcFileList.resize(100);
 }
 
 /****************************************************************************************************************************************************/
