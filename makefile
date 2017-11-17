@@ -7,7 +7,7 @@ KMER_DB_RADULS_DIR = kmer_db/raduls
 
 CC 	= /usr/local/gcc62/bin/g++
 CFLAGS	= -Wall -O3 -m64 -std=c++14 -fopenmp -pthread -I $(KMER_DB_LIBS_DIR)
-CLINK	= -lm -O3 -std=c++14 -lpthread -fopenmp -static -fabi-version=6 
+CLINK	= -lm -O3 -std=c++14 -lpthread -fopenmp -fabi-version=6 
 
 $(KMER_DB_RADULS_DIR)/sorting_network.o: $(KMER_DB_RADULS_DIR)/sorting_network.cpp
 	$(CC) -O1 -m64 -std=c++14 -mavx -pthread -c $< -o $@
