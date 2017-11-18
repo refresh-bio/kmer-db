@@ -65,3 +65,47 @@ protected:
 	int height;
 	std::vector<T> v;
 };
+
+template <class T>
+class LowerTriangularMatrix {
+public:
+	size_t getSize() const { return size; }
+	
+	LowerTriangularMatrix() : size(0) {}
+	LowerTriangularMatrix(size_t size) : size(size), data(size * (size - 1) / 2) {}
+
+	T* operator[](size_t i) { return data.data() + i * (i - 1) / 2; }
+	const T* operator[](size_t i) const { return data.data() + i * (i - 1) / 2; }
+
+	T* at(size_t i, size_t j) { return data[i * (i - 1) / 2  + j]; }
+	const T* at(size_t i, size_t j) const { return data[i * (i - 1) / 2 + j]; }
+
+	void resize(size_t size) {
+		this->size = size;
+		data.resize(size * (size - 1) / 2);
+	}
+
+	void clear() {
+		data.clear();
+	}
+
+	void save(std::ofstream & file) {
+		T * ptr = data.data();
+		for (int i = 0; i < size; ++i) {
+			for (int j = 0; j < i; ++j) {
+				file << *ptr++ << ',';
+			}
+
+			for (int j = i; j < size; ++j) {
+				file << "0,";
+			}
+
+			file << std::endl;
+		}
+	}
+
+protected:
+	size_t size;
+	std::vector<T> data;
+
+};

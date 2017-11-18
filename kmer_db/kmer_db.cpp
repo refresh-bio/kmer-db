@@ -20,6 +20,7 @@
 #include "log.h"
 
 #define USE_PREFETCH
+//#define ALL_STATS
 
 using namespace std;
 
@@ -666,15 +667,17 @@ void FastKmerDb::savePatterns(std::ofstream& file) const {
 
 }
 
-void FastKmerDb::calculateSimilarity(Array<uint32_t>& matrix) const {
-	matrix.resize(getSamplesCount(), getSamplesCount());
+void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) const {
+	matrix.resize(getSamplesCount());
 	matrix.clear();
 
 	std::vector<std::thread> workers(num_threads);
 	
+	std::atomic<uint64_t> numAdditions(0);
+
 	for (int tid = 0; tid < num_threads; ++tid) {
-		workers[tid] = std::thread([this, tid, &matrix]() {
-		
+		workers[tid] = std::thread([this, tid, &matrix, &numAdditions]() {
+			uint64_t localAdditions = 0;
 			std::vector<uint32_t> rawData(getSamplesCount());
 
 			for (int pid = 1; pid < patterns.size(); ++pid) {
@@ -691,25 +694,33 @@ void FastKmerDb::calculateSimilarity(Array<uint32_t>& matrix) const {
 				}
 
 				for (int i = 0; i < pattern.get_num_samples() - 1; ++i) {
-					sample_id_t Si = rawData[i];
-
-					int key = Si % (2 * num_threads);
+					uint32_t Si = rawData[i];
+					uint32_t key = Si % (2 * num_threads);
 
 					if (key == tid || key == (2 * num_threads - 1 - tid)) {
+						uint32_t * row = matrix[Si];
 
-						for (int j = i + 1; j < pattern.get_num_samples(); ++j) {
-							sample_id_t Sj = rawData[j];
-							matrix[Si][Sj] += pattern.get_num_kmers();
+						for (int j = 0; j < i; ++j) {
+							uint32_t Sj = rawData[j];
+							row[Sj] += pattern.get_num_kmers();
+#ifdef ALL_STATS
+							++localAdditions;
+#endif
 						}
 					}
 				}
 			}
+			numAdditions.fetch_add(localAdditions);
 		});
 	}
 	
 	for (auto & w : workers) {
 		w.join();
 	}
+
+#ifdef ALL_STATS
+	cout << "Number of additions:" << numAdditions << endl;
+#endif
 	
 }
 

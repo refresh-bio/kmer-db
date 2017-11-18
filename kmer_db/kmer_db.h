@@ -49,7 +49,7 @@ public:
 
 	virtual void mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const = 0;
 
-	virtual void calculateSimilarity(Array<uint32_t>& matrix) const = 0;
+	//virtual void calculateSimilarity(Array<uint32_t>& matrix) const = 0;
 };
 
 
@@ -153,7 +153,7 @@ public:
 
 	virtual void mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const;
 
-	virtual void calculateSimilarity(Array<uint32_t>& matrix) const;
+	virtual void calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) const;
 
 	virtual void calculateSimilarity(const FastKmerDb& sampleDb, std::vector<uint32_t>& vector) const;
 

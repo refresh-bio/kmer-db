@@ -161,7 +161,7 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 
 	cout << "Calculating similarity matrix...";
 	start = std::chrono::high_resolution_clock::now();
-	Array<uint32_t> matrix;
+	LowerTriangularMatrix<uint32_t> matrix;
 	db->calculateSimilarity(matrix);
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "OK (" << dt.count() << " seconds)" << endl;

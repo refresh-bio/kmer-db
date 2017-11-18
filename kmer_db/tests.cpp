@@ -183,7 +183,7 @@ void Tests::testSerialization(const FastKmerDb& db) {
 
 	 file << endl << "Distance matrix:" << endl;
 	 Array<uint32_t> matrix;
-	 db.calculateSimilarity(matrix);
+//	 db.calculateSimilarity(matrix);
 	 cout << "Saving distance matrix...";
 	 for (int i = 0; i < matrix.size(); ++i) {
 		 for (int j = 0; j < matrix.size(); ++j) {
