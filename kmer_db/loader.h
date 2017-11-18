@@ -3,6 +3,7 @@
 #include "kmc_api/kmc_file.h"
 #include "kmer_db.h"
 #include "queue.h"
+#include "filter.h"
 
 #include <vector>
 #include <memory>
@@ -23,7 +24,7 @@ struct Task {
 
 class Loader {
 public:
-	Loader();
+	Loader(std::shared_ptr<IKmerFilter> filter);
 	~Loader() {
 		readerQueue.MarkCompleted();
 		prefetcherQueue.MarkCompleted();
@@ -75,5 +76,5 @@ private:
 
 	std::map<size_t, std::shared_ptr<Task>> loadedTasks;
 
-	
+	std::shared_ptr<IKmerFilter> filter;
 };

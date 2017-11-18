@@ -1,126 +1,44 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Source Files">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
-    <Filter Include="raduls">
-      <UniqueIdentifier>{d4a023d3-f434-4e51-b960-378654884003}</UniqueIdentifier>
-    </Filter>
+    <ClCompile Include="console.cpp" />
+    <ClCompile Include="kmc_api\kmc_file.cpp" />
+    <ClCompile Include="kmc_api\kmer_api.cpp" />
+    <ClCompile Include="kmc_api\mmer.cpp" />
+    <ClCompile Include="kmer_db.cpp" />
+    <ClCompile Include="loader.cpp" />
+    <ClCompile Include="log.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="parallel_sorter.cpp" />
+    <ClCompile Include="queue.cpp" />
+    <ClCompile Include="raduls\sorting_network.cpp" />
+    <ClCompile Include="tests.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="kmc_api\kmc_file.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="kmc_api\kmer_api.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="kmc_api\kmer_defs.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="kmc_api\mmer.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="pattern.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="kmer_db.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="hashmap_lp.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="hashmap_dh.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="tests.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="queue.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="array.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="log.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="console.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="raduls\comp_and_swap.h">
-      <Filter>raduls</Filter>
-    </ClInclude>
-    <ClInclude Include="raduls\defs.h">
-      <Filter>raduls</Filter>
-    </ClInclude>
-    <ClInclude Include="raduls\exceptions.h">
-      <Filter>raduls</Filter>
-    </ClInclude>
-    <ClInclude Include="raduls\raduls.h">
-      <Filter>raduls</Filter>
-    </ClInclude>
-    <ClInclude Include="raduls\record.h">
-      <Filter>raduls</Filter>
-    </ClInclude>
-    <ClInclude Include="raduls\small_sort.h">
-      <Filter>raduls</Filter>
-    </ClInclude>
-    <ClInclude Include="raduls\sorting_network.h">
-      <Filter>raduls</Filter>
-    </ClInclude>
-    <ClInclude Include="aligned_vector.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="elias_gamma.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="parallel_sorter.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-    <ClInclude Include="loader.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="kmer_db.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="kmc_api\kmc_file.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="kmc_api\kmer_api.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="kmc_api\mmer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="tests.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="queue.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="log.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="console.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="raduls\sorting_network.cpp">
-      <Filter>raduls</Filter>
-    </ClCompile>
-    <ClCompile Include="parallel_sorter.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-  </ItemGroup>
-    <ClCompile Include="loader.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
+    <ClInclude Include="aligned_vector.h" />
+    <ClInclude Include="array.h" />
+    <ClInclude Include="console.h" />
+    <ClInclude Include="elias_gamma.h" />
+    <ClInclude Include="hashmap_dh.h" />
+    <ClInclude Include="hashmap_lp.h" />
+    <ClInclude Include="kmer_db.h" />
+    <ClInclude Include="kmc_api\kmc_file.h" />
+    <ClInclude Include="kmc_api\kmer_api.h" />
+    <ClInclude Include="kmc_api\kmer_defs.h" />
+    <ClInclude Include="kmc_api\mmer.h" />
+    <ClInclude Include="loader.h" />
+    <ClInclude Include="log.h" />
+    <ClInclude Include="parallel_sorter.h" />
+    <ClInclude Include="pattern.h" />
+    <ClInclude Include="queue.h" />
+    <ClInclude Include="raduls\comp_and_swap.h" />
+    <ClInclude Include="raduls\defs.h" />
+    <ClInclude Include="raduls\exceptions.h" />
+    <ClInclude Include="raduls\raduls.h" />
+    <ClInclude Include="raduls\record.h" />
+    <ClInclude Include="raduls\small_sort.h" />
+    <ClInclude Include="raduls\sorting_network.h" />
+    <ClInclude Include="tests.h" />
+    <ClInclude Include="filter.h" />
   </ItemGroup>
 </Project>

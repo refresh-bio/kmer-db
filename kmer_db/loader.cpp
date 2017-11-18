@@ -6,12 +6,13 @@
 using namespace std;
 
 /****************************************************************************************************************************************************/
-Loader::Loader() : 
+Loader::Loader(std::shared_ptr<IKmerFilter> filter) :
 	prefetcherQueue(1), 
 	intermediateQueue(1),
 	readerQueue(1), 
 	currentFileId(0), 
-	numThreads(std::thread::hardware_concurrency()) {
+	numThreads(std::thread::hardware_concurrency()),
+	filter (filter) {
 
 	kmersCollections.resize(numThreads);
 
@@ -147,7 +148,9 @@ bool Loader::loadKmers(CKMCFile& kmc_file, std::vector<kmer_t>& kmers) {
 		kmer.to_long(tmp);
 		u_kmer = tmp.front();
 
-		kmers.push_back(u_kmer);
+		if ((*filter)(u_kmer)) {
+			kmers.push_back(u_kmer);
+		}
 	}
 
 	return kmc_file.Close();

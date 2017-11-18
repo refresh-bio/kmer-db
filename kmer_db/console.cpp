@@ -76,7 +76,11 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 	std::chrono::duration<double> loadingTime, processingTime;
 	
 	LOG_DEBUG << "Creating Loader object..." << endl;
-	Loader loader;
+
+	auto filter = std::make_shared<NullFilter>();
+	//auto filter = std::make_shared<MinHashFilter>(0.1, 20);
+
+	Loader loader(filter);
 	loader.configure(multipleKmcSamples);
 
 	loader.initPrefetch();
@@ -187,7 +191,7 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 
 	cout << "Loading sample kmers...";
 	FastKmerDb sampleDb;
-	Loader loader;
+	Loader loader(make_shared<NullFilter>());
 	std::vector<kmer_t> kmers;
 	if (!loader.loadKmers(singleKmcSample, kmers)) {
 		cout << "FAILED";
