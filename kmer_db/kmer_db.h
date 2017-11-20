@@ -154,6 +154,8 @@ public:
 	virtual void mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const;
 
 	virtual void calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) const;
+	virtual void calculateSimilarityDirect(LowerTriangularMatrix<uint32_t>& matrix) const;
+	virtual void calculateSimilarityBuffered(LowerTriangularMatrix<uint32_t>& matrix) const;
 
 	virtual void calculateSimilarity(const FastKmerDb& sampleDb, std::vector<uint32_t>& vector) const;
 

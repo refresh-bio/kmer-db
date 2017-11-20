@@ -667,12 +667,25 @@ void FastKmerDb::savePatterns(std::ofstream& file) const {
 
 }
 
+#define BUFFERED_ARRAY
+
 void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) const {
+	if(getSamplesCount() < 12000)
+		calculateSimilarityDirect(matrix);
+	else
+#ifdef BUFFERED_ARRAY
+	calculateSimilarityBuffered(matrix);
+#else
+	calculateSimilarityDirect(matrix);
+#endif
+}
+
+
+void FastKmerDb::calculateSimilarityDirect(LowerTriangularMatrix<uint32_t>& matrix) const {
 	matrix.resize(getSamplesCount());
 	matrix.clear();
 
 	std::vector<std::thread> workers(num_threads);
-	
 	std::atomic<uint64_t> numAdditions(0);
 
 	for (int tid = 0; tid < num_threads; ++tid) {
@@ -684,6 +697,10 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 				const auto& pattern = patterns[pid];
 				uint32_t* out = rawData.data() + pattern.get_num_samples(); // start from the end
 														// decode all samples
+
+				if (pattern.get_num_kmers() == 0)
+					continue;
+
 				int64_t current_id = pid;
 				while (current_id >= 0) {
 					const auto& cur = patterns[current_id];
@@ -699,7 +716,6 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 
 					if (key == tid || key == (2 * num_threads - 1 - tid)) {
 						uint32_t * row = matrix[Si];
-
 						for (int j = 0; j < i; ++j) {
 							uint32_t Sj = rawData[j];
 							row[Sj] += pattern.get_num_kmers();
@@ -723,6 +739,97 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 #endif
 	
 }
+
+void FastKmerDb::calculateSimilarityBuffered(LowerTriangularMatrix<uint32_t>& matrix) const {
+	matrix.resize(getSamplesCount());
+	matrix.clear();
+
+	std::vector<std::thread> workers(num_threads);
+	std::atomic<uint64_t> numAdditions(0);
+
+	vector<ArrayBuffer> mat_buf(getSamplesCount());
+	for (size_t i = 0; i < getSamplesCount(); ++i)
+		mat_buf[i].Assign(matrix[i], 1 << 15);
+
+	for (int tid = 0; tid < num_threads; ++tid) {
+		workers[tid] = std::thread([this, tid, &matrix, &numAdditions, &mat_buf]() {
+			uint64_t localAdditions = 0;
+			std::vector<uint32_t> rawData(getSamplesCount());
+			std::vector<uint32_t> v_samples;
+
+			for (int pid = 1; pid < patterns.size(); ++pid) {
+				const auto& pattern = patterns[pid];
+				if (pattern.get_num_kmers() == 0)
+					continue;
+
+				uint32_t* out = rawData.data() + pattern.get_num_samples(); // start from the end
+																			// decode all samples
+
+				int64_t current_id = pid;
+				while (current_id >= 0) {
+					const auto& cur = patterns[current_id];
+					out -= cur.get_num_local_samples();
+					cur.decodeSamples(out);
+
+					current_id = cur.get_parent_id();
+				}
+
+				v_samples.clear();
+				for (int i = 0; i < pattern.get_num_samples() - 1; ++i) {
+					uint32_t Si = rawData[i];
+					uint32_t key = Si % (2 * num_threads);
+
+					if (key == tid || key == (2 * num_threads - 1 - tid))
+						v_samples.push_back(i);
+				}
+
+				uint32_t n_samples = v_samples.size();
+//				for (int i = 0; i < pattern.get_num_samples() - 1; ++i) {
+				for(uint32_t ii  = 0; ii < n_samples; ++ii)
+				{
+					if (ii + 2 < n_samples)
+					{
+						_mm_prefetch((const char*)(rawData.data() + v_samples[ii + 1]), _MM_HINT_T0);
+						mat_buf[rawData[v_samples[ii + 2]]].Prefetch();
+					}
+
+					uint32_t i = v_samples[ii];
+					uint32_t Si = rawData[i];
+
+					ArrayBuffer &row_buf = mat_buf[Si];
+					row_buf.SetCounter(pattern.get_num_kmers());
+
+/*					for (int j = 0; j < i; ++j) {
+						row_buf.Push(rawData[j]);*/
+					auto *end_p = rawData.data() + i;
+					for (auto p = rawData.data(); p != end_p; ++p){
+						row_buf.Push(*p);
+#ifdef ALL_STATS
+						++localAdditions;
+#endif
+					}
+				}
+			}
+			numAdditions.fetch_add(localAdditions);
+
+			for (size_t i = 0; i < getSamplesCount(); ++i)
+			{
+				uint32_t key = i % (2 * num_threads);
+				if (key == tid || key == (2 * num_threads - 1 - tid))
+					mat_buf[i].Finish();
+			}
+		});
+		}
+
+	for (auto & w : workers) {
+		w.join();
+	}
+
+#ifdef ALL_STATS
+	cout << "Number of additions:" << numAdditions << endl;
+#endif
+
+	}
 
 void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<uint32_t>& similarities) const {
 		similarities.resize(this->getSamplesCount());
