@@ -39,7 +39,7 @@ public:
 
 		h = kmer;
 		h *= 0x87c37b91114253d5ull;
-		h = _rotl64(h, 31);
+		h = rotl64(h, 31);
 		h *= 0x4cf5ad432745937f;
 		h1 ^= 42 ^ h;
 		h1 ^= k_div_4; //ceil(k / 4);
