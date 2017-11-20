@@ -19,6 +19,14 @@ public:
 };
 
 class MinHashFilter : public IKmerFilter {
+	uint64_t rotl64(uint64 x, uint32_t offset)
+	{
+#ifdef WIN32
+		return _rotl64(x, offset);
+#else
+		return (x << offset) | (x >> (64 - offset));
+#endif
+	}
 public:
 	MinHashFilter(double fraction, size_t kmer_length) :
 		threshold(std::numeric_limits<uint64_t>::max() * std::min(fraction, 1.0)),
