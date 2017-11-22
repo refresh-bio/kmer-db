@@ -158,6 +158,8 @@ public:
 	virtual void calculateSimilarityBuffered(LowerTriangularMatrix<uint32_t>& matrix) const;
 
 	virtual void calculateSimilarity(const FastKmerDb& sampleDb, std::vector<uint32_t>& vector) const;
+	virtual void calculateSimilarityOld(const FastKmerDb& sampleDb, std::vector<uint32_t>& vector) const;
+
 
 	virtual void serialize(std::ofstream& file) const;
 

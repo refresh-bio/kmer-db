@@ -817,26 +817,52 @@ void FastKmerDb::calculateSimilarityBuffered(LowerTriangularMatrix<uint32_t>& ma
 	}
 
 void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<uint32_t>& similarities) const {
-		similarities.resize(this->getSamplesCount(), 0);
-		
-		std::vector<uint32_t> samples(this->getSamplesCount());
+	similarities.resize(this->getSamplesCount(), 0);
 
-	
-		// iterate over kmers in analyzed sample
-		for (auto it = sampleDb.kmers2patternIds.cbegin(); it < sampleDb.kmers2patternIds.cend(); ++it) {
-			if (sampleDb.kmers2patternIds.is_free(*it)) {
+	std::vector<std::vector<uint32_t>> localSimilarities(num_threads, std::vector<uint32_t>(this->getSamplesCount()));
+
+	std::map<pattern_id_t, int32_t> patterns2count;
+
+	// iterate over kmers in analyzed sample
+	for (auto it = sampleDb.kmers2patternIds.cbegin(); it < sampleDb.kmers2patternIds.cend(); ++it) {
+		if (sampleDb.kmers2patternIds.is_free(*it)) {
+			continue;
+		}
+
+		// check if kmer exists in a database
+		auto entry = kmers2patternIds.find(it->key);
+
+		if (entry != nullptr) {
+			auto pid = *entry;
+			const auto& pattern = patterns[pid];
+
+			if (pattern.get_num_kmers() == 0)
 				continue;
-			}
 
-			// check if kmer exists in a database
-			auto entry = kmers2patternIds.find(it->key);
+			++patterns2count[pid];
+		}
+	}
 
-			if (entry != nullptr) {
-				auto pid = *entry;
+	std::vector<std::pair<pattern_id_t, int32_t>> patterns2countVector(patterns2count.size());
+	int i = 0;
+	for (const auto& entry : patterns2count) {
+		patterns2countVector[i++] = entry;
+	}
+
+	std::vector<std::thread> workers(num_threads);
+	for (int tid = 0; tid < num_threads; ++tid) {
+		workers[tid] = std::thread([this, tid, &patterns2countVector, &localSimilarities]() {
+			std::vector<uint32_t> samples(this->getSamplesCount());
+			
+			size_t n_patterns = patterns2countVector.size();
+			size_t block_size = n_patterns / num_threads;
+			size_t lo = tid * block_size;
+			size_t hi = (tid == num_threads - 1) ? n_patterns : lo + block_size;
+
+			for (int id = lo; id < hi; ++id) {
+				
+				auto pid = patterns2countVector[id].first;
 				const auto& pattern = patterns[pid];
-
-				if (pattern.get_num_kmers() == 0)
-					continue;
 
 				uint32_t* out = samples.data() + pattern.get_num_samples(); // start from the end
 
@@ -848,10 +874,60 @@ void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<ui
 
 					current_id = cur.get_parent_id();
 				}
-				
+
 				for (int i = 0; i < pattern.get_num_samples(); ++i) {
-					++similarities[samples[i]];
-				}	
+					localSimilarities[tid][samples[i]] += patterns2countVector[id].second;
+				}
+			}
+		});
+	}
+
+	for (int tid = 0; tid < num_threads; ++tid) {
+		workers[tid].join();
+		std::transform(localSimilarities[tid].begin(), localSimilarities[tid].end(), similarities.begin(), similarities.begin(), [](uint32_t a, uint32_t b)->uint32_t{ 
+			return a + b;
+		});
+	}
+
+	
+}
+
+
+void  FastKmerDb::calculateSimilarityOld(const FastKmerDb& sampleDb, std::vector<uint32_t>& similarities) const {
+	similarities.resize(this->getSamplesCount(), 0);
+
+	std::vector<uint32_t> samples(this->getSamplesCount());
+
+	// iterate over kmers in analyzed sample
+	for (auto it = sampleDb.kmers2patternIds.cbegin(); it < sampleDb.kmers2patternIds.cend(); ++it) {
+		if (sampleDb.kmers2patternIds.is_free(*it)) {
+			continue;
+		}
+
+		// check if kmer exists in a database
+		auto entry = kmers2patternIds.find(it->key);
+
+		if (entry != nullptr) {
+			auto pid = *entry;
+			const auto& pattern = patterns[pid];
+
+			if (pattern.get_num_kmers() == 0)
+				continue;
+
+			uint32_t* out = samples.data() + pattern.get_num_samples(); // start from the end
+
+			int64_t current_id = pid;
+			while (current_id >= 0) {
+				const auto& cur = patterns[current_id];
+				out -= cur.get_num_local_samples();
+				cur.decodeSamples(out);
+
+				current_id = cur.get_parent_id();
+			}
+
+			for (int i = 0; i < pattern.get_num_samples(); ++i) {
+				++similarities[samples[i]];
 			}
 		}
 	}
+}
