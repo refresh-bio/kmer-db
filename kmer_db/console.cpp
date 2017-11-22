@@ -188,8 +188,10 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 	std::ifstream dbFile(dbFilename, std::ios::binary);
 	FastKmerDb db;
 
-
+	std::chrono::duration<double> dt;
 	cout << "Loading sample kmers...";
+
+	auto start = std::chrono::high_resolution_clock::now();
 	FastKmerDb sampleDb;
 	Loader loader(make_shared<NullFilter>());
 	std::vector<kmer_t> kmers;
@@ -198,24 +200,29 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 		return -1;
 	}
 	sampleDb.addKmers(singleKmcSample, kmers);
-	cout << "OK" << endl
+	dt = std::chrono::high_resolution_clock::now() - start;
+	cout << "OK (" << dt.count() << " seconds)" << endl
 		<< "Number of k-mers: " << sampleDb.getKmersCount() << endl;
 
 	cout << "Loading k-mer database " << dbFilename << "...";
+	start = std::chrono::high_resolution_clock::now();
 	if (!dbFile || !db.deserialize(dbFile)) {
 		cout << "FAILED";
 		return -1;
 	}
-	cout << "OK" << endl
+	dt = std::chrono::high_resolution_clock::now() - start;
+	cout << "OK (" << dt.count() << " seconds)" << endl
 		<< "Number of samples: " << db.getSamplesCount() << endl
 		<< "Number of patterns: " << db.getPatternsCount() << endl
 		<< "Number of k-mers: " << db.getKmersCount() << endl;
 
 
 	cout << "Calculating similarity vector...";
+	start = std::chrono::high_resolution_clock::now();
 	std::vector<uint32_t> sims;
 	db.calculateSimilarity(sampleDb, sims);
-	cout << "OK" << endl;
+	dt = std::chrono::high_resolution_clock::now() - start;
+	cout << "OK (" << dt.count() << " seconds)" << endl;
 
 	cout << "Storing similarity vector in " << similarityFile << "...";
 	std::ofstream ofs(similarityFile);
@@ -268,9 +275,9 @@ void Console::showInstructions() {
 		<< "\t   similarity_matrix - file with similarity matrix (output)" << endl
 
 		<< "Calculating similarity of a new sample to all the samples in the database:" << endl
-		<< "\t kmer_db --one2all <sample> <database> <similarity_vector>" << endl
-		<< "\t   sample - k-mer file for a sample (input)" << endl
+		<< "\t kmer_db --one2all <database> <sample> <similarity_vector>" << endl
 		<< "\t   database - k-mer database file (input)" << endl
+		<< "\t   sample - k-mer file for a sample (input)" << endl
 		<< "\t   similarity_matrix - file with similarity matrix (output)" << endl;
 }
 

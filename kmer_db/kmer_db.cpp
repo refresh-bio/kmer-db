@@ -818,6 +818,7 @@ void FastKmerDb::calculateSimilarityBuffered(LowerTriangularMatrix<uint32_t>& ma
 
 void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<uint32_t>& similarities) const {
 		similarities.resize(this->getSamplesCount());
+		std::vector<uint32_t> samples(this->getSamplesCount());
 
 		// iterate over kmers in analyzed sample
 		for (auto it = sampleDb.kmers2patternIds.cbegin(); it < sampleDb.kmers2patternIds.cend(); ++it) {
@@ -830,17 +831,13 @@ void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<ui
 
 			if (entry != nullptr) {
 				auto pid = *entry;
-				while (pid >= 0) {
-					const auto& pat = patterns[pid];
+				const auto& pat = patterns[pid];
 
-					// iterate over elements in the subpattern
-					for (int i = pat.get_num_local_samples() - 1; i >= 0; --i) {
-						sample_id_t Si = pat.get_data()[i];
-						++similarities[Si];
-					}
-
-					pid = pat.get_parent_id();
-				}
+				pat.decodeSamples(samples.data());
+				
+				for (auto sid : samples) {
+					++similarities[sid];
+				}	
 			}
 		}
 	}
