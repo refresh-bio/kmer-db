@@ -127,7 +127,7 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1), dictionar
 
 	patternBytes = 0;
 	patterns.reserve(1024);
-	patterns.push_back(pattern_t<sample_id_t>());
+	patterns.push_back(pattern_t());
 	num_threads = std::thread::hardware_concurrency();
 
 	threadPatterns.resize(num_threads);
@@ -246,7 +246,7 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1), dictionar
 							//	patterns.push_back(pattern_t{ (uint32_t)pid_count, pat });
 							pattern_id_t local_pid = task.new_pid->fetch_add(1);
 
-							threadPatterns[task.block_id].emplace_back(local_pid, pattern_t<sample_id_t>(patterns[p_id], p_id, task.sample_id, (uint32_t)pid_count));
+							threadPatterns[task.block_id].emplace_back(local_pid, pattern_t(patterns[p_id], p_id, task.sample_id, (uint32_t)pid_count));
 							mem += threadPatterns[task.block_id].back().second.get_bytes();
 
 							if (p_id) {
@@ -490,26 +490,11 @@ void FastKmerDb::mapKmers2Samples(uint64_t kmer, std::vector<sample_id_t>& sampl
 	
 	// find corresponding pattern id
 	auto p_id = kmers2patternIds.find(kmer);
-	samples.clear();
-	if (p_id != nullptr) { 
-		const pattern_t<sample_id_t>* subpattern = &patterns[*p_id];
-		samples.resize(subpattern->get_num_samples());
-		int j = samples.size() - 1;
+	const auto& p = patterns[*p_id];
+	samples.resize(p.get_num_samples());
+	
+	p.decodeSamples(samples.data());
 
-		// collect in reversed order
-		int64_t cur_id = *p_id;
-
-		do {
-			subpattern = &patterns[cur_id];
-
-			for (int i = subpattern->get_num_local_samples() - 1; i >= 0 ; --i, --j) {
-				samples[j] = (*subpattern)[i];
-			}
-			
-			cur_id = subpattern->get_parent_id(); // return -1 when no parrent
-			
-		} while (cur_id >= 0);
-	}
 }
 
 

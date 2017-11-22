@@ -14,7 +14,7 @@
 #include <map>
 
 
-typedef uint16_t sample_id_t;
+
 typedef uint64_t kmer_t;
 
 
@@ -173,9 +173,9 @@ protected:
 	hash_map_lp<kmer_t, pattern_id_t> kmers2patternIds;
 
 	// liczba wystapien wzorca w kmer_dict, wektor id osobnikow zawierajacych k - mer)
-	std::vector<pattern_t<sample_id_t>> patterns;
+	std::vector<pattern_t> patterns;
 
-	std::vector<std::vector<std::pair<pattern_id_t, pattern_t<sample_id_t>>>> threadPatterns;
+	std::vector<std::vector<std::pair<pattern_id_t, pattern_t>>> threadPatterns;
 
 	// first element - pattern id, second element 
 //	std::vector<std::pair<pattern_id_t, pattern_id_t*>> samplePatterns;

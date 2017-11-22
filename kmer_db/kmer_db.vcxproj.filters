@@ -13,6 +13,7 @@
     <ClCompile Include="queue.cpp" />
     <ClCompile Include="raduls\sorting_network.cpp" />
     <ClCompile Include="tests.cpp" />
+    <ClCompile Include="pattern.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="aligned_vector.h" />

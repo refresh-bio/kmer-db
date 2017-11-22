@@ -24,6 +24,7 @@ kmer-db-1.0: $(KMER_DB_MAIN_DIR)/kmer_db.o \
 	$(KMER_DB_MAIN_DIR)/log.o \
 	$(KMER_DB_MAIN_DIR)/main.o \
 	$(KMER_DB_MAIN_DIR)/parallel_sorter.o \
+	$(KMER_DB_MAIN_DIR)/pattern.o \
 	$(KMER_DB_MAIN_DIR)/queue.o \
 	$(KMER_DB_MAIN_DIR)/tests.o \
 	$(KMER_DB_LIBS_DIR)/kmc_file.o \
@@ -37,6 +38,7 @@ kmer-db-1.0: $(KMER_DB_MAIN_DIR)/kmer_db.o \
 	$(KMER_DB_MAIN_DIR)/log.o \
 	$(KMER_DB_MAIN_DIR)/main.o \
 	$(KMER_DB_MAIN_DIR)/parallel_sorter.o \
+	$(KMER_DB_MAIN_DIR)/pattern.o \
 	$(KMER_DB_MAIN_DIR)/queue.o \
 	$(KMER_DB_MAIN_DIR)/tests.o \
 	$(KMER_DB_LIBS_DIR)/kmc_file.o \
