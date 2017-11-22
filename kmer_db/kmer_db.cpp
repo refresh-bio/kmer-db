@@ -695,7 +695,7 @@ void FastKmerDb::calculateSimilarityDirect(LowerTriangularMatrix<uint32_t>& matr
 					current_id = cur.get_parent_id();
 				}
 
-				for (int i = 0; i < pattern.get_num_samples() - 1; ++i) {
+				for (int i = 0; i < pattern.get_num_samples(); ++i) {
 					uint32_t Si = rawData[i];
 					uint32_t key = Si % (2 * num_threads);
 
@@ -760,7 +760,7 @@ void FastKmerDb::calculateSimilarityBuffered(LowerTriangularMatrix<uint32_t>& ma
 				}
 
 				v_samples.clear();
-				for (int i = 0; i < pattern.get_num_samples() - 1; ++i) {
+				for (int i = 0; i < pattern.get_num_samples(); ++i) {
 					uint32_t Si = rawData[i];
 					uint32_t key = Si % (2 * num_threads);
 
@@ -817,9 +817,11 @@ void FastKmerDb::calculateSimilarityBuffered(LowerTriangularMatrix<uint32_t>& ma
 	}
 
 void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<uint32_t>& similarities) const {
-		similarities.resize(this->getSamplesCount());
+		similarities.resize(this->getSamplesCount(), 0);
+		
 		std::vector<uint32_t> samples(this->getSamplesCount());
 
+	
 		// iterate over kmers in analyzed sample
 		for (auto it = sampleDb.kmers2patternIds.cbegin(); it < sampleDb.kmers2patternIds.cend(); ++it) {
 			if (sampleDb.kmers2patternIds.is_free(*it)) {
@@ -831,12 +833,24 @@ void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<ui
 
 			if (entry != nullptr) {
 				auto pid = *entry;
-				const auto& pat = patterns[pid];
+				const auto& pattern = patterns[pid];
 
-				pat.decodeSamples(samples.data());
+				if (pattern.get_num_kmers() == 0)
+					continue;
+
+				uint32_t* out = samples.data() + pattern.get_num_samples(); // start from the end
+
+				int64_t current_id = pid;
+				while (current_id >= 0) {
+					const auto& cur = patterns[current_id];
+					out -= cur.get_num_local_samples();
+					cur.decodeSamples(out);
+
+					current_id = cur.get_parent_id();
+				}
 				
-				for (auto sid : samples) {
-					++similarities[sid];
+				for (int i = 0; i < pattern.get_num_samples(); ++i) {
+					++similarities[samples[i]];
 				}	
 			}
 		}
