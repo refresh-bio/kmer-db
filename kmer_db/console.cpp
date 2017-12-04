@@ -63,6 +63,51 @@ int Console::parse(int argc, char** argv) {
 }
 
 
+
+int Console::runMinHash(const std::string& multipleKmcSamples, const std::string binarySamplesFile) {
+	/*cout << "Minhashing samples..." << endl;
+
+
+	std::chrono::duration<double> loadingTime, processingTime;
+
+	LOG_DEBUG << "Creating Loader object..." << endl;
+
+	auto filter = std::make_shared<MinHashFilter>(0.1, 20);
+
+	Loader loader(filter);
+	loader.configure(multipleKmcSamples);
+
+	loader.initPrefetch();
+
+	LOG_DEBUG << "Starting loop..." << endl;
+
+	for (;;) {
+		auto start = std::chrono::high_resolution_clock::now();
+		loader.waitForPrefetch();
+		loader.initLoad();
+		loader.waitForLoad();
+		loadingTime += std::chrono::high_resolution_clock::now() - start;
+
+		start = std::chrono::high_resolution_clock::now();
+		loader.initPrefetch();
+		if (!loader.getLoadedTasks().size()) {
+			break;
+		}
+
+		for (const auto& entry : loader.getLoadedTasks()) {
+			auto task = entry.second;
+			db->addKmers(task->sampleName, *task->kmers);
+			show_progress(*db);
+			cout << endl;
+		}
+
+		loader.getLoadedTasks().clear();
+		processingTime += std::chrono::high_resolution_clock::now() - start;
+	}*/
+}
+
+
+
 /****************************************************************************************************************************************************/
 
 int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::string dbFilename) {

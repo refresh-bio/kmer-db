@@ -823,6 +823,9 @@ void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<ui
 
 	std::map<pattern_id_t, int32_t> patterns2count;
 
+	std::chrono::duration<double> dt;
+	auto start = std::chrono::high_resolution_clock::now();
+
 	// iterate over kmers in analyzed sample
 	for (auto it = sampleDb.kmers2patternIds.cbegin(); it < sampleDb.kmers2patternIds.cend(); ++it) {
 		if (sampleDb.kmers2patternIds.is_free(*it)) {
@@ -848,7 +851,12 @@ void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<ui
 	for (const auto& entry : patterns2count) {
 		patterns2countVector[i++] = entry;
 	}
+	patterns2count.clear();
 
+	dt = std::chrono::high_resolution_clock::now() - start;
+	cout << "Pattern listing time: " << dt.count() << endl;
+
+	start = std::chrono::high_resolution_clock::now();
 	std::vector<std::thread> workers(num_threads);
 	for (int tid = 0; tid < num_threads; ++tid) {
 		workers[tid] = std::thread([this, tid, &patterns2countVector, &localSimilarities]() {
@@ -889,7 +897,8 @@ void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<ui
 		});
 	}
 
-	
+	dt = std::chrono::high_resolution_clock::now() - start;
+	cout << "Pattern unpacking time: " << dt.count() << endl;
 }
 
 
