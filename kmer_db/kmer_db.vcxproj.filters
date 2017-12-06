@@ -41,5 +41,6 @@
     <ClInclude Include="raduls\sorting_network.h" />
     <ClInclude Include="tests.h" />
     <ClInclude Include="filter.h" />
+    <ClInclude Include="kmc_file_wrapper.h" />
   </ItemGroup>
 </Project>

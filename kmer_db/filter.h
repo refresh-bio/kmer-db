@@ -7,41 +7,42 @@
 
 class IKmerFilter {
 public:
-	virtual bool operator()(uint64_t kmer) = 0;
+	virtual bool operator()(uint64_t kmer) const = 0;
+	virtual void setParams(uint64_t kmer_length) = 0;
 };
 
-
-class NullFilter : public IKmerFilter {
-public:
-	virtual bool operator()(uint64_t kmer) override {
-		return true;
-	}
-};
 
 class MinHashFilter : public IKmerFilter {
-	uint64_t rotl64(uint64 x, uint32_t offset)
+	uint64_t rotl64(uint64 x, int32_t offset) const
 	{
 #ifdef WIN32
 		return _rotl64(x, offset);
+		//return (x << offset) | (x >> (64 - offset));
 #else
 		return (x << offset) | (x >> (64 - offset));
 #endif
 	}
 public:
+	
 	MinHashFilter(double fraction, size_t kmer_length) :
-		threshold(std::numeric_limits<uint64_t>::max() * std::min(fraction, 1.0)),
-		k_div_4(std::ceil(kmer_length / 4)),
-		c42_xor_k_div_4(42 ^ k_div_4)
-	{}
+		threshold(fraction > 0.99999 ? std::numeric_limits<uint64_t>::max() : (uint64_t)((double)std::numeric_limits<uint64_t>::max() * fraction))
+	{
+		setParams(kmer_length);
+	}
 
-	virtual bool operator()(uint64_t kmer) override {
+	virtual void setParams(uint64_t kmer_length) override {
+		this->k_div_4 = (uint64_t)ceil((double)kmer_length / 4);
+		this->c42_xor_k_div_4 = 42 ^ k_div_4;
+	}
+
+	virtual bool operator()(uint64_t kmer) const override {
 		uint64_t h, h1, h2;
 
 		h = kmer;
 		h *= 0x87c37b91114253d5ull;
 		h = rotl64(h, 31);
-		h *= 0x4cf5ad432745937f;
-		h1 ^= 42 ^ h;
+		h *= 0x4cf5ad432745937full;
+		h1 = 42 ^ h; // fixme
 		h1 ^= k_div_4; //ceil(k / 4);
 		h2 = c42_xor_k_div_4; // 42 ^ ceil(k / 4);
 		h1 += h2;
@@ -56,16 +57,16 @@ public:
 	}
 
 private:
-	const uint64_t threshold;
-	const uint64_t k_div_4;
-	const uint64_t c42_xor_k_div_4;
+	uint64_t threshold;
+	uint64_t k_div_4;
+	uint64_t c42_xor_k_div_4;
 
-	FORCE_INLINE uint64_t fmix64(uint64_t k)
+	FORCE_INLINE uint64_t fmix64(uint64_t k) const
 	{
 		k ^= k >> 33;
-		k *= 0xff51afd7ed558ccd;
+		k *= 0xff51afd7ed558ccdull;
 		k ^= k >> 33;
-		k *= 0xc4ceb9fe1a85ec53;
+		k *= 0xc4ceb9fe1a85ec53ull;
 		k ^= k >> 33;
 
 		return k;

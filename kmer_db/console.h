@@ -13,7 +13,7 @@ protected:
 	int runAllVsAll(const std::string& dbFilename, const std::string& similarityFile);
 	int runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFile);
 	int runListPatterns(const std::string& dbFilename, const std::string& patternFile);
-	int runMinHash(const std::string& multipleKmcSamples, const std::string binarySamplesFile);
+	int runMinHash(const std::string& multipleKmcSamples, float fraction);
 
 	void showInstructions();
 

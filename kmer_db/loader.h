@@ -1,30 +1,41 @@
 #pragma once
 
-#include "kmc_api/kmc_file.h"
-#include "kmer_db.h"
+#include "kmc_file_wrapper.h"
 #include "queue.h"
 #include "filter.h"
 
 #include <vector>
 #include <memory>
 #include <map>
+#include <fstream>
 
 
 struct Task {
 	size_t fileId;
 	size_t threadId;
+	std::string filePath;
 	std::string sampleName;
-	std::shared_ptr<CKMCFile> file;
+	std::shared_ptr<KmcFileWrapper> file;
 	std::vector<kmer_t>* kmers;
 
-	Task(size_t fileId, size_t threadId, const std::string& sampleName) :
-		fileId(fileId), threadId(threadId), sampleName(sampleName), file(nullptr), kmers(nullptr) {}
+	Task(size_t fileId, size_t threadId, const std::string& filePath) :
+		fileId(fileId), threadId(threadId), filePath(filePath), file(nullptr), kmers(nullptr) {
+	
+		size_t pos = filePath.find_last_of("/\\");
+		if (pos != string::npos) {
+			sampleName = filePath.substr(pos + 1);
+		}
+		else {
+			sampleName = filePath;
+		}
+	}
 };
 
 
 class Loader {
 public:
-	Loader(std::shared_ptr<IKmerFilter> filter);
+	
+	Loader(std::shared_ptr<IKmerFilter> filter, bool tryMinHash);
 	~Loader() {
 		readerQueue.MarkCompleted();
 		prefetcherQueue.MarkCompleted();
@@ -43,13 +54,12 @@ public:
 	void initLoad();
 	void waitForLoad() { readerSemaphore.waitForZero();  }
 
-	bool loadKmers(CKMCFile& file, std::vector<kmer_t>& kmers);
-	bool loadKmers(const string &filename, std::vector<kmer_t>& kmers);
-
 	std::map<size_t, std::shared_ptr<Task>>& getLoadedTasks() { return loadedTasks;  }
 
 private:
 	
+	bool tryMinHash;
+
 	size_t currentFileId;
 
 	int numThreads;

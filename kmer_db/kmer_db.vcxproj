@@ -152,6 +152,7 @@
     <ClInclude Include="filter.h" />
     <ClInclude Include="hashmap_dh.h" />
     <ClInclude Include="hashmap_lp.h" />
+    <ClInclude Include="kmc_file_wrapper.h" />
     <ClInclude Include="kmer_db.h" />
     <ClInclude Include="kmc_api\kmc_file.h" />
     <ClInclude Include="kmc_api\kmer_api.h" />

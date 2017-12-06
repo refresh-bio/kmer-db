@@ -40,7 +40,7 @@ int Console::parse(int argc, char** argv) {
 
 	cout << "kmer-db version 1.0" << endl;
 	
-		if (argc == 4 && string(argv[1]) == "--build") {
+	if (argc == 4 && string(argv[1]) == "--build") {
 		cout << "Database building mode" << endl;
 		return runBuildDatabase(argv[2], argv[3]);
 	}
@@ -56,6 +56,10 @@ int Console::parse(int argc, char** argv) {
 		cout << "Listing all patterns" << endl;
 		return runListPatterns(argv[2], argv[3]);
 	}
+	else if (argc == 4 && string(argv[1]) == "--minhash" && std::atof(argv[3]) > 0) {
+		cout << "Listing all patterns" << endl;
+		return runMinHash(argv[2], atof(argv[3]));
+	}
 	else {
 		showInstructions();
 		return 0;
@@ -64,17 +68,16 @@ int Console::parse(int argc, char** argv) {
 
 
 
-int Console::runMinHash(const std::string& multipleKmcSamples, const std::string binarySamplesFile) {
-	/*cout << "Minhashing samples..." << endl;
-
+int Console::runMinHash(const std::string& multipleKmcSamples, float fraction) {
+	cout << "Minhashing samples..." << endl;
 
 	std::chrono::duration<double> loadingTime, processingTime;
 
 	LOG_DEBUG << "Creating Loader object..." << endl;
 
-	auto filter = std::make_shared<MinHashFilter>(0.1, 20);
+	auto filter = std::make_shared<MinHashFilter>(fraction, 20);
 
-	Loader loader(filter);
+	Loader loader(filter, false);
 	loader.configure(multipleKmcSamples);
 
 	loader.initPrefetch();
@@ -96,14 +99,15 @@ int Console::runMinHash(const std::string& multipleKmcSamples, const std::string
 
 		for (const auto& entry : loader.getLoadedTasks()) {
 			auto task = entry.second;
-			db->addKmers(task->sampleName, *task->kmers);
-			show_progress(*db);
-			cout << endl;
+			KmcFileWrapper file(nullptr); 
+			file.store(task->filePath, *task->kmers);
 		}
 
 		loader.getLoadedTasks().clear();
 		processingTime += std::chrono::high_resolution_clock::now() - start;
-	}*/
+	}
+
+	return 0;
 }
 
 
@@ -122,10 +126,7 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 	
 	LOG_DEBUG << "Creating Loader object..." << endl;
 
-	auto filter = std::make_shared<NullFilter>();
-	//auto filter = std::make_shared<MinHashFilter>(0.1, 20);
-
-	Loader loader(filter);
+	Loader loader(nullptr, true);
 	loader.configure(multipleKmcSamples);
 
 	loader.initPrefetch();
@@ -224,6 +225,8 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 	delete db;
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "OK (" << dt.count() << " seconds)" << endl;
+
+	return 0;
 }
 
 
@@ -238,9 +241,11 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 
 	auto start = std::chrono::high_resolution_clock::now();
 	FastKmerDb sampleDb;
-	Loader loader(make_shared<NullFilter>());
+
 	std::vector<kmer_t> kmers;
-	if (!loader.loadKmers(singleKmcSample, kmers)) {
+	KmcFileWrapper file(nullptr);
+
+	if (!file.open(singleKmcSample, true) && !file.load(kmers)) {
 		cout << "FAILED";
 		return -1;
 	}
@@ -278,6 +283,8 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 
 	ofs.close();
 	cout << "OK" << endl;
+
+	return 0;
 }
 
 /****************************************************************************************************************************************************/
@@ -311,18 +318,23 @@ void Console::showInstructions() {
 
 		<< "Building k-mer database:" << endl
 		<< "\t kmer_db --build <sample_list> <database>" << endl
-		<< "\t   sample_list - directory with k-mer files or file containing list of k-mer files (input)" << endl
-		<< "\t   database - file with generated k-mer database (output)" << endl
+		<< "\t   sample_list (input) - file containing list of k-mer files (raw or min-hashed)" << endl
+		<< "\t   database (output) - file with generated k-mer database" << endl
+
+		<< "Min-hashing k-mers:" << endl
+		<< "\t kmer_db --minhash <sample_list> <fraction>" << endl
+		<< "\t   sample_list (input) - file containing list of k-mer files (raw)" << endl
+		<< "\t   fraction (input) - fraction of kmers passing the filter" << endl
 
 		<< "Calculating similarity matrix for all the samples in the database:" << endl
 		<< "\t kmer_db --all2all <database> <similarity_matrix>" << endl
-		<< "\t   database - k-mer database file (input)" << endl
-		<< "\t   similarity_matrix - file with similarity matrix (output)" << endl
+		<< "\t   database (input) - k-mer database file" << endl
+		<< "\t   similarity_matrix (output) - file with similarity matrix" << endl
 
 		<< "Calculating similarity of a new sample to all the samples in the database:" << endl
 		<< "\t kmer_db --one2all <database> <sample> <similarity_vector>" << endl
-		<< "\t   database - k-mer database file (input)" << endl
-		<< "\t   sample - k-mer file for a sample (input)" << endl
-		<< "\t   similarity_matrix - file with similarity matrix (output)" << endl;
+		<< "\t   database (input) - k-mer database file" << endl
+		<< "\t   sample (input) - k-mer file for a sample" << endl
+		<< "\t   similarity_matrix (output) - file with similarity matrix" << endl;
 }
 

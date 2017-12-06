@@ -669,7 +669,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 void FastKmerDb::calculateSimilarityDirect(LowerTriangularMatrix<uint32_t>& matrix) const {
 	matrix.resize(getSamplesCount());
 	matrix.clear();
-
+	
 	std::vector<std::thread> workers(num_threads);
 	std::atomic<uint64_t> numAdditions(0);
 
