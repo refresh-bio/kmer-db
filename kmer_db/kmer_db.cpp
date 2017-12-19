@@ -652,6 +652,94 @@ void FastKmerDb::savePatterns(std::ofstream& file) const {
 
 }
 
+
+
+void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) const {
+	matrix.resize(getSamplesCount());
+	matrix.clear();
+	
+	
+	size_t bufsize = 10000000 / sizeof(uint32_t);
+	std::vector<uint32_t> patternsBuffer(bufsize);
+	uint32_t* currentPtr;
+
+	std::vector<uint32_t*> rawPatterns(bufsize);
+	std::vector<std::pair<sample_id_t, pattern_id_t>> sample2pattern(bufsize);
+
+	// process all patterns in portions
+	for (int pid = 0; pid < patterns.size(); ) {
+		
+		int first_pid = pid;
+		currentPtr = patternsBuffer.data();
+		size_t samplesCount = 0;
+		
+		// unpack as long as there is enough memory
+		while (pid < patterns.size() && currentPtr + patterns[pid].get_num_samples() < patternsBuffer.data() + bufsize) {
+
+			const auto& pattern = patterns[pid];
+			
+			currentPtr += pattern.get_num_samples();
+			uint32_t* out = currentPtr;		// start from the end
+			samplesCount += pattern.get_num_samples();
+																		
+			// decode all samples from pattern and its parents
+			if (pattern.get_num_kmers() > 0) {
+				int64_t current_id = pid;
+				while (current_id >= 0) {
+					const auto& cur = patterns[current_id];
+					out -= cur.get_num_local_samples();
+					cur.decodeSamples(out);
+
+					current_id = cur.get_parent_id();
+				}
+			}
+
+			rawPatterns[pid - first_pid] = out; // begin of unpacked pattern
+			++pid;
+		}
+
+		int last_pid = pid;
+
+		// generate sample to pattern mapping
+		sample2pattern.resize(samplesCount);
+		int pair_id = 0;
+		for (int pid = first_pid; pid < last_pid; ++pid) {
+			const auto& pattern = patterns[pid];
+			uint32_t* rawData = rawPatterns[pid - first_pid];
+
+			for (int j = 0; j < pattern.get_num_samples(); ++j) {
+				sample2pattern[pair_id].first = rawData[j];
+				sample2pattern[pair_id++].second = pid;
+			}
+		}
+
+		// sort mapping wrt to both elements
+		std::sort(sample2pattern.begin(), sample2pattern.end());
+
+		// increment array
+		for (int id = 0; id < sample2pattern.size(); ) {
+			int Si = sample2pattern[id].first;
+			uint32_t * row = matrix[Si];
+			while (id < sample2pattern.size() && sample2pattern[id].first == Si) {
+				int pid = sample2pattern[id].second;
+				const auto& pattern = patterns[pid];
+				
+				uint32_t* rawData = rawPatterns[pid - first_pid];
+				for (int j = 0; j < pattern.get_num_samples(); ++j) {
+					uint32_t Sj = rawData[j];
+					if (Sj < Si) {
+						row[Sj] += pattern.get_num_kmers();
+					}
+				}
+
+				++id;
+			}
+			
+		}
+	}
+}
+
+/*
 #define BUFFERED_ARRAY
 
 void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) const {
@@ -666,6 +754,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 }
 
 
+*/
 void FastKmerDb::calculateSimilarityDirect(LowerTriangularMatrix<uint32_t>& matrix) const {
 	matrix.resize(getSamplesCount());
 	matrix.clear();
@@ -899,44 +988,4 @@ void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<ui
 
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "Pattern unpacking time: " << dt.count() << endl;
-}
-
-
-void  FastKmerDb::calculateSimilarityOld(const FastKmerDb& sampleDb, std::vector<uint32_t>& similarities) const {
-	similarities.resize(this->getSamplesCount(), 0);
-
-	std::vector<uint32_t> samples(this->getSamplesCount());
-
-	// iterate over kmers in analyzed sample
-	for (auto it = sampleDb.kmers2patternIds.cbegin(); it < sampleDb.kmers2patternIds.cend(); ++it) {
-		if (sampleDb.kmers2patternIds.is_free(*it)) {
-			continue;
-		}
-
-		// check if kmer exists in a database
-		auto entry = kmers2patternIds.find(it->key);
-
-		if (entry != nullptr) {
-			auto pid = *entry;
-			const auto& pattern = patterns[pid];
-
-			if (pattern.get_num_kmers() == 0)
-				continue;
-
-			uint32_t* out = samples.data() + pattern.get_num_samples(); // start from the end
-
-			int64_t current_id = pid;
-			while (current_id >= 0) {
-				const auto& cur = patterns[current_id];
-				out -= cur.get_num_local_samples();
-				cur.decodeSamples(out);
-
-				current_id = cur.get_parent_id();
-			}
-
-			for (int i = 0; i < pattern.get_num_samples(); ++i) {
-				++similarities[samples[i]];
-			}
-		}
-	}
 }
