@@ -19,6 +19,13 @@
 #include "kmer_db.h"
 #include "log.h"
 
+#ifdef WIN32
+#include <ppl.h>
+#else
+#include <parallel/algorithm>
+#endif
+
+
 #define USE_PREFETCH
 //#define ALL_STATS
 
@@ -434,7 +441,7 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 		return a.first < b.first;
 	};
 
-	for (int tid = 0; tid < num_threads; ++tid) {
+	for (int tid = 0; tid < num_threads-1; ++tid) {
 		auto it = std::upper_bound(
 			samplePatterns.begin() + currentIndex,
 			samplePatterns.end(), 
@@ -452,6 +459,11 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 		}
 	}
 	
+	// this should never happen
+	if (ranges[num_threads] != n_kmers) {
+		throw std::runtime_error("ERROR in FastKmerDb::addKmers(): Invalid ranges");
+	}
+
 
 	for (int tid = 0; tid < num_threads; ++tid) {
 		semaphore.inc();
@@ -658,7 +670,6 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 	matrix.resize(getSamplesCount());
 	matrix.clear();
 	
-	
 	size_t bufsize = 10000000 / sizeof(uint32_t);
 	std::vector<uint32_t> patternsBuffer(bufsize);
 	uint32_t* currentPtr;
@@ -666,9 +677,12 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 	std::vector<uint32_t*> rawPatterns(bufsize);
 	std::vector<std::pair<sample_id_t, pattern_id_t>> sample2pattern(bufsize);
 
-	// process all patterns in portions
+	std::vector<std::thread> workers(num_threads);
+
+	// process all patterns in blocks determined by buffer size
 	for (int pid = 0; pid < patterns.size(); ) {
 		
+
 		int first_pid = pid;
 		currentPtr = patternsBuffer.data();
 		size_t samplesCount = 0;
@@ -713,28 +727,70 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 			}
 		}
 
-		// sort mapping wrt to both elements
-		std::sort(sample2pattern.begin(), sample2pattern.end());
+		// sort mapping wrt both elements
+#ifdef WIN32
+		concurrency::parallel_sort(sample2pattern.begin(), sample2pattern.end());
+#else
+		__gnu_parallel::sort(sample2pattern.begin(), sample2pattern.end());
+#endif
 
-		// increment array
-		for (int id = 0; id < sample2pattern.size(); ) {
-			int Si = sample2pattern[id].first;
-			uint32_t * row = matrix[Si];
-			while (id < sample2pattern.size() && sample2pattern[id].first == Si) {
-				int pid = sample2pattern[id].second;
-				const auto& pattern = patterns[pid];
-				
-				uint32_t* rawData = rawPatterns[pid - first_pid];
-				for (int j = 0; j < pattern.get_num_samples(); ++j) {
-					uint32_t Sj = rawData[j];
-					if (Sj < Si) {
-						row[Sj] += pattern.get_num_kmers();
-					}
-				}
+		// determine ranges of blocks processed by threads 
+		std::vector<size_t> workerRanges(num_threads + 1, sample2pattern.size());
+		workerRanges[0] = 0;
+		size_t workerBlock = sample2pattern.size() / num_threads;
 
-				++id;
+		auto currentIndex = workerBlock;
+
+		for (int tid = 0; tid < num_threads - 1; ++tid) {
+			// make sure no single row of matrix is updated by multiple workers
+			auto it = std::upper_bound(
+				sample2pattern.begin() + currentIndex,
+				sample2pattern.end(),
+				*(sample2pattern.begin() + currentIndex - 1));
+
+			size_t range = it - sample2pattern.begin();
+
+			workerRanges[tid + 1] = range;
+			currentIndex = range + workerBlock;
+
+			if (currentIndex >= sample2pattern.size()) {
+				break;
 			}
-			
+		}
+
+		// this should never happen
+		if (workerRanges[num_threads] != sample2pattern.size()) {
+			throw std::runtime_error("ERROR in FastKmerDb::calculateSimilarity(): Invalid ranges");
+		}
+
+		// increment array elements in threads
+		for (int tid = 0; tid < num_threads; ++tid) {
+			workers[tid] = std::thread([tid, &sample2pattern, &rawPatterns, &workerRanges, &matrix, this, first_pid] {
+				// each worker processes its own block
+				for (int id = workerRanges[tid]; id < workerRanges[tid + 1]; ) {
+					int Si = sample2pattern[id].first;
+					uint32_t * row = matrix[Si];
+					while (id < workerRanges[tid + 1] && sample2pattern[id].first == Si) {
+						int pid = sample2pattern[id].second;
+						const auto& pattern = patterns[pid];
+
+						uint32_t* rawData = rawPatterns[pid - first_pid];
+						for (int j = 0; j < pattern.get_num_samples(); ++j) {
+							uint32_t Sj = rawData[j];
+							if (Sj < Si) {
+								row[Sj] += pattern.get_num_kmers();
+							}
+						}
+
+						++id;
+					}
+
+				}		
+			});
+		}
+			 
+		for (auto & w : workers) {
+			w.join();
 		}
 	}
 }
