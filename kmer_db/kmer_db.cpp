@@ -670,7 +670,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 	matrix.resize(getSamplesCount());
 	matrix.clear();
 	
-	size_t bufsize = 10000000 / sizeof(uint32_t);
+	size_t bufsize = 8000000 / sizeof(uint32_t);
 	std::vector<uint32_t> patternsBuffer(bufsize);
 	uint32_t* currentPtr;
 
@@ -680,8 +680,11 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 	std::vector<std::thread> workers(num_threads);
 
 	// process all patterns in blocks determined by buffer size
+	cout << endl;
 	for (int pid = 0; pid < patterns.size(); ) {
-		
+/*		if (pid > 2000000)
+			break;*/
+		cout << pid << " of " << patterns.size() << "\r";
 
 		int first_pid = pid;
 		currentPtr = patternsBuffer.data();
@@ -689,15 +692,15 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 		
 		// unpack as long as there is enough memory
 		while (pid < patterns.size() && currentPtr + patterns[pid].get_num_samples() < patternsBuffer.data() + bufsize) {
-
 			const auto& pattern = patterns[pid];
-			
-			currentPtr += pattern.get_num_samples();
-			uint32_t* out = currentPtr;		// start from the end
-			samplesCount += pattern.get_num_samples();
-																		
-			// decode all samples from pattern and its parents
+
 			if (pattern.get_num_kmers() > 0) {
+
+				currentPtr += pattern.get_num_samples();
+				uint32_t* out = currentPtr;		// start from the end
+				samplesCount += pattern.get_num_samples();
+
+				// decode all samples from pattern and its parents
 				int64_t current_id = pid;
 				while (current_id >= 0) {
 					const auto& cur = patterns[current_id];
@@ -706,9 +709,11 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 
 					current_id = cur.get_parent_id();
 				}
+				rawPatterns[pid - first_pid] = out; // begin of unpacked pattern
 			}
+			else
+				rawPatterns[pid - first_pid] = nullptr;
 
-			rawPatterns[pid - first_pid] = out; // begin of unpacked pattern
 			++pid;
 		}
 
@@ -721,9 +726,13 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 			const auto& pattern = patterns[pid];
 			uint32_t* rawData = rawPatterns[pid - first_pid];
 
-			for (int j = 0; j < pattern.get_num_samples(); ++j) {
-				sample2pattern[pair_id].first = rawData[j];
-				sample2pattern[pair_id++].second = pid;
+			if (pattern.get_num_kmers() > 0)
+			{
+				int num_samples = pattern.get_num_samples();
+				for (int j = 0; j < num_samples; ++j) {
+					sample2pattern[pair_id].first = rawData[j];
+					sample2pattern[pair_id++].second = pid;
+				}
 			}
 		}
 
@@ -775,7 +784,8 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 						const auto& pattern = patterns[pid];
 
 						uint32_t* rawData = rawPatterns[pid - first_pid];
-						for (int j = 0; j < pattern.get_num_samples(); ++j) {
+						int num_samples = pattern.get_num_samples();
+						for (int j = 0; j < num_samples; ++j) {
 							uint32_t Sj = rawData[j];
 							if (Sj < Si) {
 								row[Sj] += pattern.get_num_kmers();
