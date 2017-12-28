@@ -675,7 +675,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 	uint32_t* currentPtr;
 
 	std::vector<uint32_t*> rawPatterns(bufsize);
-	std::vector<std::pair<sample_id_t, pattern_id_t>> sample2pattern(bufsize);
+	std::vector<std::pair<sample_id_t, uint32_t>> sample2pattern(bufsize);
 
 	std::vector<std::thread> workers(num_threads);
 
@@ -685,6 +685,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 /*		if (pid > 2000000)
 			break;*/
 		cout << pid << " of " << patterns.size() << "\r";
+		fflush(stdout);
 
 		int first_pid = pid;
 		currentPtr = patternsBuffer.data();
@@ -731,7 +732,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 				int num_samples = pattern.get_num_samples();
 				for (int j = 0; j < num_samples; ++j) {
 					sample2pattern[pair_id].first = rawData[j];
-					sample2pattern[pair_id++].second = pid;
+					sample2pattern[pair_id++].second = pid - first_pid;
 				}
 			}
 		}
@@ -744,22 +745,24 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 #endif
 
 		// determine ranges of blocks processed by threads 
-		std::vector<size_t> workerRanges(num_threads + 1, sample2pattern.size());
+		int no_ranges = num_threads * 16;
+		std::vector<size_t> workerRanges(no_ranges + 1, sample2pattern.size());
 		workerRanges[0] = 0;
-		size_t workerBlock = sample2pattern.size() / num_threads;
+		size_t workerBlock = sample2pattern.size() / no_ranges;
 
 		auto currentIndex = workerBlock;
 
-		for (int tid = 0; tid < num_threads - 1; ++tid) {
+		for (int rid = 0; rid < no_ranges - 1; ++rid) {
 			// make sure no single row of matrix is updated by multiple workers
 			auto it = std::upper_bound(
 				sample2pattern.begin() + currentIndex,
 				sample2pattern.end(),
-				*(sample2pattern.begin() + currentIndex - 1));
+				*(sample2pattern.begin() + currentIndex - 1),
+				[](auto x, auto y) {return x.first < y.first; });	// Necessary, because we are looking for end of sample data
 
 			size_t range = it - sample2pattern.begin();
 
-			workerRanges[tid + 1] = range;
+			workerRanges[rid + 1] = range;
 			currentIndex = range + workerBlock;
 
 			if (currentIndex >= sample2pattern.size()) {
@@ -768,34 +771,96 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 		}
 
 		// this should never happen
-		if (workerRanges[num_threads] != sample2pattern.size()) {
+		if (workerRanges[no_ranges] != sample2pattern.size()) {
 			throw std::runtime_error("ERROR in FastKmerDb::calculateSimilarity(): Invalid ranges");
 		}
 
+		CRegisteringQueue<int> tasks_queue(1);
+		for (int i = no_ranges - 1; i >= 0; --i)
+			tasks_queue.Push(i);
+		tasks_queue.MarkCompleted();
+
 		// increment array elements in threads
 		for (int tid = 0; tid < num_threads; ++tid) {
-			workers[tid] = std::thread([tid, &sample2pattern, &rawPatterns, &workerRanges, &matrix, this, first_pid] {
+			workers[tid] = std::thread([&sample2pattern, &rawPatterns, &workerRanges, &matrix, this, &tasks_queue, first_pid] {
 				// each worker processes its own block
-				for (int id = workerRanges[tid]; id < workerRanges[tid + 1]; ) {
-					int Si = sample2pattern[id].first;
-					uint32_t * row = matrix[Si];
-					while (id < workerRanges[tid + 1] && sample2pattern[id].first == Si) {
-						int pid = sample2pattern[id].second;
-						const auto& pattern = patterns[pid];
+				while (!tasks_queue.IsCompleted())
+				{
+					int range_id;
+					if(tasks_queue.Pop(range_id))
+					{
+						for (int id = workerRanges[range_id]; id < workerRanges[range_id + 1]; ) {
+							int Si = sample2pattern[id].first;
+							uint32_t *row = matrix[Si];
+							while (id < workerRanges[range_id + 1] && sample2pattern[id].first == Si) {
+								int local_pid = sample2pattern[id].second;
+								const auto& pattern = patterns[local_pid + first_pid];
 
-						uint32_t* rawData = rawPatterns[pid - first_pid];
-						int num_samples = pattern.get_num_samples();
-						for (int j = 0; j < num_samples; ++j) {
-							uint32_t Sj = rawData[j];
-							if (Sj < Si) {
-								row[Sj] += pattern.get_num_kmers();
+								uint32_t* rawData = rawPatterns[local_pid];
+								int num_samples = pattern.get_num_samples();
+								uint32_t to_add = pattern.get_num_kmers();
+/*								for (int j = 0; j < num_samples; ++j) {
+									uint32_t Sj = rawData[j];
+									if (Sj < Si)
+										row[Sj] += to_add;
+									else
+										break;
+								}*/
+								
+								if (num_samples < 15)
+								{
+									int j = 0;
+									uint32_t Sj;
+									switch (num_samples % 4)
+									{
+									case 3:
+										Sj = rawData[j++];	if (Sj < Si)	row[Sj] += to_add;
+									case 2:
+										Sj = rawData[j++];	if (Sj < Si)	row[Sj] += to_add;
+									case 1:
+										Sj = rawData[j++];	if (Sj < Si)	row[Sj] += to_add;
+									}
+									for (; j < num_samples && rawData[j] < Si;)
+									{
+										Sj = rawData[j++];	if (Sj < Si)	row[Sj] += to_add;
+										Sj = rawData[j++];	if (Sj < Si)	row[Sj] += to_add;
+										Sj = rawData[j++];	if (Sj < Si)	row[Sj] += to_add;
+										Sj = rawData[j++];	if (Sj < Si)	row[Sj] += to_add;
+									}
+								}
+								else
+								{
+									num_samples = lower_bound(rawData, rawData + num_samples, Si) - rawData;
+									auto *p = rawData;
+
+									switch (num_samples % 8)
+									{
+									case 7:	row[*p++] += to_add;
+									case 6:	row[*p++] += to_add;
+									case 5:	row[*p++] += to_add;
+									case 4:	row[*p++] += to_add;
+									case 3:	row[*p++] += to_add;
+									case 2:	row[*p++] += to_add;
+									case 1:	row[*p++] += to_add;
+									}
+									for (int j = num_samples % 8; j < num_samples; j += 8)
+									{
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+									}
+								}
+
+								++id;
 							}
 						}
-
-						++id;
 					}
-
-				}		
+				}
 			});
 		}
 			 

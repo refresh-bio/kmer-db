@@ -188,6 +188,8 @@ protected:
 	
 	CRegisteringQueue<PatternExtensionTask> patternExtensionQueue;
 
+//	CRegisteringQueue<
+
 	std::vector<std::thread> dictionarySearchWorkers;
 
 	std::vector<std::thread> patternExtensionWorkers;
