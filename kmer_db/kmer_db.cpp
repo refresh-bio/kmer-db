@@ -721,16 +721,30 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 								switch (num_samples % 4)
 								{
 								case 3:
-									Sj = rawData[j++];	if (Sj < Si)	row[Sj] += to_add;
-								case 2:
-									Sj = rawData[j++];	if (Sj < Si)	row[Sj] += to_add;
-								case 1:
-									Sj = rawData[j++];	if (Sj < Si)	row[Sj] += to_add;
-								}
-
+									Sj = rawData[j++];
+									if (Sj < Si) {
+										row[Sj] += to_add;
 #ifdef ALL_STATS
-								localAdditions += num_samples % 4;
+										++localAdditions;
 #endif
+									}
+								case 2:
+									Sj = rawData[j++];
+									if (Sj < Si) {
+										row[Sj] += to_add;
+#ifdef ALL_STATS
+										++localAdditions;
+#endif
+									}
+								case 1:
+									Sj = rawData[j++];
+									if (Sj < Si) {
+										row[Sj] += to_add;
+#ifdef ALL_STATS
+										++localAdditions;
+#endif
+									}
+								}
 
 								for (; j < num_samples && rawData[j] < Si;)	{
 									Sj = rawData[j++];	
@@ -768,27 +782,67 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 								num_samples = lower_bound(rawData, rawData + num_samples, Si) - rawData;
 								auto *p = rawData;
 
-								switch (num_samples % 8)
+								switch (num_samples % 16)
 								{
-								case 7:	row[*p++] += to_add;
-								case 6:	row[*p++] += to_add;
-								case 5:	row[*p++] += to_add;
-								case 4:	row[*p++] += to_add;
-								case 3:	row[*p++] += to_add;
-								case 2:	row[*p++] += to_add;
-								case 1:	row[*p++] += to_add;
+								case 15:	row[*p++] += to_add;
+								case 14:	row[*p++] += to_add;
+								case 13:	row[*p++] += to_add;
+								case 12:	row[*p++] += to_add;
+								case 11:	row[*p++] += to_add;
+								case 10:	row[*p++] += to_add;
+								case 9:		row[*p++] += to_add;
+								case 8:		row[*p++] += to_add;
+								case 7:		row[*p++] += to_add;
+								case 6:		row[*p++] += to_add;
+								case 5:		row[*p++] += to_add;
+								case 4:		row[*p++] += to_add;
+								case 3:		row[*p++] += to_add;
+								case 2:		row[*p++] += to_add;
+								case 1:		row[*p++] += to_add;
 								}
 
-								for (int j = num_samples % 8; j < num_samples; j += 8)
+								for (int j = num_samples % 16; j < num_samples; j += 16)
 								{
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
+									if (*p + 15 == *(p + 15))
+									{
+										auto q = row + *p;
+										q[0] += to_add;
+										q[1] += to_add;
+										q[2] += to_add;
+										q[3] += to_add;
+										q[4] += to_add;
+										q[5] += to_add;
+										q[6] += to_add;
+										q[7] += to_add;
+										q[8] += to_add;
+										q[9] += to_add;
+										q[10] += to_add;
+										q[11] += to_add;
+										q[12] += to_add;
+										q[13] += to_add;
+										q[14] += to_add;
+										q[15] += to_add;
+										p += 16;
+									}
+									else
+									{
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+										row[*p++] += to_add;
+									}
 								}
 
 #ifdef ALL_STATS
