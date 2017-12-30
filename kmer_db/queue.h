@@ -8,6 +8,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
+#include <vector>
 
 using namespace std;
 
@@ -24,17 +25,29 @@ public:
 	void inc() {
 		std::unique_lock<std::mutex> lk(mutex);
 		++counter;
+//		cout << "sem. counter inc: " << counter << endl;
+	}
+
+	void inc(int num) {
+		std::unique_lock<std::mutex> lk(mutex);
+		counter += num;
+//		cout << "sem. counter inc num: " << counter << endl;
 	}
 
 	void dec() {
 		std::unique_lock<std::mutex> lk(mutex);
 		--counter;
+
+//		cout << "sem. counter dec: " << counter << endl;
+
 		cv.notify_one();
 	}
 
 	void waitForZero() {
 		std::unique_lock<std::mutex> lk(mutex);
 		cv.wait(lk, [this] {return counter == 0; });
+
+//		cout << "sem. is zero!\n";
 	}
 };
 
@@ -44,7 +57,7 @@ public:
 //   * The queue can report whether it is in wainitng for new data state or there will be no new data
 template<typename T> class CRegisteringQueue
 {
-	typedef queue<T, list<T>> queue_t;
+	typedef queue<T, deque<T>> queue_t;
 
 	queue_t q;
 	bool is_completed;
@@ -104,7 +117,21 @@ public:
 		if(was_empty)
 			cv_queue_empty.notify_all();
 	}
-	bool Pop(T &data) 
+
+	void PushRange(vector<T> &data)
+	{
+		unique_lock<mutex> lck(mtx);
+		bool was_empty = n_elements == 0;
+		
+		for(auto &x : data)
+			q.push(x);
+		n_elements += data.size();
+
+		if (was_empty)
+			cv_queue_empty.notify_all();
+	}
+
+	bool Pop(T &data)
 	{
 		unique_lock<mutex> lck(mtx);
 		cv_queue_empty.wait(lck, [this]{return !this->q.empty() || !this->n_producers;}); 

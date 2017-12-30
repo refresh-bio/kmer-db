@@ -27,7 +27,7 @@
 
 
 #define USE_PREFETCH
-//#define ALL_STATS
+#define ALL_STATS
 
 using namespace std;
 
@@ -670,6 +670,258 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 	matrix.resize(getSamplesCount());
 	matrix.clear();
 	
+	size_t bufsize = 4000000 / sizeof(uint32_t);
+	std::vector<uint32_t> patternsBuffer(bufsize);
+	uint32_t* currentPtr;
+
+	std::vector<uint32_t*> rawPatterns(bufsize);
+	std::vector<std::pair<sample_id_t, uint32_t>> sample2pattern(bufsize);
+
+	std::vector<std::thread> workers(num_threads);
+	int first_pid;
+
+	// determine ranges of blocks processed by threads 
+	int no_ranges = num_threads * 16;
+	std::vector<size_t> workerRanges(no_ranges + 1, sample2pattern.size());
+	std::vector<int> v_range_ids;
+
+	for (int i = no_ranges - 1; i >= 0; --i)
+		v_range_ids.push_back(i);
+
+	CRegisteringQueue<int> tasks_queue(1);
+	Semaphore semaphore;
+	std::atomic<uint64_t> numAdditions(0);
+
+	// increment array elements in threads
+	for (int tid = 0; tid < num_threads; ++tid) {
+		workers[tid] = std::thread([&sample2pattern, &rawPatterns, &workerRanges, &matrix, this, &tasks_queue, &first_pid, &semaphore, &numAdditions] {
+			uint64_t localAdditions = 0;
+
+			int range_id;
+
+			while (!tasks_queue.IsCompleted())
+			{
+				if (tasks_queue.Pop(range_id))
+				{
+					for (int id = workerRanges[range_id]; id < workerRanges[range_id + 1]; ) {
+						int Si = sample2pattern[id].first;
+						uint32_t *row = matrix[Si];
+						while (id < workerRanges[range_id + 1] && sample2pattern[id].first == Si) {
+							int local_pid = sample2pattern[id].second;
+							const auto& pattern = patterns[local_pid + first_pid];
+
+							uint32_t* rawData = rawPatterns[local_pid];
+							int num_samples = pattern.get_num_samples();
+							uint32_t to_add = pattern.get_num_kmers();
+
+							if (num_samples < 15)
+							{
+								int j = 0;
+								uint32_t Sj;
+								switch (num_samples % 4)
+								{
+								case 3:
+									Sj = rawData[j++];	if (Sj < Si)	row[Sj] += to_add;
+								case 2:
+									Sj = rawData[j++];	if (Sj < Si)	row[Sj] += to_add;
+								case 1:
+									Sj = rawData[j++];	if (Sj < Si)	row[Sj] += to_add;
+								}
+
+#ifdef ALL_STATS
+								localAdditions += num_samples % 4;
+#endif
+
+								for (; j < num_samples && rawData[j] < Si;)	{
+									Sj = rawData[j++];	
+									if (Sj < Si) {
+										row[Sj] += to_add;
+#ifdef ALL_STATS
+										++localAdditions;
+#endif
+									}
+									Sj = rawData[j++];
+									if (Sj < Si)	{
+										row[Sj] += to_add;
+#ifdef ALL_STATS
+										++localAdditions;
+#endif
+									}
+									Sj = rawData[j++];
+									if (Sj < Si)	{
+										row[Sj] += to_add;
+#ifdef ALL_STATS
+										++localAdditions;
+#endif
+									}
+									Sj = rawData[j++];
+									if (Sj < Si)	{
+										row[Sj] += to_add;
+#ifdef ALL_STATS
+										++localAdditions;
+#endif
+									}
+								}
+							}
+							else
+							{
+								num_samples = lower_bound(rawData, rawData + num_samples, Si) - rawData;
+								auto *p = rawData;
+
+								switch (num_samples % 8)
+								{
+								case 7:	row[*p++] += to_add;
+								case 6:	row[*p++] += to_add;
+								case 5:	row[*p++] += to_add;
+								case 4:	row[*p++] += to_add;
+								case 3:	row[*p++] += to_add;
+								case 2:	row[*p++] += to_add;
+								case 1:	row[*p++] += to_add;
+								}
+
+								for (int j = num_samples % 8; j < num_samples; j += 8)
+								{
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+								}
+
+#ifdef ALL_STATS
+								localAdditions += num_samples;
+#endif
+							}
+
+							++id;
+						}
+					}
+					semaphore.dec();
+				}
+			}
+			numAdditions.fetch_add(localAdditions);
+		});
+	}
+
+	// process all patterns in blocks determined by buffer size
+	std::cout << std::endl;
+	for (int pid = 0; pid < patterns.size(); ) {
+//		if (pid > 2000000)
+//			break;
+		std::cout << pid << " of " << patterns.size() << "\r";
+		fflush(stdout);
+
+		first_pid = pid;
+		currentPtr = patternsBuffer.data();
+		size_t samplesCount = 0;
+		
+		// unpack as long as there is enough memory
+		while (pid < patterns.size() && currentPtr + patterns[pid].get_num_samples() < patternsBuffer.data() + bufsize) {
+			const auto& pattern = patterns[pid];
+
+			if (pattern.get_num_kmers() > 0) {
+
+				currentPtr += pattern.get_num_samples();
+				uint32_t* out = currentPtr;		// start from the end
+				samplesCount += pattern.get_num_samples();
+
+				// decode all samples from pattern and its parents
+				int64_t current_id = pid;
+				while (current_id >= 0) {
+					const auto& cur = patterns[current_id];
+					out -= cur.get_num_local_samples();
+					cur.decodeSamples(out);
+
+					current_id = cur.get_parent_id();
+				}
+				rawPatterns[pid - first_pid] = out; // begin of unpacked pattern
+			}
+			else
+				rawPatterns[pid - first_pid] = nullptr;
+
+			++pid;
+		}
+
+		int last_pid = pid;
+
+		// generate sample to pattern mapping
+		sample2pattern.resize(samplesCount);
+		int pair_id = 0;
+		for (int pid = first_pid; pid < last_pid; ++pid) {
+			const auto& pattern = patterns[pid];
+			uint32_t* rawData = rawPatterns[pid - first_pid];
+
+			if (pattern.get_num_kmers() > 0)
+			{
+				int num_samples = pattern.get_num_samples();
+				for (int j = 0; j < num_samples; ++j) {
+					sample2pattern[pair_id].first = rawData[j];
+					sample2pattern[pair_id++].second = pid - first_pid;
+				}
+			}
+		}
+
+		// sort mapping wrt both elements
+#ifdef WIN32
+		concurrency::parallel_sort(sample2pattern.begin(), sample2pattern.end());
+#else
+		__gnu_parallel::sort(sample2pattern.begin(), sample2pattern.end());
+#endif
+
+		// determine ranges of blocks processed by threads 
+		workerRanges.assign(no_ranges + 1, sample2pattern.size());
+		workerRanges[0] = 0;
+		size_t workerBlock = sample2pattern.size() / no_ranges;
+
+		auto currentIndex = workerBlock;
+
+		for (int rid = 0; rid < no_ranges - 1; ++rid) {
+			// make sure no single row of matrix is updated by multiple workers
+			auto it = std::upper_bound(
+				sample2pattern.begin() + currentIndex,
+				sample2pattern.end(),
+				*(sample2pattern.begin() + currentIndex - 1),
+				[](auto x, auto y) {return x.first < y.first; });	// Necessary, because we are looking for end of sample data
+
+			size_t range = it - sample2pattern.begin();
+
+			workerRanges[rid + 1] = range;
+			currentIndex = range + workerBlock;
+
+			if (currentIndex >= sample2pattern.size()) {
+				break;
+			}
+		}
+
+		// this should never happen
+		if (workerRanges[no_ranges] != sample2pattern.size()) {
+			throw std::runtime_error("ERROR in FastKmerDb::calculateSimilarity(): Invalid ranges");
+		}
+
+		semaphore.inc(no_ranges);
+		tasks_queue.PushRange(v_range_ids);
+		semaphore.waitForZero();
+	}
+
+	tasks_queue.MarkCompleted();
+
+	for (auto & w : workers) {
+		w.join();
+	}
+
+#ifdef ALL_STATS
+	cout << "Number of additions:" << numAdditions << endl;
+#endif
+}
+
+#if 0
+void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) const {
+	matrix.resize(getSamplesCount());
+	matrix.clear();
+
 	size_t bufsize = 8000000 / sizeof(uint32_t);
 	std::vector<uint32_t> patternsBuffer(bufsize);
 	uint32_t* currentPtr;
@@ -682,15 +934,15 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 	// process all patterns in blocks determined by buffer size
 	cout << endl;
 	for (int pid = 0; pid < patterns.size(); ) {
-/*		if (pid > 2000000)
-			break;*/
+		/*		if (pid > 2000000)
+		break;*/
 		cout << pid << " of " << patterns.size() << "\r";
 		fflush(stdout);
 
 		int first_pid = pid;
 		currentPtr = patternsBuffer.data();
 		size_t samplesCount = 0;
-		
+
 		// unpack as long as there is enough memory
 		while (pid < patterns.size() && currentPtr + patterns[pid].get_num_samples() < patternsBuffer.data() + bufsize) {
 			const auto& pattern = patterns[pid];
@@ -787,7 +1039,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 				while (!tasks_queue.IsCompleted())
 				{
 					int range_id;
-					if(tasks_queue.Pop(range_id))
+					if (tasks_queue.Pop(range_id))
 					{
 						for (int id = workerRanges[range_id]; id < workerRanges[range_id + 1]; ) {
 							int Si = sample2pattern[id].first;
@@ -799,14 +1051,14 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 								uint32_t* rawData = rawPatterns[local_pid];
 								int num_samples = pattern.get_num_samples();
 								uint32_t to_add = pattern.get_num_kmers();
-/*								for (int j = 0; j < num_samples; ++j) {
-									uint32_t Sj = rawData[j];
-									if (Sj < Si)
-										row[Sj] += to_add;
-									else
-										break;
+								/*								for (int j = 0; j < num_samples; ++j) {
+								uint32_t Sj = rawData[j];
+								if (Sj < Si)
+								row[Sj] += to_add;
+								else
+								break;
 								}*/
-								
+
 								if (num_samples < 15)
 								{
 									int j = 0;
@@ -863,12 +1115,13 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 				}
 			});
 		}
-			 
+
 		for (auto & w : workers) {
 			w.join();
 		}
 	}
 }
+#endif
 
 /*
 #define BUFFERED_ARRAY
@@ -1024,7 +1277,7 @@ void FastKmerDb::calculateSimilarityBuffered(LowerTriangularMatrix<uint32_t>& ma
 					mat_buf[i].Finish();
 			}
 		});
-		}
+	}
 
 	for (auto & w : workers) {
 		w.join();
@@ -1034,7 +1287,7 @@ void FastKmerDb::calculateSimilarityBuffered(LowerTriangularMatrix<uint32_t>& ma
 	cout << "Number of additions:" << numAdditions << endl;
 #endif
 
-	}
+}
 
 void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<uint32_t>& similarities) const {
 	similarities.resize(this->getSamplesCount(), 0);
