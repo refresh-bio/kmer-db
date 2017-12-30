@@ -862,11 +862,17 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 
 	// process all patterns in blocks determined by buffer size
 	std::cout << std::endl;
+
+//	int last_cout_pid = 0;
 	for (int pid = 0; pid < patterns.size(); ) {
 //		if (pid > 2000000)
 //			break;
-		std::cout << pid << " of " << patterns.size() << "\r";
-		fflush(stdout);
+//		if (pid - last_cout_pid >= 100000)
+//		{
+			std::cout << pid << " of " << patterns.size() << "\r";
+			fflush(stdout);
+//			last_cout_pid = pid;
+//		}
 
 		first_pid = pid;
 		currentPtr = patternsBuffer.data();
@@ -876,7 +882,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 		while (pid < patterns.size() && currentPtr + patterns[pid].get_num_samples() < patternsBuffer.data() + bufsize) {
 			const auto& pattern = patterns[pid];
 
-			if (pattern.get_num_kmers() > 0) {
+			if (pattern.get_num_kmers() > 0 && pattern.get_num_samples() > 1) {
 
 				currentPtr += pattern.get_num_samples();
 				uint32_t* out = currentPtr;		// start from the end
@@ -886,10 +892,15 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 				int64_t current_id = pid;
 				while (current_id >= 0) {
 					const auto& cur = patterns[current_id];
+					auto parent_id = cur.get_parent_id();
+
+					if (parent_id >= 0)
+						_mm_prefetch((const char*)(patterns.data() + parent_id), _MM_HINT_T0);
+
 					out -= cur.get_num_local_samples();
 					cur.decodeSamples(out);
 
-					current_id = cur.get_parent_id();
+					current_id = parent_id;
 				}
 				rawPatterns[pid - first_pid] = out; // begin of unpacked pattern
 			}
@@ -908,7 +919,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) co
 			const auto& pattern = patterns[pid];
 			uint32_t* rawData = rawPatterns[pid - first_pid];
 
-			if (pattern.get_num_kmers() > 0)
+			if (pattern.get_num_kmers() > 0 && pattern.get_num_samples() > 1)
 			{
 				int num_samples = pattern.get_num_samples();
 				for (int j = 0; j < num_samples; ++j) {
