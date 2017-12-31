@@ -32,6 +32,7 @@ public:
 
 	int64_t get_num_kmers() const { return num_kmers; }
 	void set_num_kmers(int64_t v) { num_kmers = v; }
+	void add_num_kmers(int64_t v) { num_kmers += v; }
 
 	sample_id_t get_num_samples() const { return num_samples; }
 	sample_id_t get_num_local_samples() const { return num_local_samples; }
