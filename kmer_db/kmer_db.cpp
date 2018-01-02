@@ -14,6 +14,7 @@
 #include <mutex>
 #include <atomic>
 #include <iterator>
+#include <numeric>
 
 #include "kmc_api/kmc_file.h"
 #include "kmer_db.h"
@@ -669,8 +670,8 @@ void FastKmerDb::savePatterns(std::ofstream& file) const {
 
 void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //const 
 {
-	int num_samples = getSamplesCount();
-	matrix.resize(num_samples);
+	int samples_count = getSamplesCount();
+	matrix.resize(samples_count);
 	matrix.clear();
 	
 	size_t bufsize = 4000000 / sizeof(uint32_t);
@@ -678,12 +679,13 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 	uint32_t* currentPtr;
 
 	std::vector<uint32_t*> rawPatterns(bufsize);
-//	std::vector<std::pair<sample_id_t, uint32_t>> sample2pattern(bufsize);
 	std::vector<std::tuple<sample_id_t, uint32_t, uint32_t>> sample2pattern(bufsize);
 
 	std::vector<std::thread> workers_matrix(num_threads);
 	std::vector<std::thread> workers_decomp(num_threads);
 	std::vector<std::thread> workers_sample2patterns(num_threads);
+	std::vector<std::thread> workers_histogram(num_threads);
+
 	int first_pid;
 
 	// Set number of k-mers to internal nodes
@@ -716,9 +718,18 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 	CRegisteringQueue<int> tasks_sample2patterns_queue(1);
 	Semaphore semaphore_sample2patterns;
 
+	Semaphore semaphore_hist_first;		// semaphore for first stage in histogram calculation
+	Semaphore semaphore_hist_second;		// semaphore for second stage in histogram calculation
 
 	int no_hist_parts = num_threads * 1;
-	std::vector<std::vector<int>> hist_sample_ids(no_hist_parts, std::vector<int>(num_samples, 0));
+	std::vector<std::vector<int>> hist_sample_ids(no_hist_parts, std::vector<int>(samples_count, 0));
+	CRegisteringQueue<int> tasks_histogram_queue(1);
+	std::vector<int> hist_boundary_values(num_threads, 0);
+	std::vector<pair<int, uint32_t>> v_tmp;
+	std::vector<int> v_tmp_int;
+	std::vector<int> v_hist_ids(num_threads);
+	for (int i = 0; i < num_threads; ++i)
+		v_hist_ids[i] = i;
 
 	// Decompress patterns
 	for (int tid = 0; tid < num_threads; ++tid) {
@@ -811,7 +822,6 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 		});
 	}
 
-
 	// increment array elements in threads
 	for (int tid = 0; tid < num_threads; ++tid) {
 		workers_matrix[tid] = std::thread([&sample2pattern, &rawPatterns, &workerRanges, &matrix, this, &tasks_matrix_queue, &first_pid, &semaphore_matrix, &numAdditions] {
@@ -831,147 +841,78 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 							const auto& pattern = patterns[local_pid + first_pid];
 
 							uint32_t* rawData = rawPatterns[local_pid];
-//							int num_samples = pattern.get_num_samples();
 							int num_samples = get<2>(sample2pattern[id]);
 							int num_local_samples = pattern.get_num_local_samples();
 							uint32_t to_add = pattern.get_num_kmers();
 
-/*							if (num_samples < 4)
+							auto *p = rawData;
+								
+							switch (num_samples % 16)
 							{
-								int j = 0;
-								uint32_t Sj;
-								switch (num_samples % 4)
-								{
-								case 3:
-									Sj = rawData[j++];
-									if (Sj < Si) {
-										row[Sj] += to_add;
-#ifdef ALL_STATS
-										++localAdditions;
-#endif
-									}
-								case 2:
-									Sj = rawData[j++];
-									if (Sj < Si) {
-										row[Sj] += to_add;
-#ifdef ALL_STATS
-										++localAdditions;
-#endif
-									}
-								case 1:
-									Sj = rawData[j++];
-									if (Sj < Si) {
-										row[Sj] += to_add;
-#ifdef ALL_STATS
-										++localAdditions;
-#endif
-									}
-								}
+							case 15:	row[*p++] += to_add;
+							case 14:	row[*p++] += to_add;
+							case 13:	row[*p++] += to_add;
+							case 12:	row[*p++] += to_add;
+							case 11:	row[*p++] += to_add;
+							case 10:	row[*p++] += to_add;
+							case 9:		row[*p++] += to_add;
+							case 8:		row[*p++] += to_add;
+							case 7:		row[*p++] += to_add;
+							case 6:		row[*p++] += to_add;
+							case 5:		row[*p++] += to_add;
+							case 4:		row[*p++] += to_add;
+							case 3:		row[*p++] += to_add;
+							case 2:		row[*p++] += to_add;
+							case 1:		row[*p++] += to_add;
+							}
 
-								for (; j < num_samples && rawData[j] < Si;)	{
-									Sj = rawData[j++];	
-									if (Sj < Si) {
-										row[Sj] += to_add;
-#ifdef ALL_STATS
-										++localAdditions;
-#endif
-									}
-									Sj = rawData[j++];
-									if (Sj < Si)	{
-										row[Sj] += to_add;
-#ifdef ALL_STATS
-										++localAdditions;
-#endif
-									}
-									Sj = rawData[j++];
-									if (Sj < Si)	{
-										row[Sj] += to_add;
-#ifdef ALL_STATS
-										++localAdditions;
-#endif
-									}
-									Sj = rawData[j++];
-									if (Sj < Si)	{
-										row[Sj] += to_add;
-#ifdef ALL_STATS
-										++localAdditions;
-#endif
-									}
+							for (int j = num_samples % 16; j < num_samples; j += 16)
+							{
+								if (*p + 15 == *(p + 15))
+								{
+									auto q = row + *p;
+									q[0] += to_add;
+									q[1] += to_add;
+									q[2] += to_add;
+									q[3] += to_add;
+									q[4] += to_add;
+									q[5] += to_add;
+									q[6] += to_add;
+									q[7] += to_add;
+									q[8] += to_add;
+									q[9] += to_add;
+									q[10] += to_add;
+									q[11] += to_add;
+									q[12] += to_add;
+									q[13] += to_add;
+									q[14] += to_add;
+									q[15] += to_add;
+									p += 16;
+								}
+								else
+								{
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
 								}
 							}
-							else
-							{
-								num_samples = lower_bound(rawData + num_samples - num_local_samples, rawData + num_samples, Si) - rawData;
-*/
-								auto *p = rawData;
-								
-								switch (num_samples % 16)
-								{
-								case 15:	row[*p++] += to_add;
-								case 14:	row[*p++] += to_add;
-								case 13:	row[*p++] += to_add;
-								case 12:	row[*p++] += to_add;
-								case 11:	row[*p++] += to_add;
-								case 10:	row[*p++] += to_add;
-								case 9:		row[*p++] += to_add;
-								case 8:		row[*p++] += to_add;
-								case 7:		row[*p++] += to_add;
-								case 6:		row[*p++] += to_add;
-								case 5:		row[*p++] += to_add;
-								case 4:		row[*p++] += to_add;
-								case 3:		row[*p++] += to_add;
-								case 2:		row[*p++] += to_add;
-								case 1:		row[*p++] += to_add;
-								}
-
-								for (int j = num_samples % 16; j < num_samples; j += 16)
-								{
-									if (*p + 15 == *(p + 15))
-									{
-										auto q = row + *p;
-										q[0] += to_add;
-										q[1] += to_add;
-										q[2] += to_add;
-										q[3] += to_add;
-										q[4] += to_add;
-										q[5] += to_add;
-										q[6] += to_add;
-										q[7] += to_add;
-										q[8] += to_add;
-										q[9] += to_add;
-										q[10] += to_add;
-										q[11] += to_add;
-										q[12] += to_add;
-										q[13] += to_add;
-										q[14] += to_add;
-										q[15] += to_add;
-										p += 16;
-									}
-									else
-									{
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-									}
-								}
 
 #ifdef ALL_STATS
-								localAdditions += num_samples;
+							localAdditions += num_samples;
 #endif
-//							}
 
 							++id;
 						}
@@ -982,6 +923,44 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 			numAdditions.fetch_add(localAdditions);
 		});
 	}
+
+	// calculate histogram
+	for (int tid = 0; tid < num_threads; ++tid)
+		workers_histogram[tid] = std::thread([&hist_boundary_values, &tasks_histogram_queue, samples_count, this, &v_tmp, 
+			&hist_sample_ids, &semaphore_hist_first, &semaphore_hist_second] {
+			int task_id;
+
+			while (!tasks_histogram_queue.IsCompleted())
+			{
+				if (tasks_histogram_queue.Pop(task_id))
+				{
+					int first_sample = samples_count * task_id / num_threads;
+					int last_sample = samples_count * (task_id + 1) / num_threads;
+
+					int sum = 0;
+					for (int i = first_sample; i < last_sample; ++i)
+						for (int j = 0; j < v_tmp.size(); ++j)
+						{
+							int x = hist_sample_ids[j][i];
+							hist_sample_ids[j][i] = sum;
+							sum += x;
+						}
+
+					hist_boundary_values[task_id] = sum;
+					semaphore_hist_first.dec_notify_all();
+					semaphore_hist_first.waitForZero();
+
+					int to_add = 0;
+					for (int i = 0; i < task_id; ++i)
+						to_add += hist_boundary_values[i];
+
+					for (int j = 0; j < v_tmp.size(); ++j)
+						for (int i = first_sample; i < last_sample; ++i)
+							hist_sample_ids[j][i] += to_add;
+					semaphore_hist_second.dec();
+				}
+			}
+		});
 
 	// process all patterns in blocks determined by buffer size
 	std::cout << std::endl;
@@ -1010,8 +989,9 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 		int part_size = bufsize / no_hist_parts + 1;
 		int next_boundary = 0;
 		int part_id = 0;
-		std::vector<pair<int, uint32_t>> v_tmp;
-		std::vector<int> v_tmp_int;
+
+		v_tmp.clear();
+		v_tmp_int.clear();
 
 		while (pid < patterns.size() && samplesCount + patterns[pid].get_num_samples() < bufsize && part_id < no_hist_parts) {
 			const auto& pattern = patterns[pid];
@@ -1041,22 +1021,16 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 
 		auto t2 = std::chrono::high_resolution_clock::now();
 
-		int sum = 0;
-
-		for (int i = 0; i < num_samples; ++i)
-		{			
-			for (int j = 0; j < v_tmp.size(); ++j)
-			{
-				int x = hist_sample_ids[j][i];
-				hist_sample_ids[j][i] = sum;
-				sum += x;
-			}
-		}
+		semaphore_hist_first.inc(num_threads);
+		semaphore_hist_second.inc(num_threads);
+		tasks_histogram_queue.PushRange(v_hist_ids);
+		semaphore_hist_second.waitForZero();
 
 		auto t3 = std::chrono::high_resolution_clock::now();
 
 		// generate sample to pattern mapping
-		sample2pattern.resize(sum);		// resize to number of items in the current fragment
+		int num_items = std::accumulate(hist_boundary_values.begin(), hist_boundary_values.end(), 0);
+		sample2pattern.resize(num_items);		// resize to number of items in the current fragment
 
 		semaphore_sample2patterns.inc(v_tmp_int.size());
 		tasks_sample2patterns_queue.PushRange(v_tmp_int);
@@ -1108,6 +1082,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 	tasks_matrix_queue.MarkCompleted();
 	tasks_decomp_queue.MarkCompleted();
 	tasks_sample2patterns_queue.MarkCompleted();
+	tasks_histogram_queue.MarkCompleted();
 
 	for (auto & w : workers_matrix)
 		w.join();
@@ -1116,6 +1091,9 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 		w.join();
 
 	for (auto & w : workers_sample2patterns)
+		w.join();
+
+	for (auto &w : workers_histogram)
 		w.join();
 
 	cout << "Decomp   time: " << decomp_time << endl;

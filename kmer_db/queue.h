@@ -25,29 +25,30 @@ public:
 	void inc() {
 		std::unique_lock<std::mutex> lk(mutex);
 		++counter;
-//		cout << "sem. counter inc: " << counter << endl;
 	}
 
 	void inc(int num) {
 		std::unique_lock<std::mutex> lk(mutex);
 		counter += num;
-//		cout << "sem. counter inc num: " << counter << endl;
 	}
 
 	void dec() {
 		std::unique_lock<std::mutex> lk(mutex);
 		--counter;
 
-//		cout << "sem. counter dec: " << counter << endl;
-
 		cv.notify_one();
+	}
+
+	void dec_notify_all() {
+		std::unique_lock<std::mutex> lk(mutex);
+		--counter;
+
+		cv.notify_all();
 	}
 
 	void waitForZero() {
 		std::unique_lock<std::mutex> lk(mutex);
 		cv.wait(lk, [this] {return counter == 0; });
-
-//		cout << "sem. is zero!\n";
 	}
 };
 
