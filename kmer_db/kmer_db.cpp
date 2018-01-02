@@ -24,6 +24,7 @@
 #else
 #include <parallel/algorithm>
 #endif
+#include <omp.h>
 
 
 #define USE_PREFETCH
@@ -672,6 +673,8 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 	matrix.resize(num_samples);
 	matrix.clear();
 	
+	omp_set_num_threads(num_threads);
+
 	size_t bufsize = 4000000 / sizeof(uint32_t);
 	std::vector<uint32_t> patternsBuffer(bufsize);
 	uint32_t* currentPtr;
