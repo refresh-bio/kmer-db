@@ -678,7 +678,8 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 	uint32_t* currentPtr;
 
 	std::vector<uint32_t*> rawPatterns(bufsize);
-	std::vector<std::pair<sample_id_t, uint32_t>> sample2pattern(bufsize);
+//	std::vector<std::pair<sample_id_t, uint32_t>> sample2pattern(bufsize);
+	std::vector<std::tuple<sample_id_t, uint32_t, uint32_t>> sample2pattern(bufsize);
 
 	std::vector<std::thread> workers_matrix(num_threads);
 	std::vector<std::thread> workers_decomp(num_threads);
@@ -717,7 +718,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 
 
 	int no_hist_parts = num_threads * 1;
-	std::vector<std::vector<int>> hist_sample_ids(no_hist_parts + 1, std::vector<int>(num_samples, 0));
+	std::vector<std::vector<int>> hist_sample_ids(no_hist_parts, std::vector<int>(num_samples, 0));
 
 	// Decompress patterns
 	for (int tid = 0; tid < num_threads; ++tid) {
@@ -800,8 +801,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 						{
 							int pos = my_hist_sample_ids[out[i]]++;
 
-							sample2pattern[pos].first = out[i];
-							sample2pattern[pos].second = pid - first_pid;
+							sample2pattern[pos] = make_tuple(out[i], pid - first_pid, i);
 						}
 					}
 
@@ -824,18 +824,19 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 				if (tasks_matrix_queue.Pop(range_id))
 				{
 					for (int id = workerRanges[range_id]; id < workerRanges[range_id + 1]; ) {
-						int Si = sample2pattern[id].first;
+						int Si = get<0>(sample2pattern[id]);
 						uint32_t *row = matrix[Si];
-						while (id < workerRanges[range_id + 1] && sample2pattern[id].first == Si) {
-							int local_pid = sample2pattern[id].second;
+						while (id < workerRanges[range_id + 1] && get<0>(sample2pattern[id]) == Si) {
+							int local_pid = get<1>(sample2pattern[id]);
 							const auto& pattern = patterns[local_pid + first_pid];
 
 							uint32_t* rawData = rawPatterns[local_pid];
-							int num_samples = pattern.get_num_samples();
+//							int num_samples = pattern.get_num_samples();
+							int num_samples = get<2>(sample2pattern[id]);
 							int num_local_samples = pattern.get_num_local_samples();
 							uint32_t to_add = pattern.get_num_kmers();
 
-							if (num_samples < 4)
+/*							if (num_samples < 4)
 							{
 								int j = 0;
 								uint32_t Sj;
@@ -901,8 +902,9 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 							else
 							{
 								num_samples = lower_bound(rawData + num_samples - num_local_samples, rawData + num_samples, Si) - rawData;
+*/
 								auto *p = rawData;
-
+								
 								switch (num_samples % 16)
 								{
 								case 15:	row[*p++] += to_add;
@@ -969,7 +971,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 #ifdef ALL_STATS
 								localAdditions += num_samples;
 #endif
-							}
+//							}
 
 							++id;
 						}
@@ -1047,7 +1049,6 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 			{
 				int x = hist_sample_ids[j][i];
 				hist_sample_ids[j][i] = sum;
-				
 				sum += x;
 			}
 		}
@@ -1060,26 +1061,6 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 		semaphore_sample2patterns.inc(v_tmp_int.size());
 		tasks_sample2patterns_queue.PushRange(v_tmp_int);
 		semaphore_sample2patterns.waitForZero();
-
-		int pair_id = 0;
-
-/*		for (int pid = first_pid; pid < last_pid; ++pid) {
-			const auto& pattern = patterns[pid];
-			uint32_t* rawData = rawPatterns[pid - first_pid];
-
-			int num_samples = pattern.get_num_samples();
-			int num_local_samples = pattern.get_num_local_samples();
-			for (int j = num_samples - num_local_samples; j < num_samples; ++j) {
-				int pos = sum_hist_sample_ids[rawData[j]]++;
-
-				sample2pattern[pos].first = rawData[j];
-				sample2pattern[pos].second = pid - first_pid;
-			}
-
-			pair_id += num_local_samples;
-		}
-		sample2pattern.resize(pair_id);
-		*/
 
 		auto t4 = std::chrono::high_resolution_clock::now();
 
@@ -1104,17 +1085,14 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 				sample2pattern.begin() + currentIndex,
 				sample2pattern.end(),
 				*(sample2pattern.begin() + currentIndex - 1),
-				[](auto x, auto y) {return x.first < y.first; });	// Necessary, because we are looking for end of sample data
+				[](auto x, auto y) {return get<0>(x) < get<0>(y); });	// Necessary, because we are looking for end of sample data
 
 			size_t range = it - sample2pattern.begin();
-
 			workerRanges[rid + 1] = range;
-
 			currentIndex = range + workerBlock;
 
-			if (currentIndex >= sample2pattern.size()) {
+			if (currentIndex >= sample2pattern.size())
 				break;
-			}
 		}
 
 		// this should never happen
@@ -1131,17 +1109,14 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 	tasks_decomp_queue.MarkCompleted();
 	tasks_sample2patterns_queue.MarkCompleted();
 
-	for (auto & w : workers_matrix) {
+	for (auto & w : workers_matrix)
 		w.join();
-	}
 
-	for (auto & w : workers_decomp) {
+	for (auto & w : workers_decomp)
 		w.join();
-	}
 
-	for (auto & w : workers_sample2patterns) {
+	for (auto & w : workers_sample2patterns)
 		w.join();
-	}
 
 	cout << "Decomp   time: " << decomp_time << endl;
 	cout << "Hist     time: " << hist_time << endl;

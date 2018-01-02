@@ -11,3 +11,6 @@
 *.vspx
 *.psess
 *.opendb
+*.sqlite
+*.json
+*.suo

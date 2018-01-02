@@ -11,7 +11,6 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="parallel_sorter.cpp" />
     <ClCompile Include="queue.cpp" />
-    <ClCompile Include="raduls\sorting_network.cpp" />
     <ClCompile Include="tests.cpp" />
     <ClCompile Include="pattern.cpp" />
   </ItemGroup>
