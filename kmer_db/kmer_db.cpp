@@ -998,7 +998,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 		auto t2 = std::chrono::high_resolution_clock::now();
 
 #ifdef WIN32
-		concurrency::parallel_for(0, num_samples, [this, &hist_sample_ids](int i){
+/*		concurrency::parallel_for(0, num_samples, [this, &hist_sample_ids](int i){
 			int sum = 0;
 			for (int j = 0; j < num_threads; ++j)
 			{
@@ -1007,17 +1007,8 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 			}
 
 			hist_sample_ids[num_threads][i] = sum;
-			});
-
-		int tmp = 0;
-		for (int i = 0; i < num_samples; ++i)
-		{
-			int x = sum_hist_sample_ids[i];
-			sum_hist_sample_ids[i] = tmp;
-			tmp += x;
-		}
-#else
-		__gnu_parallel::for_each(sample_range.begin(), sample_range.end(), [&hist_sample_ids, this](auto i) {
+			});*/
+/*		for_each(sample_range.begin(), sample_range.end(), [&hist_sample_ids, this](auto i) {
 			int sum = 0;
 			for (int j = 0; j < num_threads; ++j)
 			{
@@ -1027,6 +1018,50 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 
 			hist_sample_ids[num_threads][i] = sum;
 		});
+		*/
+		for(int i = 0; i < num_samples; ++i) 
+		{
+			int sum = 0;
+			for (int j = 0; j < num_threads; ++j)
+			{
+				sum += hist_sample_ids[j][i];
+				hist_sample_ids[j][i] = 0;
+			}
+
+			hist_sample_ids[num_threads][i] = sum;
+		}
+
+
+		int tmp = 0;
+		for (int i = 0; i < num_samples; ++i)
+		{
+			int x = sum_hist_sample_ids[i];
+			sum_hist_sample_ids[i] = tmp;
+			tmp += x;
+		}
+#else
+/*		__gnu_parallel::for_each(sample_range.begin(), sample_range.end(), [&hist_sample_ids, this](auto i) {
+			int sum = 0;
+			for (int j = 0; j < num_threads; ++j)
+			{
+				sum += hist_sample_ids[j][i];
+				hist_sample_ids[j][i] = 0;
+			}
+
+			hist_sample_ids[num_threads][i] = sum;
+		});*/
+		for (int i = 0; i < num_samples; ++i)
+		{
+			int sum = 0;
+			for (int j = 0; j < num_threads; ++j)
+			{
+				sum += hist_sample_ids[j][i];
+				hist_sample_ids[j][i] = 0;
+			}
+
+			hist_sample_ids[num_threads][i] = sum;
+		}
+
 
 		int tmp = 0;
 		for (int i = 0; i < num_samples; ++i)
