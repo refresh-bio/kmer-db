@@ -22,6 +22,8 @@ class AbstractKmerDb {
 protected:
 	std::vector<string> sampleNames;
 
+	std::vector<size_t> sampleKmersCount;
+
 public:
 
 	AbstractKmerDb() {}
@@ -43,6 +45,7 @@ public:
 	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers) {
 		sample_id_t newId = sampleNames.size();
 		sampleNames.push_back(sampleName);
+		sampleKmersCount.push_back(kmers.size());
 		return newId;
 
 	}

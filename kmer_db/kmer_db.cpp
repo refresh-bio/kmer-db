@@ -523,13 +523,16 @@ void FastKmerDb::serialize(std::ofstream& file) const {
 	size_t temp = getSamplesCount();
 	file.write(reinterpret_cast<const char*>(&temp), sizeof(temp));
 
-	// store sample names
-	for (const string& s : sampleNames) {
+	// store sample info 
+	for (int i = 0; i < sampleNames.size(); ++i) {
+		temp = sampleKmersCount[i]; // store kmer count
+		file.write(reinterpret_cast<const char*>(&temp), sizeof(temp));
+
+		const string& s = sampleNames[i]; // store name
 		temp = s.size();
 		file.write(reinterpret_cast<const char*>(&temp), sizeof(temp));
 		file.write(s.data(), temp);
 	}
-
 
 	// store hashmap
 	temp = kmers2patternIds.get_size();
@@ -587,13 +590,18 @@ bool FastKmerDb::deserialize(std::ifstream& file) {
 	std::vector <hash_map_lp<kmer_t, pattern_id_t>::item_t> hastableBuffer(numHastableElements);
 	char* buffer = reinterpret_cast<char*>(hastableBuffer.data());
 
-	// load sample names
+	// load sample info
 	size_t temp;
 	file.read(reinterpret_cast<char*>(&temp), sizeof(temp));
 	sampleNames.resize(temp);
+	sampleKmersCount.resize(temp);
 
-	for (string& s : sampleNames) {
-		file.read(reinterpret_cast<char*>(&temp), sizeof(temp));
+	for (int i = 0; i < sampleNames.size(); ++i) {
+		file.read(reinterpret_cast<char*>(&temp), sizeof(temp));  // load kmer count
+		sampleKmersCount[i] = temp;
+
+		string& s = sampleNames[i];
+		file.read(reinterpret_cast<char*>(&temp), sizeof(temp));  // load sample name
 		file.read(buffer, temp);
 		s.assign(buffer, temp);
 	}
