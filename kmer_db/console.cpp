@@ -245,7 +245,7 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 	std::vector<kmer_t> kmers;
 	KmcFileWrapper file(nullptr);
 
-	if (!file.open(singleKmcSample, true) && !file.load(kmers)) {
+	if (!file.open(singleKmcSample, true) || !file.load(kmers)) {
 		cout << "FAILED";
 		return -1;
 	}
