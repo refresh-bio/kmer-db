@@ -53,7 +53,12 @@ class CEliasGamma
 	FORCE_INLINE
 	uint32_t no_of_16B_blocks(uint32_t no_bits)
 	{
-		return (no_bits + 127) / 128;
+		if(no_bits <= 256)
+			return (no_bits + 127) / 128;
+		else if(no_bits <= 512)
+			return 2 * ((no_bits + 255) / 256);
+		else
+			return 3 * ((no_bits + 127 + 256) / (128 + 256));
 	}
 
 	FORCE_INLINE
@@ -278,11 +283,13 @@ public:
 		uint32_t predicted_size_in_bits = calculate_size(input, input_size);
 		uint32_t predicted_size_in_8B = no_of_16B_blocks(predicted_size_in_bits) * 2;
 		
-		if(output)
-			delete[] output;
-		output = new uint64_t[predicted_size_in_8B];
-		fill_n(output, predicted_size_in_8B, 0);
-		
+		if (output)
+			//			delete[] output;
+			free(output);
+//		output = new uint64_t[predicted_size_in_8B];
+//		fill_n(output, predicted_size_in_8B, 0);
+		output = (uint64_t*)calloc(predicted_size_in_8B, sizeof(uint64_t));
+
 		output_size_in_bits = 0;
 		for (uint32_t i = 0; i < input_size; ++i)
 			encode(input[i], output, output_size_in_bits);
@@ -299,14 +306,14 @@ public:
 		// Sprawdzanie czy trzeba przealokowac (zalozenie, ze alokacja jest na wielokrotnosc 16B)
 		if(current_no_blocks != new_no_blocks)
 		{
-			uint64_t *old_output = output;
+/*			uint64_t *old_output = output;
 			output = new uint64_t[new_no_blocks * 2];
-/*			for(uint32_t i = 0; i < current_no_blocks * 2; ++i)
-				output[i] = old_output[i];*/
 			memcpy(output, old_output, current_no_blocks * 16);
-			fill_n(output+current_no_blocks * 2, new_no_blocks * 2 - current_no_blocks * 2, 0);
-			
-			delete[] old_output;
+			fill_n(output + current_no_blocks * 2, new_no_blocks * 2 - current_no_blocks * 2, 0);*/
+			output = (uint64_t*) realloc(output, new_no_blocks * 16);
+			fill_n(output + current_no_blocks * 2, new_no_blocks * 2 - current_no_blocks * 2, 0); 
+
+//			delete[] old_output;
 		}
 		
 		encode(value, output, output_size_in_bits);

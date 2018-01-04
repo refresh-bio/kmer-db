@@ -87,7 +87,8 @@ public:
 	{
 		if (data)
 		{
-			delete[] data;
+//			delete[] data;
+			free(data);
 		}
 	}
 
@@ -132,7 +133,8 @@ public:
 	void release() {
 		if (data)
 		{
-			delete[] data;
+//			delete[] data;
+			free(data);
 			data = nullptr;
 		}
 	}
