@@ -859,7 +859,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 #ifdef ALL_STATS
 							localAdditions += num_samples;
 #endif
-#if 1
+#if 0
 							if (num_samples < 16)
 							{
 								switch (num_samples % 16)
@@ -959,7 +959,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 
 #endif
 
-#if 0
+#if 1
 							switch (num_samples % 16)
 							{
 							case 15:	row[*p++] += to_add;
@@ -979,15 +979,15 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 							case 1:		row[*p++] += to_add;
 							}
 
-							__m128i _to_add = _mm_set1_epi32((int)to_add);
-							__m128i r;
+//							__m128i _to_add = _mm_set1_epi32((int)to_add);
+//							__m128i r;
 
 							for (int j = num_samples % 16; j < num_samples; j += 16)
 							{
 								if (*p + 15 == *(p + 15))
 								{
 									auto q = row + *p;
-									auto _q = (__m128i*) q;
+//									auto _q = (__m128i*) q;
 									q[0] += to_add;
 									q[1] += to_add;
 									q[2] += to_add;
