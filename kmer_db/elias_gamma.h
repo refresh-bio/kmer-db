@@ -301,8 +301,9 @@ public:
 		{
 			uint64_t *old_output = output;
 			output = new uint64_t[new_no_blocks * 2];
-			for(uint32_t i = 0; i < current_no_blocks * 2; ++i)
-				output[i] = old_output[i];
+/*			for(uint32_t i = 0; i < current_no_blocks * 2; ++i)
+				output[i] = old_output[i];*/
+			memcpy(output, old_output, current_no_blocks * 16);
 			fill_n(output+current_no_blocks * 2, new_no_blocks * 2 - current_no_blocks * 2, 0);
 			
 			delete[] old_output;
