@@ -6,7 +6,7 @@
     <LocalDebuggerWorkingDirectory>H:\100k-pathogens</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommandArguments>--build  fl_3666.txt kmdb_3666.db2</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>--all2all kmdb_3666.db3 3666.sm6</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerWorkingDirectory>H:\100k-pathogens</LocalDebuggerWorkingDirectory>
   </PropertyGroup>

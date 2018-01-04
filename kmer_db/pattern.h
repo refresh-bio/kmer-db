@@ -87,8 +87,11 @@ public:
 	{
 		if (data)
 		{
-//			delete[] data;
+#ifdef USE_MALLOC
 			free(data);
+#else
+			delete[] data;
+#endif
 		}
 	}
 
@@ -133,8 +136,11 @@ public:
 	void release() {
 		if (data)
 		{
-//			delete[] data;
+#ifdef USE_MALLOC
 			free(data);
+#else
+			delete[] data;
+#endif
 			data = nullptr;
 		}
 	}
