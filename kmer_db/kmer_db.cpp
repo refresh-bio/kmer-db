@@ -859,7 +859,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 #ifdef ALL_STATS
 							localAdditions += num_samples;
 #endif
-#if 0
+#if 1
 							if (num_samples < 16)
 							{
 								switch (num_samples % 16)
@@ -883,22 +883,6 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 							}
 							else
 							{
-								if (((uint64_t)p) % 16)
-								{
-									row[*p++] += to_add;
-									--num_samples;
-								}
-								if (((uint64_t)p) % 16)
-								{
-									row[*p++] += to_add;
-									--num_samples;
-								}
-								if (((uint64_t)p) % 16)
-								{
-									row[*p++] += to_add;
-									--num_samples;
-								}
-
 								__m128i _to_add = _mm_set1_epi32((int)to_add);
 
 								int j;
@@ -908,10 +892,10 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 									{
 										auto _q = (__m128i*) (row + *p);
 
-										_mm_store_si128(_q, _mm_add_epi32(_mm_load_si128(_q), _to_add));
-										_mm_store_si128(_q+1, _mm_add_epi32(_mm_load_si128(_q + 1), _to_add));
-										_mm_store_si128(_q+2, _mm_add_epi32(_mm_load_si128(_q + 2), _to_add));
-										_mm_store_si128(_q+3, _mm_add_epi32(_mm_load_si128(_q + 3), _to_add));
+										_mm_storeu_si128(_q, _mm_add_epi32(_mm_loadu_si128(_q), _to_add));
+										_mm_storeu_si128(_q+1, _mm_add_epi32(_mm_loadu_si128(_q + 1), _to_add));
+										_mm_storeu_si128(_q+2, _mm_add_epi32(_mm_loadu_si128(_q + 2), _to_add));
+										_mm_storeu_si128(_q+3, _mm_add_epi32(_mm_loadu_si128(_q + 3), _to_add));
 
 										p += 16;
 									}
@@ -959,7 +943,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 
 #endif
 
-#if 1
+#if 0
 							switch (num_samples % 16)
 							{
 							case 15:	row[*p++] += to_add;
