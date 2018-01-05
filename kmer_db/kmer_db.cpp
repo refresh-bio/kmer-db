@@ -1523,7 +1523,7 @@ void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<ui
 
 	std::vector<std::vector<uint32_t>> localSimilarities(num_threads, std::vector<uint32_t>(this->getSamplesCount()));
 
-	std::map<pattern_id_t, int32_t> patterns2count;
+	std::unordered_map<pattern_id_t, int32_t> patterns2count;
 
 	std::chrono::duration<double> dt;
 	auto start = std::chrono::high_resolution_clock::now();
@@ -1568,26 +1568,48 @@ void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<ui
 			size_t block_size = n_patterns / num_threads;
 			size_t lo = tid * block_size;
 			size_t hi = (tid == num_threads - 1) ? n_patterns : lo + block_size;
+			auto &my_localSimilarities = localSimilarities[tid];
 
 			for (int id = lo; id < hi; ++id) {
-				
+				if (id + 1 < hi)
+					_mm_prefetch((const char*)(patterns.data() + patterns2countVector[id + 1].first), _MM_HINT_T0);
+
 				auto pid = patterns2countVector[id].first;
 				const auto& pattern = patterns[pid];
+				int num_samples = pattern.get_num_samples();
+				int to_add = patterns2countVector[id].second;
 
 				uint32_t* out = samples.data() + pattern.get_num_samples(); // start from the end
 
 				int64_t current_id = pid;
 				while (current_id >= 0) {
 					const auto& cur = patterns[current_id];
+
 					out -= cur.get_num_local_samples();
 					cur.decodeSamples(out);
 
 					current_id = cur.get_parent_id();
 				}
 
-				for (int i = 0; i < pattern.get_num_samples(); ++i) {
-					localSimilarities[tid][samples[i]] += patterns2countVector[id].second;
+				auto *p = samples.data();
+
+				int i;
+				for (i = 0; i + 4 <= num_samples; i += 4)
+				{
+					my_localSimilarities[*p++] += to_add;
+					my_localSimilarities[*p++] += to_add;
+					my_localSimilarities[*p++] += to_add;
+					my_localSimilarities[*p++] += to_add;
 				}
+				num_samples -= i;
+
+				switch (num_samples)
+				{
+				case 3: my_localSimilarities[*p++] += to_add;
+				case 2: my_localSimilarities[*p++] += to_add;
+				case 1: my_localSimilarities[*p++] += to_add;
+				}
+
 			}
 		});
 	}
