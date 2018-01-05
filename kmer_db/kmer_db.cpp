@@ -851,7 +851,6 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 
 							uint32_t* rawData = rawPatterns[local_pid];
 							int num_samples = get<2>(sample2pattern[id]);
-							int num_local_samples = pattern.get_num_local_samples();
 							uint32_t to_add = pattern.get_num_kmers();
 
 							auto *p = rawData;
@@ -859,154 +858,58 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 #ifdef ALL_STATS
 							localAdditions += num_samples;
 #endif
-#if 1
-							if (num_samples < 16)
+							__m128i _to_add = _mm_set1_epi32((int)to_add);
+
+							int j;
+
+							if(num_samples % 32 >= 16)
 							{
-								switch (num_samples % 16)
-								{
-								case 15:	row[*p++] += to_add;
-								case 14:	row[*p++] += to_add;
-								case 13:	row[*p++] += to_add;
-								case 12:	row[*p++] += to_add;
-								case 11:	row[*p++] += to_add;
-								case 10:	row[*p++] += to_add;
-								case 9:		row[*p++] += to_add;
-								case 8:		row[*p++] += to_add;
-								case 7:		row[*p++] += to_add;
-								case 6:		row[*p++] += to_add;
-								case 5:		row[*p++] += to_add;
-								case 4:		row[*p++] += to_add;
-								case 3:		row[*p++] += to_add;
-								case 2:		row[*p++] += to_add;
-								case 1:		row[*p++] += to_add;
-								}
-							}
-							else
-							{
-								__m128i _to_add = _mm_set1_epi32((int)to_add);
-
-								int j;
-								for (j = 0; j + 16 <= num_samples; j += 16)
-								{
-									if (*p + 15 == *(p + 15))
-									{
-										auto _q = (__m128i*) (row + *p);
-
-										_mm_storeu_si128(_q, _mm_add_epi32(_mm_loadu_si128(_q), _to_add));
-										_mm_storeu_si128(_q+1, _mm_add_epi32(_mm_loadu_si128(_q + 1), _to_add));
-										_mm_storeu_si128(_q+2, _mm_add_epi32(_mm_loadu_si128(_q + 2), _to_add));
-										_mm_storeu_si128(_q+3, _mm_add_epi32(_mm_loadu_si128(_q + 3), _to_add));
-
-										p += 16;
-									}
-									else
-									{
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-									}
-								}
-
-								num_samples -= j;
-								switch (num_samples % 16)
-								{
-								case 15:	row[*p++] += to_add;
-								case 14:	row[*p++] += to_add;
-								case 13:	row[*p++] += to_add;
-								case 12:	row[*p++] += to_add;
-								case 11:	row[*p++] += to_add;
-								case 10:	row[*p++] += to_add;
-								case 9:		row[*p++] += to_add;
-								case 8:		row[*p++] += to_add;
-								case 7:		row[*p++] += to_add;
-								case 6:		row[*p++] += to_add;
-								case 5:		row[*p++] += to_add;
-								case 4:		row[*p++] += to_add;
-								case 3:		row[*p++] += to_add;
-								case 2:		row[*p++] += to_add;
-								case 1:		row[*p++] += to_add;
-								}
+								j = -16;
+								goto inner_start;
 							}
 
-#endif
-
-#if 0
-							switch (num_samples % 16)
-							{
-							case 15:	row[*p++] += to_add;
-							case 14:	row[*p++] += to_add;
-							case 13:	row[*p++] += to_add;
-							case 12:	row[*p++] += to_add;
-							case 11:	row[*p++] += to_add;
-							case 10:	row[*p++] += to_add;
-							case 9:		row[*p++] += to_add;
-							case 8:		row[*p++] += to_add;
-							case 7:		row[*p++] += to_add;
-							case 6:		row[*p++] += to_add;
-							case 5:		row[*p++] += to_add;
-							case 4:		row[*p++] += to_add;
-							case 3:		row[*p++] += to_add;
-							case 2:		row[*p++] += to_add;
-							case 1:		row[*p++] += to_add;
-							}
-
-//							__m128i _to_add = _mm_set1_epi32((int)to_add);
-//							__m128i r;
-
-							for (int j = num_samples % 16; j < num_samples; j += 16)
+							for (j = 0; j + 32 <= num_samples; j += 32)
 							{
 								if (*p + 15 == *(p + 15))
 								{
-									auto q = row + *p;
-//									auto _q = (__m128i*) q;
-									q[0] += to_add;
-									q[1] += to_add;
-									q[2] += to_add;
-									q[3] += to_add;
-									q[4] += to_add;
-									q[5] += to_add;
-									q[6] += to_add;
-									q[7] += to_add;
-									q[8] += to_add;
-									q[9] += to_add;
-									q[10] += to_add;
-									q[11] += to_add;
-									q[12] += to_add;
-									q[13] += to_add;
-									q[14] += to_add;
-									q[15] += to_add;
-									/*									r = _mm_loadu_si128(_q);
-									r = _mm_add_epi32(r, _to_add);
-									_mm_storeu_si128(_q, r);
-									++_q;
+									auto _q = (__m128i*) (row + *p);
 
-									r = _mm_loadu_si128(_q);
-									r = _mm_add_epi32(r, _to_add);
-									_mm_storeu_si128(_q, r);
-									++_q;
+									_mm_storeu_si128(_q, _mm_add_epi32(_mm_loadu_si128(_q), _to_add));
+									_mm_storeu_si128(_q + 1, _mm_add_epi32(_mm_loadu_si128(_q + 1), _to_add));
+									_mm_storeu_si128(_q + 2, _mm_add_epi32(_mm_loadu_si128(_q + 2), _to_add));
+									_mm_storeu_si128(_q + 3, _mm_add_epi32(_mm_loadu_si128(_q + 3), _to_add));
 
-									r = _mm_loadu_si128(_q);
-									r = _mm_add_epi32(r, _to_add);
-									_mm_storeu_si128(_q, r);
-									++_q;
+									p += 16;
+								}
+								else
+								{
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+								}
 
-									r = _mm_loadu_si128(_q);
-									r = _mm_add_epi32(r, _to_add);
-									_mm_storeu_si128(_q, r);
-									++_q;*/
+inner_start:
+								if (*p + 15 == *(p + 15))
+								{
+									auto _q = (__m128i*) (row + *p);
+
+									_mm_storeu_si128(_q, _mm_add_epi32(_mm_loadu_si128(_q), _to_add));
+									_mm_storeu_si128(_q + 1, _mm_add_epi32(_mm_loadu_si128(_q + 1), _to_add));
+									_mm_storeu_si128(_q + 2, _mm_add_epi32(_mm_loadu_si128(_q + 2), _to_add));
+									_mm_storeu_si128(_q + 3, _mm_add_epi32(_mm_loadu_si128(_q + 3), _to_add));
 
 									p += 16;
 								}
@@ -1030,7 +933,26 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 									row[*p++] += to_add;
 								}
 							}
-#endif
+							num_samples -= j;
+
+							switch (num_samples % 16)
+							{
+							case 15:	row[*p++] += to_add;
+							case 14:	row[*p++] += to_add;
+							case 13:	row[*p++] += to_add;
+							case 12:	row[*p++] += to_add;
+							case 11:	row[*p++] += to_add;
+							case 10:	row[*p++] += to_add;
+							case 9:		row[*p++] += to_add;
+							case 8:		row[*p++] += to_add;
+							case 7:		row[*p++] += to_add;
+							case 6:		row[*p++] += to_add;
+							case 5:		row[*p++] += to_add;
+							case 4:		row[*p++] += to_add;
+							case 3:		row[*p++] += to_add;
+							case 2:		row[*p++] += to_add;
+							case 1:		row[*p++] += to_add;
+							}
 
 							++id;
 						}
@@ -1056,8 +978,9 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 					int last_sample = samples_count * (task_id + 1) / num_threads;
 
 					int sum = 0;
+					int max_j = v_tmp.size();
 					for (int i = first_sample; i < last_sample; ++i)
-						for (int j = 0; j < v_tmp.size(); ++j)
+						for (int j = 0; j < max_j; ++j)
 						{
 							int x = hist_sample_ids[j][i];
 							hist_sample_ids[j][i] = sum;
@@ -1072,7 +995,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 					for (int i = 0; i < task_id; ++i)
 						to_add += hist_boundary_values[i];
 
-					for (int j = 0; j < v_tmp.size(); ++j)
+					for (int j = 0; j < max_j; ++j)
 						for (int i = first_sample; i < last_sample; ++i)
 							hist_sample_ids[j][i] += to_add;
 					semaphore_hist_second.dec();
