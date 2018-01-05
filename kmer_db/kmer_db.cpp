@@ -1550,10 +1550,27 @@ void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<ui
 
 	std::vector<std::pair<pattern_id_t, int32_t>> patterns2countVector(patterns2count.size());
 	int i = 0;
+	uint64_t tot_pattern_lengths = 0;
 	for (const auto& entry : patterns2count) {
-		patterns2countVector[i++] = entry;
+		tot_pattern_lengths += patterns[entry.first].get_num_samples();
 	}
+
+	vector<uint32_t> range_boundaries(num_threads + 1, patterns2count.size());
+	uint64_t sum_pattern_lengths = 0;
+	uint64_t part_length = (tot_pattern_lengths + num_threads - 1) / num_threads;
+	uint32_t range_id = 1;
+	for (auto &entry : patterns2count)
+	{
+		sum_pattern_lengths += patterns[entry.first].get_num_samples();
+		patterns2countVector[i++] = entry;
+
+		if (sum_pattern_lengths > range_id * part_length)
+			range_boundaries[range_id++] = i;
+	}
+	range_boundaries[0] = 0;
+
 	patterns2count.clear();
+
 
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "Pattern listing time: " << dt.count() << endl;
@@ -1561,13 +1578,15 @@ void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<ui
 	start = std::chrono::high_resolution_clock::now();
 	std::vector<std::thread> workers(num_threads);
 	for (int tid = 0; tid < num_threads; ++tid) {
-		workers[tid] = std::thread([this, tid, &patterns2countVector, &localSimilarities]() {
+		workers[tid] = std::thread([this, tid, &patterns2countVector, &localSimilarities, &range_boundaries]() {
 			std::vector<uint32_t> samples(this->getSamplesCount());
 			
 			size_t n_patterns = patterns2countVector.size();
 			size_t block_size = n_patterns / num_threads;
-			size_t lo = tid * block_size;
-			size_t hi = (tid == num_threads - 1) ? n_patterns : lo + block_size;
+//			size_t lo = tid * block_size;
+//			size_t hi = (tid == num_threads - 1) ? n_patterns : lo + block_size;
+			size_t lo = range_boundaries[tid];
+			size_t hi = range_boundaries[tid+1];
 			auto &my_localSimilarities = localSimilarities[tid];
 
 			for (int id = lo; id < hi; ++id) {
