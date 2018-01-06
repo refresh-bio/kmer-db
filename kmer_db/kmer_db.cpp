@@ -38,6 +38,8 @@ const size_t FastKmerDb::ioBufferBytes = (2 << 29); //512MB buffer
 //const size_t FastKmerDb::ioBufferBytes = 16000000; //16MB buffer 
 //const size_t FastKmerDb::ioBufferBytes = 100000; //100KB buffer 
 
+#define ALL2ALL_VER	2
+
 /****************************************************************************************************************************************************/
 
 
@@ -853,11 +855,13 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 							int num_samples = get<2>(sample2pattern[id]);
 							uint32_t to_add = pattern.get_num_kmers();
 
-							auto *p = rawData;
-
 #ifdef ALL_STATS
 							localAdditions += num_samples;
 #endif
+
+							auto *p = rawData;
+
+#if ALL2ALL_VER==0
 							__m128i _to_add = _mm_set1_epi32((int)to_add);
 
 							int j;
@@ -953,6 +957,124 @@ inner_start:
 							case 2:		row[*p++] += to_add;
 							case 1:		row[*p++] += to_add;
 							}
+#elif ALL2ALL_VER==1
+							switch (num_samples % 16)
+							{
+							case 15:	row[*p++] += to_add;
+							case 14:	row[*p++] += to_add;
+							case 13:	row[*p++] += to_add;
+							case 12:	row[*p++] += to_add;
+							case 11:	row[*p++] += to_add;
+							case 10:	row[*p++] += to_add;
+							case 9:		row[*p++] += to_add;
+							case 8:		row[*p++] += to_add;
+							case 7:		row[*p++] += to_add;
+							case 6:		row[*p++] += to_add;
+							case 5:		row[*p++] += to_add;
+							case 4:		row[*p++] += to_add;
+							case 3:		row[*p++] += to_add;
+							case 2:		row[*p++] += to_add;
+							case 1:		row[*p++] += to_add;
+							}
+
+							__m128i _to_add = _mm_set1_epi32((int)to_add);
+
+							for (int j = num_samples % 16; j < num_samples; j += 16)
+							{
+								if (*p + 15 == *(p + 15))
+								{
+									auto _q = (__m128i*) (row + *p);
+
+									_mm_storeu_si128(_q, _mm_add_epi32(_mm_loadu_si128(_q), _to_add));
+									_mm_storeu_si128(_q + 1, _mm_add_epi32(_mm_loadu_si128(_q + 1), _to_add));
+									_mm_storeu_si128(_q + 2, _mm_add_epi32(_mm_loadu_si128(_q + 2), _to_add));
+									_mm_storeu_si128(_q + 3, _mm_add_epi32(_mm_loadu_si128(_q + 3), _to_add));
+
+									p += 16;
+								}
+								else
+								{
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+									row[*p++] += to_add;
+								}
+							}
+#elif ALL2ALL_VER==2
+							switch (num_samples % 16)
+							{
+							case 15:	row[*p++] += to_add;
+							case 14:	row[*p++] += to_add;
+							case 13:	row[*p++] += to_add;
+							case 12:	row[*p++] += to_add;
+							case 11:	row[*p++] += to_add;
+							case 10:	row[*p++] += to_add;
+							case 9:		row[*p++] += to_add;
+							case 8:		row[*p++] += to_add;
+							case 7:		row[*p++] += to_add;
+							case 6:		row[*p++] += to_add;
+							case 5:		row[*p++] += to_add;
+							case 4:		row[*p++] += to_add;
+							case 3:		row[*p++] += to_add;
+							case 2:		row[*p++] += to_add;
+							case 1:		row[*p++] += to_add;
+							}
+
+							for (int j = num_samples % 16; j < num_samples; j += 16)
+							{
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+							}
+#elif ALL2ALL_VER==3
+							switch (num_samples % 8)
+							{
+							case 7:		row[*p++] += to_add;
+							case 6:		row[*p++] += to_add;
+							case 5:		row[*p++] += to_add;
+							case 4:		row[*p++] += to_add;
+							case 3:		row[*p++] += to_add;
+							case 2:		row[*p++] += to_add;
+							case 1:		row[*p++] += to_add;
+							}
+
+							for (int j = num_samples % 8; j < num_samples; j += 8)
+							{
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+								row[*p++] += to_add;
+							}
+#endif
 
 							++id;
 						}
@@ -1012,8 +1134,8 @@ inner_start:
 
 	int pid_to_cout = 0;
 	for (int pid = 0; pid < patterns.size(); ) {
-//		if (pid > 2000000)
-//			break;
+		if (pid > 10000000)
+			break;
 		if (pid >= pid_to_cout)
 		{
 			std::cout << pid << " of " << patterns.size() << "\r";
