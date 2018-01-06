@@ -38,7 +38,7 @@ const size_t FastKmerDb::ioBufferBytes = (2 << 29); //512MB buffer
 //const size_t FastKmerDb::ioBufferBytes = 16000000; //16MB buffer 
 //const size_t FastKmerDb::ioBufferBytes = 100000; //100KB buffer 
 
-#define ALL2ALL_VER	4
+#define ALL2ALL_VER	0
 
 /****************************************************************************************************************************************************/
 
@@ -1197,8 +1197,8 @@ inner_start:
 
 	int pid_to_cout = 0;
 	for (int pid = 0; pid < patterns.size(); ) {
-		if (pid > 10000000)
-			break;
+//		if (pid > 10000000)
+//			break;
 		if (pid >= pid_to_cout)
 		{
 			std::cout << pid << " of " << patterns.size() << "\r";
