@@ -120,7 +120,6 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 	
 	LOG_DEBUG << "Creating FastKmerDb object" << endl;
 	FastKmerDb* db = new FastKmerDb();
-	std::ofstream ofs(dbFilename, std::ios::binary);
 
 	std::chrono::duration<double> loadingTime, processingTime;
 	
@@ -170,9 +169,18 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 
 	cout << "Serializing database...";
 	auto start = std::chrono::high_resolution_clock::now();
+	std::ofstream ofs;
+	ofs.open(dbFilename, std::ios::binary);
 	db->serialize(ofs);
 	ofs.close();
+
+	ofs.open(dbFilename + ".log");
+	for (int i = 0; i < db->getSamplesCount(); ++i) {
+		ofs << db->getSampleNames()[i] << " " << db->getSampleKmersCount()[i] << endl;
+	}
+	ofs.close();
 	dt = std::chrono::high_resolution_clock::now() - start;
+
 	cout << "OK (" << dt.count() << " seconds)" << endl;
 
 	cout << "Releasing memory...";

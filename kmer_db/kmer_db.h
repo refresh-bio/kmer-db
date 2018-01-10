@@ -32,6 +32,8 @@ public:
 
 	const std::vector<string>& getSampleNames() const { return sampleNames; }
 
+	const std::vector<size_t>& getSampleKmersCount() const { return sampleKmersCount; }
+
 	virtual const size_t getKmersCount() const = 0;
 
 	virtual const size_t getPatternsCount() const = 0;
@@ -157,8 +159,6 @@ public:
 	virtual void mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const;
 
 	virtual void calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix);// const;
-	virtual void calculateSimilarityDirect(LowerTriangularMatrix<uint32_t>& matrix) const;
-	virtual void calculateSimilarityBuffered(LowerTriangularMatrix<uint32_t>& matrix) const;
 
 	virtual void calculateSimilarity(const FastKmerDb& sampleDb, std::vector<uint32_t>& vector) const;
 	

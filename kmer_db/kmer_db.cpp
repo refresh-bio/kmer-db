@@ -89,6 +89,7 @@ sample_id_t NaiveKmerDb::addKmers(std::string sampleName, const std::vector<kmer
 }
 
 
+/****************************************************************************************************************************************************/
 void NaiveKmerDb::mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const {
 	samples.clear();
 	auto v = kmers2patternIds.find(kmer);
@@ -98,7 +99,7 @@ void NaiveKmerDb::mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& sample
 	}
 }
 
-
+/****************************************************************************************************************************************************/
 void NaiveKmerDb::calculateSimilarity(Array<uint32_t>& matrix) const {
 	matrix.resize(getSamplesCount(), getSamplesCount());
 	matrix.clear();
@@ -286,6 +287,7 @@ FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1), dictionar
 }
 
 
+/****************************************************************************************************************************************************/
 FastKmerDb::~FastKmerDb() {
 	dictionarySearchQueue.MarkCompleted();
 	for (auto& t : dictionarySearchWorkers) {
@@ -296,32 +298,11 @@ FastKmerDb::~FastKmerDb() {
 	for (auto& t : patternExtensionWorkers) {
 		t.join();
 	}
-/*
-	std::vector<std::thread> workers(num_threads);
-	for (int tid = 0; tid < num_threads; ++tid) {
-		workers[tid] = std::thread([this, tid]() {
-			size_t n_patterns = patterns.size();
-			size_t block_size = n_patterns / num_threads;
-			size_t lo = tid * block_size;
-			size_t hi = (tid == num_threads - 1) ? n_patterns : lo + block_size;
-
-			for (size_t i = lo; i < hi; ++i) {
-				patterns[i].release();
-			}
-		});
-	}
-
-	for (auto& t : workers) {
-		t.join();
-	}
-	*/
 }
 
 
 
-
-
-// Przetwarza pojedyncza baze KMC
+/****************************************************************************************************************************************************/
 sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_t>& kmers)
 {
 #ifdef USE_PREFETCH
@@ -503,6 +484,7 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 }
 
 
+/****************************************************************************************************************************************************/
 void FastKmerDb::mapKmers2Samples(uint64_t kmer, std::vector<sample_id_t>& samples) const {
 	
 	// find corresponding pattern id
@@ -514,8 +496,7 @@ void FastKmerDb::mapKmers2Samples(uint64_t kmer, std::vector<sample_id_t>& sampl
 
 }
 
-
-
+/****************************************************************************************************************************************************/
 void FastKmerDb::serialize(std::ofstream& file) const {
 	
 	size_t numHastableElements = ioBufferBytes / sizeof(hash_map_lp<kmer_t, pattern_id_t>::item_t);
@@ -586,7 +567,7 @@ void FastKmerDb::serialize(std::ofstream& file) const {
 }
 
 
-
+/****************************************************************************************************************************************************/
 bool FastKmerDb::deserialize(std::ifstream& file) {
 	
 	size_t numHastableElements = ioBufferBytes / sizeof(hash_map_lp<kmer_t, pattern_id_t>::item_t);
@@ -662,7 +643,7 @@ bool FastKmerDb::deserialize(std::ifstream& file) {
 }
 
 
-
+/****************************************************************************************************************************************************/
 void FastKmerDb::savePatterns(std::ofstream& file) const {
 	
 	std::vector<uint32_t> aux(getSamplesCount());
@@ -678,7 +659,7 @@ void FastKmerDb::savePatterns(std::ofstream& file) const {
 }
 
 
-
+/****************************************************************************************************************************************************/
 void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //const 
 {
 	int samples_count = getSamplesCount();
@@ -1331,378 +1312,8 @@ inner_start:
 #endif
 }
 
-#if 0
-void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) const {
-	matrix.resize(getSamplesCount());
-	matrix.clear();
 
-	size_t bufsize = 8000000 / sizeof(uint32_t);
-	std::vector<uint32_t> patternsBuffer(bufsize);
-	uint32_t* currentPtr;
-
-	std::vector<uint32_t*> rawPatterns(bufsize);
-	std::vector<std::pair<sample_id_t, uint32_t>> sample2pattern(bufsize);
-
-	std::vector<std::thread> workers(num_threads);
-
-	// process all patterns in blocks determined by buffer size
-	cout << endl;
-	for (int pid = 0; pid < patterns.size(); ) {
-		/*		if (pid > 2000000)
-		break;*/
-		cout << pid << " of " << patterns.size() << "\r";
-		fflush(stdout);
-
-		int first_pid = pid;
-		currentPtr = patternsBuffer.data();
-		size_t samplesCount = 0;
-
-		// unpack as long as there is enough memory
-		while (pid < patterns.size() && currentPtr + patterns[pid].get_num_samples() < patternsBuffer.data() + bufsize) {
-			const auto& pattern = patterns[pid];
-
-			if (pattern.get_num_kmers() > 0) {
-
-				currentPtr += pattern.get_num_samples();
-				uint32_t* out = currentPtr;		// start from the end
-				samplesCount += pattern.get_num_samples();
-
-				// decode all samples from pattern and its parents
-				int64_t current_id = pid;
-				while (current_id >= 0) {
-					const auto& cur = patterns[current_id];
-					out -= cur.get_num_local_samples();
-					cur.decodeSamples(out);
-
-					current_id = cur.get_parent_id();
-				}
-				rawPatterns[pid - first_pid] = out; // begin of unpacked pattern
-			}
-			else
-				rawPatterns[pid - first_pid] = nullptr;
-
-			++pid;
-		}
-
-		int last_pid = pid;
-
-		// generate sample to pattern mapping
-		sample2pattern.resize(samplesCount);
-		int pair_id = 0;
-		for (int pid = first_pid; pid < last_pid; ++pid) {
-			const auto& pattern = patterns[pid];
-			uint32_t* rawData = rawPatterns[pid - first_pid];
-
-			if (pattern.get_num_kmers() > 0)
-			{
-				int num_samples = pattern.get_num_samples();
-				for (int j = 0; j < num_samples; ++j) {
-					sample2pattern[pair_id].first = rawData[j];
-					sample2pattern[pair_id++].second = pid - first_pid;
-				}
-			}
-		}
-
-		// sort mapping wrt both elements
-#ifdef WIN32
-		concurrency::parallel_sort(sample2pattern.begin(), sample2pattern.end());
-#else
-		__gnu_parallel::sort(sample2pattern.begin(), sample2pattern.end());
-#endif
-
-		// determine ranges of blocks processed by threads 
-		int no_ranges = num_threads * 16;
-		std::vector<size_t> workerRanges(no_ranges + 1, sample2pattern.size());
-		workerRanges[0] = 0;
-		size_t workerBlock = sample2pattern.size() / no_ranges;
-
-		auto currentIndex = workerBlock;
-
-		for (int rid = 0; rid < no_ranges - 1; ++rid) {
-			// make sure no single row of matrix is updated by multiple workers
-			auto it = std::upper_bound(
-				sample2pattern.begin() + currentIndex,
-				sample2pattern.end(),
-				*(sample2pattern.begin() + currentIndex - 1),
-				[](auto x, auto y) {return x.first < y.first; });	// Necessary, because we are looking for end of sample data
-
-			size_t range = it - sample2pattern.begin();
-
-			workerRanges[rid + 1] = range;
-			currentIndex = range + workerBlock;
-
-			if (currentIndex >= sample2pattern.size()) {
-				break;
-			}
-		}
-
-		// this should never happen
-		if (workerRanges[no_ranges] != sample2pattern.size()) {
-			throw std::runtime_error("ERROR in FastKmerDb::calculateSimilarity(): Invalid ranges");
-		}
-
-		CRegisteringQueue<int> tasks_queue(1);
-		for (int i = no_ranges - 1; i >= 0; --i)
-			tasks_queue.Push(i);
-		tasks_queue.MarkCompleted();
-
-		// increment array elements in threads
-		for (int tid = 0; tid < num_threads; ++tid) {
-			workers[tid] = std::thread([&sample2pattern, &rawPatterns, &workerRanges, &matrix, this, &tasks_queue, first_pid] {
-				// each worker processes its own block
-				while (!tasks_queue.IsCompleted())
-				{
-					int range_id;
-					if (tasks_queue.Pop(range_id))
-					{
-						for (int id = workerRanges[range_id]; id < workerRanges[range_id + 1]; ) {
-							int Si = sample2pattern[id].first;
-							uint32_t *row = matrix[Si];
-							while (id < workerRanges[range_id + 1] && sample2pattern[id].first == Si) {
-								int local_pid = sample2pattern[id].second;
-								const auto& pattern = patterns[local_pid + first_pid];
-
-								uint32_t* rawData = rawPatterns[local_pid];
-								int num_samples = pattern.get_num_samples();
-								uint32_t to_add = pattern.get_num_kmers();
-								/*								for (int j = 0; j < num_samples; ++j) {
-								uint32_t Sj = rawData[j];
-								if (Sj < Si)
-								row[Sj] += to_add;
-								else
-								break;
-								}*/
-
-								if (num_samples < 15)
-								{
-									int j = 0;
-									uint32_t Sj;
-									switch (num_samples % 4)
-									{
-									case 3:
-										Sj = rawData[j++];	if (Sj < Si)	row[Sj] += to_add;
-									case 2:
-										Sj = rawData[j++];	if (Sj < Si)	row[Sj] += to_add;
-									case 1:
-										Sj = rawData[j++];	if (Sj < Si)	row[Sj] += to_add;
-									}
-									for (; j < num_samples && rawData[j] < Si;)
-									{
-										Sj = rawData[j++];	if (Sj < Si)	row[Sj] += to_add;
-										Sj = rawData[j++];	if (Sj < Si)	row[Sj] += to_add;
-										Sj = rawData[j++];	if (Sj < Si)	row[Sj] += to_add;
-										Sj = rawData[j++];	if (Sj < Si)	row[Sj] += to_add;
-									}
-								}
-								else
-								{
-									num_samples = lower_bound(rawData, rawData + num_samples, Si) - rawData;
-									auto *p = rawData;
-
-									switch (num_samples % 8)
-									{
-									case 7:	row[*p++] += to_add;
-									case 6:	row[*p++] += to_add;
-									case 5:	row[*p++] += to_add;
-									case 4:	row[*p++] += to_add;
-									case 3:	row[*p++] += to_add;
-									case 2:	row[*p++] += to_add;
-									case 1:	row[*p++] += to_add;
-									}
-									for (int j = num_samples % 8; j < num_samples; j += 8)
-									{
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-										row[*p++] += to_add;
-									}
-								}
-
-								++id;
-							}
-						}
-					}
-				}
-			});
-		}
-
-		for (auto & w : workers) {
-			w.join();
-		}
-	}
-}
-#endif
-
-/*
-#define BUFFERED_ARRAY
-
-void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) const {
-	if(getSamplesCount() < 12000)
-		calculateSimilarityDirect(matrix);
-	else
-#ifdef BUFFERED_ARRAY
-	calculateSimilarityBuffered(matrix);
-#else
-	calculateSimilarityDirect(matrix);
-#endif
-}
-
-
-*/
-void FastKmerDb::calculateSimilarityDirect(LowerTriangularMatrix<uint32_t>& matrix) const {
-	matrix.resize(getSamplesCount());
-	matrix.clear();
-	
-	std::vector<std::thread> workers(num_threads);
-	std::atomic<uint64_t> numAdditions(0);
-
-	for (int tid = 0; tid < num_threads; ++tid) {
-		workers[tid] = std::thread([this, tid, &matrix, &numAdditions]() {
-			uint64_t localAdditions = 0;
-			std::vector<uint32_t> rawData(getSamplesCount());
-
-			for (int pid = 1; pid < patterns.size(); ++pid) {
-				const auto& pattern = patterns[pid];
-				uint32_t* out = rawData.data() + pattern.get_num_samples(); // start from the end
-														// decode all samples
-
-				if (pattern.get_num_kmers() == 0)
-					continue;
-
-				int64_t current_id = pid;
-				while (current_id >= 0) {
-					const auto& cur = patterns[current_id];
-					out -= cur.get_num_local_samples();
-					cur.decodeSamples(out);
-
-					current_id = cur.get_parent_id();
-				}
-
-				for (int i = 0; i < pattern.get_num_samples(); ++i) {
-					uint32_t Si = rawData[i];
-					uint32_t key = Si % (2 * num_threads);
-
-					if (key == tid || key == (2 * num_threads - 1 - tid)) {
-						uint32_t * row = matrix[Si];
-						for (int j = 0; j < i; ++j) {
-							uint32_t Sj = rawData[j];
-							row[Sj] += pattern.get_num_kmers();
-#ifdef ALL_STATS
-							++localAdditions;
-#endif
-						}
-					}
-				}
-			}
-			numAdditions.fetch_add(localAdditions);
-		});
-	}
-	
-	for (auto & w : workers) {
-		w.join();
-	}
-
-#ifdef ALL_STATS
-	cout << "Number of additions:" << numAdditions << endl;
-#endif
-	
-}
-
-void FastKmerDb::calculateSimilarityBuffered(LowerTriangularMatrix<uint32_t>& matrix) const {
-	matrix.resize(getSamplesCount());
-	matrix.clear();
-
-	std::vector<std::thread> workers(num_threads);
-	std::atomic<uint64_t> numAdditions(0);
-
-	vector<ArrayBuffer> mat_buf(getSamplesCount());
-	for (size_t i = 0; i < getSamplesCount(); ++i)
-		mat_buf[i].Assign(matrix[i], 1 << 15);
-
-	for (int tid = 0; tid < num_threads; ++tid) {
-		workers[tid] = std::thread([this, tid, &matrix, &numAdditions, &mat_buf]() {
-			uint64_t localAdditions = 0;
-			std::vector<uint32_t> rawData(getSamplesCount());
-			std::vector<uint32_t> v_samples;
-
-			for (int pid = 1; pid < patterns.size(); ++pid) {
-				const auto& pattern = patterns[pid];
-				if (pattern.get_num_kmers() == 0)
-					continue;
-
-				uint32_t* out = rawData.data() + pattern.get_num_samples(); // start from the end
-																			// decode all samples
-
-				int64_t current_id = pid;
-				while (current_id >= 0) {
-					const auto& cur = patterns[current_id];
-					out -= cur.get_num_local_samples();
-					cur.decodeSamples(out);
-
-					current_id = cur.get_parent_id();
-				}
-
-				v_samples.clear();
-				for (int i = 0; i < pattern.get_num_samples(); ++i) {
-					uint32_t Si = rawData[i];
-					uint32_t key = Si % (2 * num_threads);
-
-					if (key == tid || key == (2 * num_threads - 1 - tid))
-						v_samples.push_back(i);
-				}
-
-				uint32_t n_samples = v_samples.size();
-//				for (int i = 0; i < pattern.get_num_samples() - 1; ++i) {
-				for(uint32_t ii  = 0; ii < n_samples; ++ii)
-				{
-					if (ii + 2 < n_samples)
-					{
-						_mm_prefetch((const char*)(rawData.data() + v_samples[ii + 1]), _MM_HINT_T0);
-						mat_buf[rawData[v_samples[ii + 2]]].Prefetch();
-					}
-
-					uint32_t i = v_samples[ii];
-					uint32_t Si = rawData[i];
-
-					ArrayBuffer &row_buf = mat_buf[Si];
-					row_buf.SetCounter(pattern.get_num_kmers());
-
-/*					for (int j = 0; j < i; ++j) {
-						row_buf.Push(rawData[j]);*/
-					auto *end_p = rawData.data() + i;
-					for (auto p = rawData.data(); p != end_p; ++p){
-						row_buf.Push(*p);
-#ifdef ALL_STATS
-						++localAdditions;
-#endif
-					}
-				}
-			}
-			numAdditions.fetch_add(localAdditions);
-
-			for (size_t i = 0; i < getSamplesCount(); ++i)
-			{
-				uint32_t key = i % (2 * num_threads);
-				if (key == tid || key == (2 * num_threads - 1 - tid))
-					mat_buf[i].Finish();
-			}
-		});
-	}
-
-	for (auto & w : workers) {
-		w.join();
-	}
-
-#ifdef ALL_STATS
-	cout << "Number of additions:" << numAdditions << endl;
-#endif
-
-}
-
+/****************************************************************************************************************************************************/
 void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<uint32_t>& similarities) const {
 	similarities.resize(this->getSamplesCount(), 0);
 
