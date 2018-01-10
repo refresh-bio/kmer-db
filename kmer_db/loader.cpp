@@ -7,12 +7,12 @@
 using namespace std;
 
 /****************************************************************************************************************************************************/
-Loader::Loader(std::shared_ptr<IKmerFilter> filter, bool tryMinHash) :
+Loader::Loader(std::shared_ptr<IKmerFilter> filter, bool tryMinHash, int _num_threads) :
 	prefetcherQueue(1), 
 	intermediateQueue(1),
 	readerQueue(1), 
 	currentFileId(0), 
-	numThreads(std::thread::hardware_concurrency()),
+	numThreads(_num_threads > 0 ? _num_threads : std::thread::hardware_concurrency()),
 	filter (filter),
 	tryMinHash(tryMinHash) {
 
@@ -23,18 +23,17 @@ Loader::Loader(std::shared_ptr<IKmerFilter> filter, bool tryMinHash) :
 		while (!this->prefetcherQueue.IsCompleted()) {
 			std::shared_ptr<Task> task;
 			if (this->prefetcherQueue.Pop(task)) {
+				cout << "\r" << std::string(task->sampleName.size() + 100, ' ') << "\r";
 				ostringstream oss;
-				oss << task->sampleName << " (" << task->fileId + 1 << "/" << kmcFileList.size() << ")...";
+				cout << task->sampleName << " (" << task->fileId + 1 << "/" << kmcFileList.size() << ")...";
 				
 				task->file = std::make_shared<KmcFileWrapper>(this->filter);
 				if (task->file->open(kmcFileList[task->fileId], this->tryMinHash)) {
 					intermediateQueue.Push(task);
-					oss << "OK";
 				}
 				else {
-					oss << "failed";
+					cout << "failed" << endl;
 				}
-				cout << oss.str() << endl;
 				prefetcherSemaphore.dec();
 			}
 		}

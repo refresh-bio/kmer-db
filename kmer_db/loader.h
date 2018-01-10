@@ -35,7 +35,7 @@ struct Task {
 class Loader {
 public:
 	
-	Loader(std::shared_ptr<IKmerFilter> filter, bool tryMinHash);
+	Loader(std::shared_ptr<IKmerFilter> filter, bool tryMinHash, int _num_threads);
 	~Loader() {
 		readerQueue.MarkCompleted();
 		prefetcherQueue.MarkCompleted();

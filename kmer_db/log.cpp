@@ -6,7 +6,8 @@
 using namespace std;
 
 const int Log::LEVEL_DEBUG = 0;
-const int Log::LEVEL_NORMAL = 1;
+const int Log::LEVEL_VERBOSE = 1;
+const int Log::LEVEL_NORMAL = 2;
 
 Log::Log() 
 {

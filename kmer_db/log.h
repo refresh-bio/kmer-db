@@ -4,6 +4,7 @@
 #include <memory>
 
 #define LOG_NORMAL Log::getInstance(Log::LEVEL_NORMAL)
+#define LOG_VERBOSE Log::getInstance(Log::LEVEL_VERBOSE)
 #define LOG_DEBUG Log::getInstance(Log::LEVEL_DEBUG)
 
 
@@ -11,7 +12,9 @@ class Log
 {
 public:
 	static const int LEVEL_NORMAL;
+	static const int LEVEL_VERBOSE;
 	static const int LEVEL_DEBUG;
+
 
 	void enable()	{ enabled = true; }
 	void disable()	{ enabled = false; }
@@ -19,6 +22,7 @@ public:
 	static Log& getInstance(int level) {
 		static std::vector<std::shared_ptr<Log>> logs;
 		if (logs.size() == 0) {
+			logs.push_back(std::shared_ptr<Log>(new Log()));
 			logs.push_back(std::shared_ptr<Log>(new Log()));
 			logs.push_back(std::shared_ptr<Log>(new Log()));
 		}

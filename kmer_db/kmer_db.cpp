@@ -136,13 +136,16 @@ std::map<std::vector<sample_id_t>, size_t> NaiveKmerDb::getPatternsStatistics() 
 /****************************************************************************************************************************************************/
 
 
-FastKmerDb::FastKmerDb() : kmers2patternIds((unsigned long long) - 1), dictionarySearchQueue(1), patternExtensionQueue(1) {
+FastKmerDb::FastKmerDb(int _num_threads) :
+	kmers2patternIds((unsigned long long) - 1), 
+	dictionarySearchQueue(1), 
+	patternExtensionQueue(1),
+	num_threads(_num_threads > 0 ? _num_threads : std::thread::hardware_concurrency()) {
 
 	patternBytes = 0;
 	patterns.reserve(1024);
 	patterns.push_back(pattern_t());
-	num_threads = std::thread::hardware_concurrency();
-
+	
 	threadPatterns.resize(num_threads);
 	for (auto & tp : threadPatterns) {
 		tp.reserve(1024);
@@ -398,17 +401,17 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 	for (raduls_key_size = 1; raduls_tmp >= 256; raduls_tmp >>= 8)
 		++raduls_key_size;
 
-	ParallelSort(samplePatterns.data(), samplePatterns.size(), tmp_samplePatterns.data(), sizeof(std::pair<pattern_id_t, pattern_id_t*>), raduls_key_size, std::thread::hardware_concurrency());
+	ParallelSort(samplePatterns.data(), samplePatterns.size(), tmp_samplePatterns.data(), sizeof(std::pair<pattern_id_t, pattern_id_t*>), raduls_key_size, num_threads);
 //	raduls::RadixSortMSD(reinterpret_cast<uint8_t*>(samplePatterns.data()), reinterpret_cast<uint8_t*>(tmp_samplePatterns.data()),
-//		samplePatterns.size(), sizeof(std::pair<pattern_id_t, pattern_id_t*>), raduls_key_size, std::thread::hardware_concurrency());
+//		samplePatterns.size(), sizeof(std::pair<pattern_id_t, pattern_id_t*>), raduls_key_size, num_threads);
 	if (raduls_key_size & 1)
 		samplePatterns.swap(tmp_samplePatterns); 
 #else
-	ParallelSort(samplePatterns.data(), samplePatterns.size(), nullptr, 0, 0, std::thread::hardware_concurrency());
+	ParallelSort(samplePatterns.data(), samplePatterns.size(), nullptr, 0, 0, num_threads);
 #endif
 	
 	sortTime += std::chrono::high_resolution_clock::now() - start;
-	std::cout << "sort time: " << sortTime.count() << "  " << samplePatterns.size() << endl;
+	LOG_VERBOSE << "sort time: " << sortTime.count() << "  " << samplePatterns.size() << endl;
 
 
 	LOG_DEBUG << "Extending kmers (parallel)..." << endl;

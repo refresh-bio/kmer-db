@@ -19,7 +19,6 @@ Example command line
 
 int main(int argc, char **argv)
 {
-	//Log::getInstance(Log::LEVEL_DEBUG).enable();
 	Console console;
 	console.parse(argc, argv);
 	

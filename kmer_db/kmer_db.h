@@ -130,7 +130,7 @@ public:
 	std::chrono::duration<double> sortTime;
 	std::chrono::duration<double> extensionTime;
 
-	FastKmerDb();
+	FastKmerDb(int _num_threads = 0);
 
 	~FastKmerDb();
 

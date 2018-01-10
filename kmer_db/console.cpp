@@ -24,46 +24,66 @@ void show_progress(const AbstractKmerDb &db)
 	size_t tot_pat_size = 0;
 	size_t num_calc = 0;			// Liczba operacji przy wyznaczaniu macierzy podobieñstwa
 
-	cout << "dict= " << Log::formatLargeNumber(db.getKmersCount())
+	LOG_VERBOSE << "dict= " << Log::formatLargeNumber(db.getKmersCount())
 		<< " (" << db.getKmersCount() * 2 * sizeof(uint64_t) / (1ull << 20) << " MB)   "
 		<< "\t patterns= " << Log::formatLargeNumber(db.getPatternsCount())
 		<< "\t patterns mem= " << Log::formatLargeNumber(db.getPatternBytes())
 		<< "\t ht mem= " << Log::formatLargeNumber(db.getHashtableBytes())
 		<< endl;
-
-	fflush(stdout);
 }
 
 /****************************************************************************************************************************************************/
 
 int Console::parse(int argc, char** argv) {
 
-	cout << "kmer-db version 1.0" << endl;
+	cout << "kmer-db version 1.0" << endl << endl;
 	
-	if (argc == 4 && string(argv[1]) == "--build") {
-		cout << "Database building mode" << endl;
-		return runBuildDatabase(argv[2], argv[3]);
+	numThreads = 0;
+
+	std::vector<string> params(argc - 1);
+	std::transform(argv + 1, argv + argc, params.begin(), [](char* c)->string { return c; });
+
+	// search for switches
+	auto it = find(params.begin(), params.end(), "-v"); // verbose mode
+	if (it != params.end()) {
+		Log::getInstance(Log::LEVEL_VERBOSE).enable();
+		params.erase(it);
 	}
-	else if (argc == 4 && string(argv[1]) == "--all2all") {
-		cout << "All versus all comparison" << endl;
-		return runAllVsAll(argv[2], argv[3]);
+
+	it = find(params.begin(), std::prev(params.end()), "-t"); // number of threads
+	if (it != std::prev(params.end())) {
+		numThreads = atof(std::next(it)->c_str());
+		params.erase(it, it + 2);
 	}
-	else if (argc == 5 && string(argv[1]) == "--one2all") {
-		cout << "One versus all comparison" << endl;
-		return runOneVsAll(argv[2], argv[3], argv[4]);
+
+	// all modes need at least 3 parameters
+	if (params.size() >= 3) {
+		const string& mode = params[0];
+		
+		if (params.size() == 3 && mode == "--build") {
+			cout << "Database building mode" << endl;
+			return runBuildDatabase(params[1], params[2]);
+		}
+		else if (params.size() == 3 && mode == "--all2all") {
+			cout << "All versus all comparison" << endl;
+			return runAllVsAll(params[1], params[2]);
+		}
+		else if (params.size() == 4 && mode == "--one2all") {
+			cout << "One versus all comparison" << endl;
+			return runOneVsAll(params[1], params[2], params[3]);
+		}
+		else if (params.size() == 3 && mode == "--list-patterns") {
+			cout << "Listing all patterns" << endl;
+			return runListPatterns(params[1], params[2]);
+		}
+		else if (params.size() == 3 && mode == "--minhash" && std::atof(params[2].c_str()) > 0) {
+			cout << "Listing all patterns" << endl;
+			return runMinHash(params[1], atof(params[2].c_str()));
+		}
 	}
-	else if (argc == 4 && string(argv[1]) == "--list-patterns") {
-		cout << "Listing all patterns" << endl;
-		return runListPatterns(argv[2], argv[3]);
-	}
-	else if (argc == 4 && string(argv[1]) == "--minhash" && std::atof(argv[3]) > 0) {
-		cout << "Listing all patterns" << endl;
-		return runMinHash(argv[2], atof(argv[3]));
-	}
-	else {
-		showInstructions();
-		return 0;
-	}
+
+	showInstructions();
+	return 0;
 }
 
 
@@ -77,7 +97,7 @@ int Console::runMinHash(const std::string& multipleKmcSamples, float fraction) {
 
 	auto filter = std::make_shared<MinHashFilter>(fraction, 20);
 
-	Loader loader(filter, false);
+	Loader loader(filter, false, numThreads);
 	loader.configure(multipleKmcSamples);
 
 	loader.initPrefetch();
@@ -119,13 +139,13 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 	cout << "Processing samples..." << endl;
 	
 	LOG_DEBUG << "Creating FastKmerDb object" << endl;
-	FastKmerDb* db = new FastKmerDb();
+	FastKmerDb* db = new FastKmerDb(numThreads);
 
 	std::chrono::duration<double> loadingTime, processingTime;
 	
 	LOG_DEBUG << "Creating Loader object..." << endl;
 
-	Loader loader(nullptr, true);
+	Loader loader(nullptr, true, numThreads);
 	loader.configure(multipleKmcSamples);
 
 	loader.initPrefetch();
@@ -149,21 +169,24 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 			auto task = entry.second;
 			db->addKmers(task->sampleName, *task->kmers);
 			show_progress(*db);
-			cout << endl;
 		}
 		
 		loader.getLoadedTasks().clear();
 		processingTime += std::chrono::high_resolution_clock::now() - start;
 	}
 
-	cout << endl << "EXECUTION TIMES" << endl
+	cout << endl << endl << "EXECUTION TIMES" << endl
 		<< "Loading k-mers: " << loadingTime.count() << endl
 		<< "Processing time: " << processingTime.count() << endl
 		<< "\tHashatable resizing (serial): " << db->hashtableResizeTime.count() << endl
 		<< "\tHashtable searching (parallel): " << db->hashtableFindTime.count() << endl
 		<< "\tHashatable insertion (serial): " << db->hashtableAddTime.count() << endl
 		<< "\tSort time (parallel): " << db->sortTime.count() << endl
-		<< "\tPattern extension time (serial): " << db->extensionTime.count() << endl;
+		<< "\tPattern extension time (serial): " << db->extensionTime.count() << endl << endl
+		<< "STATISTICS" << endl
+		<< "Number of samples: " << db->getSamplesCount() << endl
+		<< "Number of patterns: " << db->getPatternsCount() << endl
+		<< "Number of k-mers: " << db->getKmersCount() << endl;
 
 	std::chrono::duration<double> dt;
 
@@ -197,7 +220,7 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 int Console::runAllVsAll(const std::string& dbFilename, const std::string& similarityFile) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
 	std::ofstream ofs(similarityFile);
-	FastKmerDb* db = new FastKmerDb();;
+	FastKmerDb* db = new FastKmerDb(numThreads);;
 
 	std::chrono::duration<double> dt;
 	cout << "Loading k-mer database " << dbFilename << "...";
@@ -242,13 +265,13 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 
 int Console::runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFile) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
-	FastKmerDb db;
+	FastKmerDb db(numThreads);
 
 	std::chrono::duration<double> dt;
 	cout << "Loading sample kmers...";
 
 	auto start = std::chrono::high_resolution_clock::now();
-	FastKmerDb sampleDb;
+	FastKmerDb sampleDb(numThreads);
 
 	std::vector<kmer_t> kmers;
 	KmcFileWrapper file(nullptr);
@@ -299,7 +322,7 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 
 int Console::runListPatterns(const std::string& dbFilename, const std::string& patternFile) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
-	FastKmerDb db;
+	FastKmerDb db(numThreads);
 
 	cout << "Loading k-mer database " << dbFilename << "...";
 	if (!dbFile || !db.deserialize(dbFile)) {
@@ -311,10 +334,11 @@ int Console::runListPatterns(const std::string& dbFilename, const std::string& p
 		<< "Number of patterns: " << db.getPatternsCount() << endl
 		<< "Number of k-mers: " << db.getKmersCount() << endl;
 
-	cout << "Storing patterns in in " << patternFile << "...";
+	cout << "Storing patterns in " << patternFile << "...";
 	std::ofstream ofs(patternFile);
 	db.savePatterns(ofs);
 	ofs.close();
+	cout << "OK" << endl; 
 
 	return 0;
 }

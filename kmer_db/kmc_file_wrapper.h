@@ -95,7 +95,7 @@ public:
 			}
 			kmers.resize(passed);
 			double fraction = (double)kmers.size() / _total_kmers;
-			cout << "Min-hash passed: " << passed << "/" << _total_kmers << "(" << fraction << ")" << endl;
+			LOG_VERBOSE << "Min-hash passed: " << passed << "/" << _total_kmers << "(" << fraction << ")" << endl;
 			return kmcfile->Close();
 		}
 

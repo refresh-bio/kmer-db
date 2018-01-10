@@ -9,6 +9,8 @@ public:
 
 
 protected:
+	int numThreads;
+
 	int runBuildDatabase(const std::string& multipleKmcSamples, const std::string dbFilename);
 	int runAllVsAll(const std::string& dbFilename, const std::string& similarityFile);
 	int runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFile);
