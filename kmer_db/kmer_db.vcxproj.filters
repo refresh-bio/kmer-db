@@ -10,8 +10,6 @@
     <ClCompile Include="log.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="parallel_sorter.cpp" />
-    <ClCompile Include="queue.cpp" />
-    <ClCompile Include="tests.cpp" />
     <ClCompile Include="pattern.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -38,7 +36,6 @@
     <ClInclude Include="raduls\record.h" />
     <ClInclude Include="raduls\small_sort.h" />
     <ClInclude Include="raduls\sorting_network.h" />
-    <ClInclude Include="tests.h" />
     <ClInclude Include="filter.h" />
     <ClInclude Include="kmc_file_wrapper.h" />
   </ItemGroup>

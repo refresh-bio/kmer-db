@@ -1,5 +1,4 @@
 #include "kmer_db.h"
-#include "tests.h"
 #include "log.h"
 
 #include "console.h"

@@ -1,14 +1,12 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>--all2all kmdb_3666.db 3666.sm4</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>--all2all d:\kmer.db d:\matrix.csv -t 8</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerWorkingDirectory>H:\100k-pathogens</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommandArguments>--all2all kmdb_3666.db3 3666.sm7</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>--all2all d:\kmer.db d:\matrix.csv -t 8</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerWorkingDirectory>H:\100k-pathogens</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LocalDebuggerCommandArguments>e:/data/kmc250.list</LocalDebuggerCommandArguments>

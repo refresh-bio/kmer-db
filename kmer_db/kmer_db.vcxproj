@@ -170,7 +170,6 @@
     <ClInclude Include="raduls\record.h" />
     <ClInclude Include="raduls\small_sort.h" />
     <ClInclude Include="raduls\sorting_network.h" />
-    <ClInclude Include="tests.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="console.cpp" />
@@ -183,8 +182,6 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="parallel_sorter.cpp" />
     <ClCompile Include="pattern.cpp" />
-    <ClCompile Include="queue.cpp" />
-    <ClCompile Include="tests.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

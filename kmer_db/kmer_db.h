@@ -53,55 +53,7 @@ public:
 	}
 
 	virtual void mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const = 0;
-
-	//virtual void calculateSimilarity(Array<uint32_t>& matrix) const = 0;
 };
-
-
-class NaiveKmerDb : public AbstractKmerDb {
-public:
-	NaiveKmerDb() : kmers2patternIds((unsigned long long) - 1) {
-		patternBytes = 0;
-	}
-
-	virtual const size_t getKmersCount() const { return kmers2patternIds.get_size(); }
-
-	virtual const size_t getPatternsCount() const { return kmers2patternIds.get_size(); }
-
-	virtual const size_t getPatternBytes() const { return patternBytes; }
-
-	virtual const size_t getHashtableBytes() const { return kmers2patternIds.get_bytes(); }
-
-	virtual std::vector<kmer_t> getKmers() const {
-		std::vector<kmer_t> kmers(kmers2patternIds.get_size());
-		size_t i = 0;
-		for (auto it = kmers2patternIds.cbegin(); it < kmers2patternIds.cend(); ++it) {
-			if (kmers2patternIds.is_free(*it)) {
-				continue;
-			}
-			kmers[i++] = it->key;
-		}
-		return kmers;
-	}
-
-	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers);
-
-	virtual void mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const;
-
-	virtual void calculateSimilarity(Array<uint32_t>& matrix) const;
-
-	std::map<std::vector<sample_id_t>, size_t> getPatternsStatistics() const;
-
-protected:
-	size_t patternBytes;		// iloœæ pamiêci zajmowana przez wszystkie wzorce
-
-	hash_map_lp<kmer_t, pattern_id_t> kmers2patternIds;
-
-	std::vector<std::vector<sample_id_t>> patterns;
-
-
-};
-
 
 
 struct DictionarySearchTask {
