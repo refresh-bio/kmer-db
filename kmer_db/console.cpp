@@ -60,25 +60,29 @@ int Console::parse(int argc, char** argv) {
 	if (params.size() >= 3) {
 		const string& mode = params[0];
 		
-		if (params.size() == 3 && mode == "--build") {
+		if (params.size() == 3 && mode == "build") {
 			cout << "Database building mode" << endl;
 			return runBuildDatabase(params[1], params[2]);
 		}
-		else if (params.size() == 3 && mode == "--all2all") {
+		else if (params.size() == 3 && mode == "all2all") {
 			cout << "All versus all comparison" << endl;
 			return runAllVsAll(params[1], params[2]);
 		}
-		else if (params.size() == 4 && mode == "--one2all") {
+		else if (params.size() == 4 && mode == "one2all") {
 			cout << "One versus all comparison" << endl;
 			return runOneVsAll(params[1], params[2], params[3]);
 		}
-		else if (params.size() == 3 && mode == "--list-patterns") {
+		else if (params.size() == 3 && mode == "list-patterns") {
 			cout << "Listing all patterns" << endl;
 			return runListPatterns(params[1], params[2]);
 		}
-		else if (params.size() == 3 && mode == "--minhash" && std::atof(params[2].c_str()) > 0) {
-			cout << "Listing all patterns" << endl;
+		else if (params.size() == 3 && mode == "minhash" && std::atof(params[2].c_str()) > 0) {
+			cout << "Min-hashing k-mers" << endl;
 			return runMinHash(params[1], atof(params[2].c_str()));
+		}
+		else if (params.size() == 3 && mode == "distance") {
+			cout << "Calculating distance measures" << endl;
+			return runDistanceCalculation(params[1], params[2]);
 		}
 	}
 
@@ -318,6 +322,84 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 	return 0;
 }
 
+
+/****************************************************************************************************************************************************/
+
+int Console::runDistanceCalculation(const std::string& dbFilename, const std::string& similarityFilename) {
+	
+	std::string rerportFilename = dbFilename + ".log";
+	
+	std::ifstream report(rerportFilename);
+
+	std::vector<size_t> kmersCount;
+	
+	cout << "Loading k-mer statistics from report " << rerportFilename << "...";
+	if (!report) {
+		cout << "FAILED" << endl
+		 << "Loading k-mer statistics from database " << dbFilename << "...";
+		std::ifstream dbFile(dbFilename, std::ios::binary);
+		FastKmerDb db;
+		 if (!dbFile || !db.deserialize(dbFile)) {
+			 cout << "FAILED" << endl;
+			 return -1;
+		 }
+		 else {
+			 cout << "OK" << endl;
+			 kmersCount = db.getSampleKmersCount();
+		 }
+	} else {
+		cout << "OK" << endl;
+		string name;
+		size_t count;
+		while (report >> name >> count) {
+			kmersCount.push_back(count);
+		}
+	}
+
+
+	cout << "Loading raw similarity file " << similarityFilename << "...";
+	ifstream similarityFile(similarityFilename);
+	if (!similarityFile) {
+		cout << "FAILED" << endl;
+		return -1;
+	}
+	cout << "OK" << endl;
+
+	cout << "Calculating distances...";
+	ofstream jaccardFile(similarityFilename + ".jaccard");
+	ofstream mashFile(similarityFilename + ".mash");
+
+	string in;
+	getline(similarityFile, in); // ignore first row
+
+	for (int i = 0; i < kmersCount.size() && getline(similarityFile, in); ++i) {
+		std::replace(in.begin(), in.end(), ',', ' ');
+		istringstream iss(in);
+		size_t intersection;
+
+		int j = 0;
+		for (; j < i && iss >> intersection; ++j) {
+			double d_jaccard = (double)intersection / (kmersCount[i] + kmersCount[j] - intersection);
+			// fixme: fixed kmer length
+			double d_mash = (d_jaccard == 0) ? 1.0 : (-1.0 / 18) * log((2 * d_jaccard) / (d_jaccard + 1)); 
+			
+			jaccardFile << d_jaccard << ",";
+			mashFile << d_mash << ",";
+		}
+		
+		for (; j < kmersCount.size(); ++j) {
+			jaccardFile << ",0";
+			mashFile << ",0";
+		}
+		jaccardFile << endl;
+		mashFile << endl;
+		++i;
+	}
+
+	cout << "OK" << endl;
+}
+
+
 /****************************************************************************************************************************************************/
 
 int Console::runListPatterns(const std::string& dbFilename, const std::string& patternFile) {
@@ -349,22 +431,22 @@ void Console::showInstructions() {
 	cout	<< "USAGE" << endl
 
 		<< "Building k-mer database:" << endl
-		<< "\t kmer_db --build <sample_list> <database>" << endl
+		<< "\t kmer_db build <sample_list> <database>" << endl
 		<< "\t   sample_list (input) - file containing list of k-mer files (raw or min-hashed)" << endl
 		<< "\t   database (output) - file with generated k-mer database" << endl
 
 		<< "Min-hashing k-mers:" << endl
-		<< "\t kmer_db --minhash <sample_list> <fraction>" << endl
+		<< "\t kmer_db minhash <sample_list> <fraction>" << endl
 		<< "\t   sample_list (input) - file containing list of k-mer files (raw)" << endl
 		<< "\t   fraction (input) - fraction of kmers passing the filter" << endl
 
 		<< "Calculating similarity matrix for all the samples in the database:" << endl
-		<< "\t kmer_db --all2all <database> <similarity_matrix>" << endl
+		<< "\t kmer_db all2all <database> <similarity_matrix>" << endl
 		<< "\t   database (input) - k-mer database file" << endl
 		<< "\t   similarity_matrix (output) - file with similarity matrix" << endl
 
 		<< "Calculating similarity of a new sample to all the samples in the database:" << endl
-		<< "\t kmer_db --one2all <database> <sample> <similarity_vector>" << endl
+		<< "\t kmer_db one2all <database> <sample> <similarity_vector>" << endl
 		<< "\t   database (input) - k-mer database file" << endl
 		<< "\t   sample (input) - k-mer file for a sample" << endl
 		<< "\t   similarity_matrix (output) - file with similarity matrix" << endl;
