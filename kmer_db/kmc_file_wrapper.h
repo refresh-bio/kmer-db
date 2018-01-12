@@ -27,6 +27,7 @@ public:
 					kmers.resize(numKmers);
 
 					file->read(reinterpret_cast<char*>(kmers.data()), sizeof(kmer_t) * numKmers);
+					file->read(reinterpret_cast<char*>(&kmerLength), sizeof(kmerLength));
 
 					if (*file) {
 						minhashFile = file;
@@ -49,16 +50,16 @@ public:
 		return false;
 	}
 
-	bool load(std::vector<kmer_t>& kmers) {
+	bool load(std::vector<kmer_t>& kmers, uint32_t& kmerLength) {
 		if (minhashFile) {
 			kmers = std::move(this->kmers);
+			kmerLength = this->kmerLength;
 			minhashFile->close();
 			return true;
 		}
 		else if (kmcfile) {
 			uint32_t counter;
 
-			uint32 _kmer_length;
 			uint32 _mode;
 			uint32 _counter_size;
 			uint32 _lut_prefix_length;
@@ -67,10 +68,10 @@ public:
 			uint64 _max_count;
 			uint64 _total_kmers;
 
-			kmcfile->Info(_kmer_length, _mode, _counter_size, _lut_prefix_length, _signature_len, _min_count, _max_count, _total_kmers);
+			kmcfile->Info(kmerLength, _mode, _counter_size, _lut_prefix_length, _signature_len, _min_count, _max_count, _total_kmers);
 
-			CKmerAPI kmer(_kmer_length);
-
+			CKmerAPI kmer(kmerLength);
+			
 			uint64_t u_kmer;
 			vector<uint64> tmp;
 
@@ -79,7 +80,7 @@ public:
 			size_t passed = 0;
 			
 			if (filter) {
-				filter->setParams(_kmer_length);
+				filter->setParams(kmerLength);
 			}
 
 			while (!kmcfile->Eof())
@@ -103,12 +104,13 @@ public:
 	}
 
 
-	bool store(const std::string& filename, const std::vector<kmer_t>& kmers) {
+	bool store(const std::string& filename, const std::vector<kmer_t>& kmers, uint32_t kmerLength) {
 		ofstream ofs(filename + ".minhash", std::ios_base::binary);
 		ofs.write(reinterpret_cast<const char*>(&MINHASH_FORMAT_SIGNATURE), sizeof(MINHASH_FORMAT_SIGNATURE));
 		size_t numKmers = kmers.size();
 		ofs.write(reinterpret_cast<const char*>(&numKmers), sizeof(size_t));
 		ofs.write(reinterpret_cast<const char*>(kmers.data()), kmers.size() * sizeof(kmer_t));
+		ofs.write(reinterpret_cast<const char*>(&kmerLength), sizeof(kmerLength));
 		return true;
 	}
 
@@ -119,5 +121,7 @@ protected:
 	std::shared_ptr<IKmerFilter> filter;
 
 	std::vector<kmer_t> kmers;
+
+	uint32_t kmerLength;
 
 };

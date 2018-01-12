@@ -20,13 +20,18 @@ typedef uint64_t kmer_t;
 
 class AbstractKmerDb {
 protected:
+
+	uint32_t kmerLength;
+
 	std::vector<string> sampleNames;
 
 	std::vector<size_t> sampleKmersCount;
 
 public:
 
-	AbstractKmerDb() {}
+	AbstractKmerDb() : kmerLength(0) {}
+
+	const uint32_t getKmerLength() const { return kmerLength; }
 
 	const size_t getSamplesCount() const { return sampleNames.size(); }
 
@@ -44,12 +49,19 @@ public:
 
 	virtual std::vector<kmer_t> getKmers() const = 0;
 
-	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers) {
+	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength) {
 		sample_id_t newId = sampleNames.size();
 		sampleNames.push_back(sampleName);
 		sampleKmersCount.push_back(kmers.size());
-		return newId;
 
+		if (this->kmerLength == 0) {
+			this->kmerLength = kmerLength;
+		}
+		else if (this->kmerLength != kmerLength) {
+			throw std::runtime_error("ERROR in FastKmerDb::addKmers(): adding kmers of different length");
+		}
+
+		return newId;
 	}
 
 	virtual void mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const = 0;
@@ -106,7 +118,7 @@ public:
 		return kmers;
 	}
 
-	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers);
+	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength);
 
 	virtual void mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const;
 

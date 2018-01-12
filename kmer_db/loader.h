@@ -17,6 +17,7 @@ struct Task {
 	std::string sampleName;
 	std::shared_ptr<KmcFileWrapper> file;
 	std::vector<kmer_t>* kmers;
+	uint32_t kmerLength;
 
 	Task(size_t fileId, size_t threadId, const std::string& filePath) :
 		fileId(fileId), threadId(threadId), filePath(filePath), file(nullptr), kmers(nullptr) {
@@ -85,6 +86,4 @@ private:
 	CRegisteringQueue<std::shared_ptr<Task>> intermediateQueue;
 
 	std::map<size_t, std::shared_ptr<Task>> loadedTasks;
-
-	std::shared_ptr<IKmerFilter> filter;
 };

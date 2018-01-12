@@ -99,7 +99,7 @@ int Console::runMinHash(const std::string& multipleKmcSamples, float fraction) {
 
 	LOG_DEBUG << "Creating Loader object..." << endl;
 
-	auto filter = std::make_shared<MinHashFilter>(fraction, 20);
+	auto filter = std::make_shared<MinHashFilter>(fraction, 0);
 
 	Loader loader(filter, false, numThreads);
 	loader.configure(multipleKmcSamples);
@@ -124,7 +124,7 @@ int Console::runMinHash(const std::string& multipleKmcSamples, float fraction) {
 		for (const auto& entry : loader.getLoadedTasks()) {
 			auto task = entry.second;
 			KmcFileWrapper file(nullptr); 
-			file.store(task->filePath, *task->kmers);
+			file.store(task->filePath, *task->kmers, task->kmerLength);
 		}
 
 		loader.getLoadedTasks().clear();
@@ -171,7 +171,7 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 		
 		for (const auto& entry : loader.getLoadedTasks()) {
 			auto task = entry.second;
-			db->addKmers(task->sampleName, *task->kmers);
+			db->addKmers(task->sampleName, *task->kmers, task->kmerLength);
 			show_progress(*db);
 		}
 		
@@ -190,7 +190,8 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 		<< "STATISTICS" << endl
 		<< "Number of samples: " << db->getSamplesCount() << endl
 		<< "Number of patterns: " << db->getPatternsCount() << endl
-		<< "Number of k-mers: " << db->getKmersCount() << endl;
+		<< "Number of k-mers: " << db->getKmersCount() << endl
+		<< "K-mer length: " << db->getKmerLength() << endl;
 
 	std::chrono::duration<double> dt;
 
@@ -202,6 +203,7 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 	ofs.close();
 
 	ofs.open(dbFilename + ".log");
+	ofs << "Kmer_length: " << db->getKmerLength() << endl;
 	for (int i = 0; i < db->getSamplesCount(); ++i) {
 		ofs << db->getSampleNames()[i] << " " << db->getSampleKmersCount()[i] << endl;
 	}
@@ -237,7 +239,8 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 	cout << "OK (" << dt.count() << " seconds)" << endl
 		<< "Number of samples: " << db->getSamplesCount() << endl
 		<< "Number of patterns: " << db->getPatternsCount() << endl
-		<< "Number of k-mers: " << db->getKmersCount() << endl;
+		<< "Number of k-mers: " << db->getKmersCount() << endl
+		<< "K-mer length: " << db->getKmerLength() << endl;
 
 
 	cout << "Calculating similarity matrix...";
@@ -278,13 +281,14 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 	FastKmerDb sampleDb(numThreads);
 
 	std::vector<kmer_t> kmers;
+	uint32_t kmerLength;
 	KmcFileWrapper file(nullptr);
 
-	if (!file.open(singleKmcSample, true) || !file.load(kmers)) {
+	if (!file.open(singleKmcSample, true) || !file.load(kmers, kmerLength)) {
 		cout << "FAILED";
 		return -1;
 	}
-	sampleDb.addKmers(singleKmcSample, kmers);
+	sampleDb.addKmers(singleKmcSample, kmers, kmerLength);
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "OK (" << dt.count() << " seconds)" << endl
 		<< "Number of k-mers: " << sampleDb.getKmersCount() << endl;
@@ -299,7 +303,8 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 	cout << "OK (" << dt.count() << " seconds)" << endl
 		<< "Number of samples: " << db.getSamplesCount() << endl
 		<< "Number of patterns: " << db.getPatternsCount() << endl
-		<< "Number of k-mers: " << db.getKmersCount() << endl;
+		<< "Number of k-mers: " << db.getKmersCount() << endl
+		<< "K-mer length: " << db.getKmerLength() << endl;
 
 
 	cout << "Calculating similarity vector...";
@@ -328,11 +333,10 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 int Console::runDistanceCalculation(const std::string& dbFilename, const std::string& similarityFilename) {
 	
 	std::string rerportFilename = dbFilename + ".log";
-	
 	std::ifstream report(rerportFilename);
-
 	std::vector<size_t> kmersCount;
-	
+	uint32_t kmerLength;
+
 	cout << "Loading k-mer statistics from report " << rerportFilename << "...";
 	if (!report) {
 		cout << "FAILED" << endl
@@ -346,11 +350,13 @@ int Console::runDistanceCalculation(const std::string& dbFilename, const std::st
 		 else {
 			 cout << "OK" << endl;
 			 kmersCount = db.getSampleKmersCount();
+			 kmerLength = db.getKmerLength();
 		 }
 	} else {
 		cout << "OK" << endl;
 		string name;
 		size_t count;
+		report >> name >> kmerLength; // get kmer length
 		while (report >> name >> count) {
 			kmersCount.push_back(count);
 		}
@@ -381,7 +387,7 @@ int Console::runDistanceCalculation(const std::string& dbFilename, const std::st
 		for (; j < i && iss >> intersection; ++j) {
 			double d_jaccard = (double)intersection / (kmersCount[i] + kmersCount[j] - intersection);
 			// fixme: fixed kmer length
-			double d_mash = (d_jaccard == 0) ? 1.0 : (-1.0 / 18) * log((2 * d_jaccard) / (d_jaccard + 1)); 
+			double d_mash = (d_jaccard == 0) ? 1.0 : (-1.0 / kmerLength) * log((2 * d_jaccard) / (d_jaccard + 1)); 
 			
 			jaccardFile << d_jaccard << ",";
 			mashFile << d_mash << ",";
@@ -414,7 +420,8 @@ int Console::runListPatterns(const std::string& dbFilename, const std::string& p
 	cout << "OK" << endl
 		<< "Number of samples: " << db.getSamplesCount() << endl
 		<< "Number of patterns: " << db.getPatternsCount() << endl
-		<< "Number of k-mers: " << db.getKmersCount() << endl;
+		<< "Number of k-mers: " << db.getKmersCount() << endl
+		<< "K-mer length: " << db.getKmerLength() << endl;
 
 	cout << "Storing patterns in " << patternFile << "...";
 	std::ofstream ofs(patternFile);
@@ -440,15 +447,21 @@ void Console::showInstructions() {
 		<< "\t   sample_list (input) - file containing list of k-mer files (raw)" << endl
 		<< "\t   fraction (input) - fraction of kmers passing the filter" << endl
 
-		<< "Calculating similarity matrix for all the samples in the database:" << endl
-		<< "\t kmer_db all2all <database> <similarity_matrix>" << endl
+		<< "Calculating number of common k-mers for all the samples in the database:" << endl
+		<< "\t kmer_db all2all <database> <common_matrix>" << endl
 		<< "\t   database (input) - k-mer database file" << endl
-		<< "\t   similarity_matrix (output) - file with similarity matrix" << endl
+		<< "\t   commony_matrix (output) - file containing matrix with numbers of common k-mers" << endl
 
-		<< "Calculating similarity of a new sample to all the samples in the database:" << endl
-		<< "\t kmer_db one2all <database> <sample> <similarity_vector>" << endl
+		<< "Calculating number of common kmers between single sample and all the samples in the database:" << endl
+		<< "\t kmer_db one2all <database> <sample> <common_vector>" << endl
 		<< "\t   database (input) - k-mer database file" << endl
 		<< "\t   sample (input) - k-mer file for a sample" << endl
-		<< "\t   similarity_matrix (output) - file with similarity matrix" << endl;
+		<< "\t   common_vector (output) - file containing vector with numbers of common k-mers" << endl
+
+		<< "Calculating similarity/distance metrices (jaccard index and Mash distance) on the basis of common k-mers:" << endl
+		<< "\t kmer_db distance <database> <common_file>" << endl
+		<< "\t   database (input) - k-mer database file" << endl
+		<< "\t   common_file (output) - file containing matrix/vector with numbers of common k-mers" << endl
+		<< "This mode generates two files named <common_file>.jaccard and <common_file>.mash." << endl;
 }
 

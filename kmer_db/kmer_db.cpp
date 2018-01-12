@@ -215,12 +215,12 @@ FastKmerDb::~FastKmerDb() {
 
 
 /****************************************************************************************************************************************************/
-sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_t>& kmers)
+sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength)
 {
 #ifdef USE_PREFETCH
 	const size_t prefetch_dist = 48;
 #endif
-	sample_id_t sampleId = AbstractKmerDb::addKmers(sampleName, kmers);
+	sample_id_t sampleId = AbstractKmerDb::addKmers(sampleName, kmers, kmerLength);
 
 	size_t n_kmers = kmers.size();
 	
@@ -432,7 +432,7 @@ void FastKmerDb::serialize(std::ofstream& file) const {
 
 	// store hashmap
 	temp = kmers2patternIds.get_size();
-	file.write(reinterpret_cast<char*>(&temp), sizeof(temp));
+	file.write(reinterpret_cast<const char*>(&temp), sizeof(temp));
 	
 	// write ht elements in portions
 	size_t bufpos = 0;
@@ -443,24 +443,24 @@ void FastKmerDb::serialize(std::ofstream& file) const {
 
 		hastableBuffer[bufpos++] = *it;
 		if (bufpos == numHastableElements) {
-			file.write(reinterpret_cast<char*>(&bufpos), sizeof(size_t));
+			file.write(reinterpret_cast<const char*>(&bufpos), sizeof(size_t));
 			file.write(buffer, bufpos * sizeof(hash_map_lp<kmer_t, pattern_id_t>::item_t));
 			bufpos = 0;
 		}
 	}
 	// write remaining ht elements
-	file.write(reinterpret_cast<char*>(&bufpos), sizeof(size_t));
+	file.write(reinterpret_cast<const char*>(&bufpos), sizeof(size_t));
 	file.write(buffer, bufpos * sizeof(hash_map_lp<kmer_t, pattern_id_t>::item_t));
 	
 	// write patterns in portions
 	temp = patterns.size();
-	file.write(reinterpret_cast<char*>(&temp), sizeof(temp));
+	file.write(reinterpret_cast<const char*>(&temp), sizeof(temp));
 	
 	char * currentPtr = buffer;
 	for (int pid = 0; pid < patterns.size(); ++pid) {
 		if (currentPtr + patterns[pid].get_bytes() > buffer + ioBufferBytes) {
 			size_t blockSize = currentPtr - buffer;
-			file.write(reinterpret_cast<char*>(&blockSize), sizeof(size_t)); // write size of block to facilitate deserialization
+			file.write(reinterpret_cast<const char*>(&blockSize), sizeof(size_t)); // write size of block to facilitate deserialization
 			file.write(buffer, blockSize);
 			currentPtr = buffer;
 		}
@@ -474,8 +474,11 @@ void FastKmerDb::serialize(std::ofstream& file) const {
 
 	// write remaining patterns
 	size_t blockSize = currentPtr - buffer;
-	file.write(reinterpret_cast<char*>(&blockSize), sizeof(size_t)); // write size of block to facilitate deserialization
+	file.write(reinterpret_cast<const char*>(&blockSize), sizeof(size_t)); // write size of block to facilitate deserialization
 	file.write(buffer, blockSize);
+
+	// save kmer length
+	file.write(reinterpret_cast<const char*>(&kmerLength), sizeof(kmerLength)); // write size of block to facilitate deserialization
 }
 
 
@@ -550,7 +553,11 @@ bool FastKmerDb::deserialize(std::ifstream& file) {
 	if (!file) {
 		return false;
 	}
-	
+
+	// load kmer length (18 if not present in the file - backward compatibility)
+	kmerLength = 18;
+	file.read(reinterpret_cast<char*>(&kmerLength), sizeof(kmerLength));
+
 	return true;
 }
 

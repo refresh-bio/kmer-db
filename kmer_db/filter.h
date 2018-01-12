@@ -9,6 +9,7 @@ class IKmerFilter {
 public:
 	virtual bool operator()(uint64_t kmer) const = 0;
 	virtual void setParams(uint64_t kmer_length) = 0;
+	virtual std::unique_ptr<IKmerFilter> clone() const = 0;
 };
 
 
@@ -28,6 +29,10 @@ public:
 		threshold(fraction > 0.99999 ? std::numeric_limits<uint64_t>::max() : (uint64_t)((double)std::numeric_limits<uint64_t>::max() * fraction))
 	{
 		setParams(kmer_length);
+	}
+
+	virtual std::unique_ptr<IKmerFilter> clone() const {
+		return unique_ptr<IKmerFilter>(new MinHashFilter(*this));
 	}
 
 	virtual void setParams(uint64_t kmer_length) override {

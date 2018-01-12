@@ -13,13 +13,13 @@ Loader::Loader(std::shared_ptr<IKmerFilter> filter, bool tryMinHash, int _num_th
 	readerQueue(1), 
 	currentFileId(0), 
 	numThreads(_num_threads > 0 ? _num_threads : std::thread::hardware_concurrency()),
-	filter (filter),
 	tryMinHash(tryMinHash) {
 
 	kmersCollections.resize(numThreads);
 
+
 	// generate preloader thread
-	prefetcher = std::thread([this]() {
+	prefetcher = std::thread([this, filter]() {
 		while (!this->prefetcherQueue.IsCompleted()) {
 			std::shared_ptr<Task> task;
 			if (this->prefetcherQueue.Pop(task)) {
@@ -27,7 +27,7 @@ Loader::Loader(std::shared_ptr<IKmerFilter> filter, bool tryMinHash, int _num_th
 				ostringstream oss;
 				cout << task->sampleName << " (" << task->fileId + 1 << "/" << kmcFileList.size() << ")...";
 				
-				task->file = std::make_shared<KmcFileWrapper>(this->filter);
+				task->file = std::make_shared<KmcFileWrapper>(filter ? filter->clone() : nullptr);
 				if (task->file->open(kmcFileList[task->fileId], this->tryMinHash)) {
 					intermediateQueue.Push(task);
 				}
@@ -44,8 +44,9 @@ Loader::Loader(std::shared_ptr<IKmerFilter> filter, bool tryMinHash, int _num_th
 		t = std::thread([this]() {
 			while (!this->readerQueue.IsCompleted()) {
 				std::shared_ptr<Task> task;
+
 				if (this->readerQueue.Pop(task)) {
-					if (task->file->load(kmersCollections[task->threadId])) {
+					if (task->file->load(kmersCollections[task->threadId], task->kmerLength)) {
 						task->kmers = &kmersCollections[task->threadId];
 						std::unique_lock<std::mutex> lck(outputMutex, std::defer_lock);
 						lck.lock();
