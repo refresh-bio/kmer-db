@@ -56,8 +56,8 @@ int Console::parse(int argc, char** argv) {
 		params.erase(it, it + 2);
 	}
 
-	// all modes need at least 3 parameters
-	if (params.size() >= 3) {
+	// all modes need at least 2 parameters
+	if (params.size() >= 2) {
 		const string& mode = params[0];
 		
 		if (params.size() == 3 && mode == "build") {
@@ -80,9 +80,9 @@ int Console::parse(int argc, char** argv) {
 			cout << "Min-hashing k-mers" << endl;
 			return runMinHash(params[1], atof(params[2].c_str()));
 		}
-		else if (params.size() == 3 && mode == "distance") {
+		else if (params.size() == 2 && mode == "distance") {
 			cout << "Calculating distance measures" << endl;
-			return runDistanceCalculation(params[1], params[2]);
+			return runDistanceCalculation(params[1]);
 		}
 	}
 
@@ -202,12 +202,6 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 	db->serialize(ofs);
 	ofs.close();
 
-	ofs.open(dbFilename + ".log");
-	ofs << "Kmer_length: " << db->getKmerLength() << endl;
-	for (int i = 0; i < db->getSamplesCount(); ++i) {
-		ofs << db->getSampleNames()[i] << " " << db->getSampleKmersCount()[i] << endl;
-	}
-	ofs.close();
 	dt = std::chrono::high_resolution_clock::now() - start;
 
 	cout << "OK (" << dt.count() << " seconds)" << endl;
@@ -243,17 +237,20 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 		<< "K-mer length: " << db->getKmerLength() << endl;
 
 
-	cout << "Calculating similarity matrix...";
+	cout << "Calculating matrix of common k-mers...";
 	start = std::chrono::high_resolution_clock::now();
 	LowerTriangularMatrix<uint32_t> matrix;
 	db->calculateSimilarity(matrix);
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "OK (" << dt.count() << " seconds)" << endl;
 
-	cout << "Storing similarity matrix in " << similarityFile << "...";
+	cout << "Storing matrix of common k-mers in " << similarityFile << "...";
 	start = std::chrono::high_resolution_clock::now();
-	std::copy(db->getSampleNames().begin(), db->getSampleNames().end(), ostream_iterator<string>(ofs, ","));
-	ofs << endl;
+	ofs << "kmer-length, " << db->getKmerLength() << endl;
+	std::copy(db->getSampleNames().cbegin(), db->getSampleNames().cend(), ostream_iterator<string>(ofs, ","));
+	ofs << endl <<  "total-kmers:" << endl;
+	std::copy(db->getSampleKmersCount().cbegin(), db->getSampleKmersCount().cend(), ostream_iterator<size_t>(ofs, ","));
+	ofs << endl << "common-kmers:" << endl;
 	matrix.save(ofs);
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "OK (" << dt.count() << " seconds)" << endl;
@@ -330,40 +327,12 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 
 /****************************************************************************************************************************************************/
 
-int Console::runDistanceCalculation(const std::string& dbFilename, const std::string& similarityFilename) {
-	
-	std::string rerportFilename = dbFilename + ".log";
-	std::ifstream report(rerportFilename);
+int Console::runDistanceCalculation(const std::string& similarityFilename) {
+
 	std::vector<size_t> kmersCount;
 	uint32_t kmerLength;
 
-	cout << "Loading k-mer statistics from report " << rerportFilename << "...";
-	if (!report) {
-		cout << "FAILED" << endl
-		 << "Loading k-mer statistics from database " << dbFilename << "...";
-		std::ifstream dbFile(dbFilename, std::ios::binary);
-		FastKmerDb db;
-		 if (!dbFile || !db.deserialize(dbFile)) {
-			 cout << "FAILED" << endl;
-			 return -1;
-		 }
-		 else {
-			 cout << "OK" << endl;
-			 kmersCount = db.getSampleKmersCount();
-			 kmerLength = db.getKmerLength();
-		 }
-	} else {
-		cout << "OK" << endl;
-		string name;
-		size_t count;
-		report >> name >> kmerLength; // get kmer length
-		while (report >> name >> count) {
-			kmersCount.push_back(count);
-		}
-	}
-
-
-	cout << "Loading raw similarity file " << similarityFilename << "...";
+	cout << "Loading file with common k-mer counts" << similarityFilename << "...";
 	ifstream similarityFile(similarityFilename);
 	if (!similarityFile) {
 		cout << "FAILED" << endl;
@@ -376,7 +345,17 @@ int Console::runDistanceCalculation(const std::string& dbFilename, const std::st
 	ofstream mashFile(similarityFilename + ".mash");
 
 	string in;
-	getline(similarityFile, in); // ignore first row
+	getline(similarityFile, in);  // get kmer length
+	istringstream(in) >> in >> kmerLength;
+	getline(similarityFile, in); // ignore row with sample name
+	getline(similarityFile, in); // ignore description row
+	
+	getline(similarityFile, in); // get number of kmers for all samples
+	std::replace(in.begin(), in.end(), ',', ' ');
+	std::copy(std::istream_iterator<size_t>(std::istringstream(in)),
+		std::istream_iterator<size_t>(),
+		std::back_inserter(kmersCount));
+	getline(similarityFile, in); // ignore description row
 
 	for (int i = 0; i < kmersCount.size() && getline(similarityFile, in); ++i) {
 		std::replace(in.begin(), in.end(), ',', ' ');
@@ -459,9 +438,8 @@ void Console::showInstructions() {
 		<< "\t   common_vector (output) - file containing vector with numbers of common k-mers" << endl
 
 		<< "Calculating similarity/distance metrices (jaccard index and Mash distance) on the basis of common k-mers:" << endl
-		<< "\t kmer_db distance <database> <common_file>" << endl
-		<< "\t   database (input) - k-mer database file" << endl
-		<< "\t   common_file (output) - file containing matrix/vector with numbers of common k-mers" << endl
-		<< "This mode generates two files named <common_file>.jaccard and <common_file>.mash." << endl;
+		<< "\t kmer_db distance <common_file>" << endl
+		<< "\t   common_file (input) - file containing matrix/vector with numbers of common k-mers" << endl
+		<< "This mode generates two files named <common_file>.jaccard and <common_file>.mash" << endl;
 }
 

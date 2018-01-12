@@ -12,7 +12,7 @@ build E:\Data\kmc250.list d:\kmer.db
 all2all d:\kmer.db d:\matrix.csv
 one2all d:\kmer.db E:\Data\kmc250\GCF_000171975.1_ASM17197v1_genomic_s d:\vector.csv
 list-patterns d:\kmer.db d:\patterns.txt
-distance d:\kmer.db d:\matrix.csv
+distance d:\matrix.csv
 
 */
 

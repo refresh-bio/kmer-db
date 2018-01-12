@@ -16,7 +16,7 @@ protected:
 	int runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFilename);
 	int runListPatterns(const std::string& dbFilename, const std::string& patternFile);
 	int runMinHash(const std::string& multipleKmcSamples, float fraction);
-	int runDistanceCalculation(const std::string& dbFilename, const std::string& similarityFilename);
+	int runDistanceCalculation(const std::string& similarityFilename);
 
 	void showInstructions();
 
