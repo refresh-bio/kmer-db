@@ -352,8 +352,9 @@ int Console::runDistanceCalculation(const std::string& similarityFilename) {
 	
 	getline(similarityFile, in); // get number of kmers for all samples
 	std::replace(in.begin(), in.end(), ',', ' ');
-	std::copy(std::istream_iterator<size_t>(std::istringstream(in)),
-		std::istream_iterator<size_t>(),
+	std::istringstream iss(in);
+	std::copy(std::istream_iterator<size_t>(),
+		std::istream_iterator<size_t>(iss),
 		std::back_inserter(kmersCount));
 	getline(similarityFile, in); // ignore description row
 
