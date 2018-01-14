@@ -16,6 +16,8 @@
 #include <iterator>
 #include <numeric>
 #include <emmintrin.h>
+#include <immintrin.h>
+#include "instrset.h"
 
 #include "kmc_api/kmc_file.h"
 #include "kmer_db.h"
@@ -50,6 +52,8 @@ FastKmerDb::FastKmerDb(int _num_threads) :
 	dictionarySearchQueue(1), 
 	patternExtensionQueue(1),
 	num_threads(_num_threads > 0 ? _num_threads : std::thread::hardware_concurrency()) {
+
+	avx2_present = instrset_detect() >= 8;
 
 	patternBytes = 0;
 	patterns.reserve(1024);
@@ -761,7 +765,12 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 
 							auto *p = rawData;
 
-#if ALL2ALL_VER==0
+							if (avx2_present)
+								row_add_avx2(row, p, num_samples, to_add);
+							else
+								row_add_avx(row, p, num_samples, to_add);
+								
+#if ALL2ALL_VER==055
 							__m128i _to_add = _mm_set1_epi32((int)to_add);
 
 							int j;

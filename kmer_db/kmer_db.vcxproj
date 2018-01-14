@@ -152,6 +152,7 @@
     <ClInclude Include="filter.h" />
     <ClInclude Include="hashmap_dh.h" />
     <ClInclude Include="hashmap_lp.h" />
+    <ClInclude Include="instrset.h" />
     <ClInclude Include="kmc_file_wrapper.h" />
     <ClInclude Include="kmer_db.h" />
     <ClInclude Include="kmc_api\kmc_file.h" />
@@ -170,9 +171,11 @@
     <ClInclude Include="raduls\record.h" />
     <ClInclude Include="raduls\small_sort.h" />
     <ClInclude Include="raduls\sorting_network.h" />
+    <ClInclude Include="row_add.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="console.cpp" />
+    <ClCompile Include="instrset_detect.cpp" />
     <ClCompile Include="kmc_api\kmc_file.cpp" />
     <ClCompile Include="kmc_api\kmer_api.cpp" />
     <ClCompile Include="kmc_api\mmer.cpp" />
@@ -182,6 +185,10 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="parallel_sorter.cpp" />
     <ClCompile Include="pattern.cpp" />
+    <ClCompile Include="row_add_avx.cpp" />
+    <ClCompile Include="row_add_avx2.cpp">
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+    </ClCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

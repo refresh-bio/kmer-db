@@ -7,16 +7,23 @@ KMER_DB_RADULS_DIR = kmer_db/raduls
 
 CC 	= /usr/local/gcc62/bin/g++
 CFLAGS	= -Wall -O3 -m64 -std=c++14 -fopenmp -pthread -mavx -I $(KMER_DB_LIBS_DIR)
+CFLAGS_AVX2	= -Wall -O3 -m64 -std=c++14 -fopenmp -pthread -mavx2 -I $(KMER_DB_LIBS_DIR)
 CLINK	= -lm -O3 -std=c++14 -lpthread -fopenmp -mavx -fabi-version=6 
 
 $(KMER_DB_MAIN_DIR)/parallel_sorter.o: $(KMER_DB_MAIN_DIR)/parallel_sorter.cpp
 	$(CC) -O3 -mavx -m64 -std=c++14 -pthread -fopenmp -c $< -o $@
+
+row_add_avx2.o: row_add_avx2.cpp
+	$(CC) $(CFLAGS_AVX2) -c $< -o $@
 
 %.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 kmer-db-1.0: $(KMER_DB_MAIN_DIR)/kmer_db.o \
 	$(KMER_DB_MAIN_DIR)/console.o \
+	$(KMER_DB_MAIN_DIR)/insrtset_detect.o \
+	$(KMER_DB_MAIN_DIR)/row_add_avx.o \
+	$(KMER_DB_MAIN_DIR)/row_add_avx2.o \
 	$(KMER_DB_MAIN_DIR)/loader.o \
 	$(KMER_DB_MAIN_DIR)/log.o \
 	$(KMER_DB_MAIN_DIR)/main.o \
@@ -28,6 +35,9 @@ kmer-db-1.0: $(KMER_DB_MAIN_DIR)/kmer_db.o \
 	$(CC) $(CLINK) -o $(KMER_DB_ROOT_DIR)/$@  \
 	$(KMER_DB_MAIN_DIR)/kmer_db.o \
 	$(KMER_DB_MAIN_DIR)/console.o \
+	$(KMER_DB_MAIN_DIR)/insrtset_detect.o \
+	$(KMER_DB_MAIN_DIR)/row_add_avx.o \
+	$(KMER_DB_MAIN_DIR)/row_add_avx2.o \
 	$(KMER_DB_MAIN_DIR)/loader.o \
 	$(KMER_DB_MAIN_DIR)/log.o \
 	$(KMER_DB_MAIN_DIR)/main.o \

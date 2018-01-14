@@ -11,6 +11,9 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="parallel_sorter.cpp" />
     <ClCompile Include="pattern.cpp" />
+    <ClCompile Include="row_add_avx.cpp" />
+    <ClCompile Include="row_add_avx2.cpp" />
+    <ClCompile Include="instrset_detect.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="aligned_vector.h" />
@@ -38,5 +41,7 @@
     <ClInclude Include="raduls\sorting_network.h" />
     <ClInclude Include="filter.h" />
     <ClInclude Include="kmc_file_wrapper.h" />
+    <ClInclude Include="row_add.h" />
+    <ClInclude Include="instrset.h" />
   </ItemGroup>
 </Project>
