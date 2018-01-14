@@ -589,7 +589,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 	matrix.resize(samples_count);
 	matrix.clear();
 	
-	size_t bufsize = 4000000 / sizeof(uint32_t);
+	size_t bufsize = 12000000 / sizeof(uint32_t);
 	std::vector<uint32_t> patternsBuffer(bufsize);
 	uint32_t* currentPtr;
 
