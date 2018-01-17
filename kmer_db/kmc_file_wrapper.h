@@ -13,9 +13,9 @@ public:
 
 	KmcFileWrapper(std::shared_ptr<IKmerFilter> filter) : filter(filter) {}
 
-	bool open(const std::string& filename, bool tryMinHash) {
+	bool open(const std::string& filename, bool useMinhash) {
 		// try minhashed format
-		if (tryMinHash) {
+		if (useMinhash) {
 			auto file = std::make_shared<std::ifstream>(filename + ".minhash", std::ios_base::binary);
 			if (*file) {
 				uint32_t signature = 0;
@@ -37,8 +37,7 @@ public:
 				}
 			}
 		}
-		
-		if (!minhashFile) {
+		else {
 			// try KMC format
 			auto file = std::make_shared<CKMCFile>();
 			if (file->OpenForListing(filename)) {

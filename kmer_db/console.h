@@ -11,7 +11,7 @@ public:
 protected:
 	int numThreads;
 
-	int runBuildDatabase(const std::string& multipleKmcSamples, const std::string dbFilename);
+	int runBuildDatabase(const std::string& multipleKmcSamples, const std::string dbFilename, bool loadMinhash);
 	int runAllVsAll(const std::string& dbFilename, const std::string& similarityFile);
 	int runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFilename);
 	int runListPatterns(const std::string& dbFilename, const std::string& patternFile);

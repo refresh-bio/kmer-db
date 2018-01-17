@@ -60,9 +60,9 @@ int Console::parse(int argc, char** argv) {
 	if (params.size() >= 2) {
 		const string& mode = params[0];
 		
-		if (params.size() == 3 && mode == "build") {
+		if (params.size() == 3 && (mode == "build" || mode == "build-minhash")) {
 			cout << "Database building mode" << endl;
-			return runBuildDatabase(params[1], params[2]);
+			return runBuildDatabase(params[1], params[2], mode == "build-minhash");
 		}
 		else if (params.size() == 3 && mode == "all2all") {
 			cout << "All versus all comparison" << endl;
@@ -138,7 +138,7 @@ int Console::runMinHash(const std::string& multipleKmcSamples, float fraction) {
 
 /****************************************************************************************************************************************************/
 
-int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::string dbFilename) {
+int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::string dbFilename, bool loadMinhash) {
 
 	cout << "Processing samples..." << endl;
 	
@@ -149,7 +149,7 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 	
 	LOG_DEBUG << "Creating Loader object..." << endl;
 
-	Loader loader(nullptr, true, numThreads);
+	Loader loader(nullptr, loadMinhash, numThreads);
 	loader.configure(multipleKmcSamples);
 
 	loader.initPrefetch();
@@ -178,6 +178,8 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 		loader.getLoadedTasks().clear();
 		processingTime += std::chrono::high_resolution_clock::now() - start;
 	}
+
+	loader.waitForPrefetch();
 
 	cout << endl << endl << "EXECUTION TIMES" << endl
 		<< "Loading k-mers: " << loadingTime.count() << endl

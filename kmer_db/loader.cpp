@@ -7,13 +7,13 @@
 using namespace std;
 
 /****************************************************************************************************************************************************/
-Loader::Loader(std::shared_ptr<IKmerFilter> filter, bool tryMinHash, int _num_threads) :
+Loader::Loader(std::shared_ptr<IKmerFilter> filter, bool useMinhash, int _num_threads) :
 	prefetcherQueue(1), 
 	intermediateQueue(1),
 	readerQueue(1), 
 	currentFileId(0), 
 	numThreads(_num_threads > 0 ? _num_threads : std::thread::hardware_concurrency()),
-	tryMinHash(tryMinHash) {
+	useMinhash(useMinhash) {
 
 	kmersCollections.resize(numThreads);
 
@@ -28,7 +28,7 @@ Loader::Loader(std::shared_ptr<IKmerFilter> filter, bool tryMinHash, int _num_th
 				cout << task->sampleName << " (" << task->fileId + 1 << "/" << kmcFileList.size() << ")...";
 				
 				task->file = std::make_shared<KmcFileWrapper>(filter ? filter->clone() : nullptr);
-				if (task->file->open(kmcFileList[task->fileId], this->tryMinHash)) {
+				if (task->file->open(kmcFileList[task->fileId], this->useMinhash)) {
 					intermediateQueue.Push(task);
 				}
 				else {

@@ -59,7 +59,7 @@ public:
 
 private:
 	
-	bool tryMinHash;
+	bool useMinhash;
 
 	size_t currentFileId;
 
