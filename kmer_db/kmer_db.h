@@ -6,6 +6,7 @@
 #include "queue.h"
 #include "aligned_vector.h"
 #include "parallel_sorter.h"
+#include "row_add.h"
 
 #include <map>
 #include <fstream>
@@ -93,6 +94,8 @@ public:
 	std::chrono::duration<double> hashtableAddTime;
 	std::chrono::duration<double> sortTime;
 	std::chrono::duration<double> extensionTime;
+
+	bool avx2_present;
 
 	FastKmerDb(int _num_threads = 0);
 
