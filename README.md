@@ -21,12 +21,13 @@ Parameters:
   For each sample from the list, a binary file with `.minhash` extension containing filtered k-mers is created.
 
 ### Building the database from k-mers
-Construction of k-mers database is an obligatory step for further analyses.
+Construction of k-mers database is an obligatory step for further analyses. Both, raw [KMC-generated](https://github.com/refresh-bio/KMC) as well as min-hashed k-mers are accepted as in input for the procedure.  
 
 `kmer-db build <sample_list> <database>`
+`kmer-db build-minhash <sample_list> <database>`
 
 Parameters:
- * `sample_list` (input) - file containing list of k-mer files for each sample. Both, raw [KMC-generated](https://github.com/refresh-bio/KMC) as well as min-hashed k-mers are accepted. When both types of k-mer files exist, `.minhash` have higher priority.
+ * `sample_list` (input) - file containing list of k-mer files, one entry per sample. In `build` mode, the tool requires corresponding KMC-generated files (with `.pre` and `.suf` extensions), while in `build-minhash`, min-hashed files (`.minhash`) are neccessary.
  * `database` (output) - file with k-mer database for all samples.
  
  ### Calculating number of common k-mers ###
