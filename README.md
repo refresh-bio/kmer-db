@@ -15,7 +15,7 @@ Parameters:
     sample3
     ...
     ```
-    When reading k-mers, the tool will automatically add `.pre` and `.suf` extensions for each sample. 
+    When reading k-mers, the tool searches for KMC files with `.pre` and `.suf` extensions for each sample. 
  * `fraction` (input) - a number from <0,1> interval determining a fraction of all k-mers to be accepted by filter.
  
   For each sample from the list, a binary file with `.minhash` extension containing filtered k-mers is created.
