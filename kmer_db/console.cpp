@@ -283,7 +283,7 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 	uint32_t kmerLength;
 	KmcFileWrapper file(nullptr);
 
-	if (!file.open(singleKmcSample, true) || !file.load(kmers, kmerLength)) {
+	if (!file.open(singleKmcSample, false) || !file.load(kmers, kmerLength)) {
 		cout << "FAILED";
 		return -1;
 	}
@@ -316,8 +316,12 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 	cout << "Storing similarity vector in " << similarityFile << "...";
 	std::ofstream ofs(similarityFile);
 	
+	ofs << "kmer-length, " << db.getKmerLength() << endl
+		<< "sample-kmers, " << sampleDb.getSampleKmersCount().front() << endl;
 	std::copy(db.getSampleNames().cbegin(), db.getSampleNames().cend(), ostream_iterator<string>(ofs, ","));
-	ofs << endl;
+	ofs << endl << "total-kmers:" << endl;
+	std::copy(db.getSampleKmersCount().cbegin(), db.getSampleKmersCount().cend(), ostream_iterator<size_t>(ofs, ","));
+	ofs << endl << "common-kmers:" << endl;
 	std::copy(sims.begin(), sims.end(), ostream_iterator<uint32_t>(ofs, ","));
 
 	ofs.close();
@@ -355,9 +359,7 @@ int Console::runDistanceCalculation(const std::string& similarityFilename) {
 	getline(similarityFile, in); // get number of kmers for all samples
 	std::replace(in.begin(), in.end(), ',', ' ');
 	std::istringstream iss(in);
-	std::copy(std::istream_iterator<size_t>(),
-		std::istream_iterator<size_t>(iss),
-		std::back_inserter(kmersCount));
+	std::copy(std::istream_iterator<size_t>(iss), std::istream_iterator<size_t>(), std::back_inserter(kmersCount));
 	getline(similarityFile, in); // ignore description row
 
 	for (int i = 0; i < kmersCount.size() && getline(similarityFile, in); ++i) {
@@ -381,7 +383,6 @@ int Console::runDistanceCalculation(const std::string& similarityFilename) {
 		}
 		jaccardFile << endl;
 		mashFile << endl;
-		++i;
 	}
 
 	cout << "OK" << endl;

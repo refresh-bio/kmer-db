@@ -152,7 +152,7 @@ FastKmerDb::FastKmerDb(int _num_threads) :
 						size_t j;
 						auto p_id = samplePatterns[i].first;
 
-						// zliczamy odczyty z aktualnego pliku (osobnika) o tym samym wzorcu
+						// zliczamy kmery z aktualnego pliku (osobnika) o tym samym wzorcu
 						for (j = i + 1; j < hi; ++j) {
 							if (p_id != samplePatterns[j].first) {
 								break;
