@@ -56,13 +56,20 @@ int Console::parse(int argc, char** argv) {
 		params.erase(it, it + 2);
 	}
 
+	bool useMinhash = false;
+	it = find(params.begin(), params.end(), "-mh-input"); // minhash mode
+	if (it != params.end()) {
+		useMinhash = true;
+		params.erase(it);
+	}
+
 	// all modes need at least 2 parameters
 	if (params.size() >= 2) {
 		const string& mode = params[0];
 		
-		if (params.size() == 3 && (mode == "build" || mode == "build-minhash")) {
+		if (params.size() == 3 && (mode == "build")) {
 			cout << "Database building mode" << endl;
-			return runBuildDatabase(params[1], params[2], mode == "build-minhash");
+			return runBuildDatabase(params[1], params[2], useMinhash);
 		}
 		else if (params.size() == 3 && mode == "all2all") {
 			cout << "All versus all comparison" << endl;
@@ -70,7 +77,7 @@ int Console::parse(int argc, char** argv) {
 		}
 		else if (params.size() == 4 && mode == "one2all") {
 			cout << "One versus all comparison" << endl;
-			return runOneVsAll(params[1], params[2], params[3]);
+			return runOneVsAll(params[1], params[2], params[3], useMinhash);
 		}
 		else if (params.size() == 3 && mode == "list-patterns") {
 			cout << "Listing all patterns" << endl;
@@ -269,7 +276,7 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 
 /****************************************************************************************************************************************************/
 
-int Console::runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFile) {
+int Console::runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFile, bool useMinhash) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
 	FastKmerDb db(numThreads);
 
@@ -283,7 +290,7 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 	uint32_t kmerLength;
 	KmcFileWrapper file(nullptr);
 
-	if (!file.open(singleKmcSample, false) || !file.load(kmers, kmerLength)) {
+	if (!file.open(singleKmcSample, useMinhash) || !file.load(kmers, kmerLength)) {
 		cout << "FAILED";
 		return -1;
 	}
@@ -432,10 +439,10 @@ void Console::showInstructions() {
 
 		<< "Building k-mer database:" << endl
 		<< "\t kmer_db build <sample_list> <database>" << endl
-		<< "\t   sample_list (input) - file containing list of k-mer files (raw or min-hashed)" << endl
+		<< "\t   sample_list (input) - file containing list of k-mer files (raw or minhashed)" << endl
 		<< "\t   database (output) - file with generated k-mer database" << endl
 
-		<< "Min-hashing k-mers:" << endl
+		<< "Minhashing k-mers:" << endl
 		<< "\t kmer_db minhash <sample_list> <fraction>" << endl
 		<< "\t   sample_list (input) - file containing list of k-mer files (raw)" << endl
 		<< "\t   fraction (input) - fraction of kmers passing the filter" << endl
