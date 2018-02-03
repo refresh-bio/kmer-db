@@ -2,7 +2,7 @@
 
 ## USAGE
 
-### Min-hashing k-mers
+### Minhashing k-mers
 This is an optional analysis step - it can be skipped if one wants to use all k-mers from samples for distance estimation. 
 
 `kmer-db minhash <sample_list> <fraction>`
@@ -21,13 +21,15 @@ Parameters:
   For each sample from the list, a binary file with `.minhash` extension containing filtered k-mers is created.
 
 ### Building the database from k-mers
-Construction of k-mers database is an obligatory step for further analyses. Both, raw [KMC-generated](https://github.com/refresh-bio/KMC) as well as min-hashed k-mers are accepted as in input for the procedure.  
+Construction of k-mers database is an obligatory step for further analyses. Both, raw [KMC-generated](https://github.com/refresh-bio/KMC) as well as minhashed k-mers are accepted as in input for the procedure.  
 
-`kmer-db build <sample_list> <database>`
-`kmer-db build-minhash <sample_list> <database>`
+```
+kmer-db build <sample_list> <database>
+kmer-db build-minhash <sample_list> <database>
+```
 
 Parameters:
- * `sample_list` (input) - file containing list of k-mer files, one entry per sample. In `build` mode, the tool requires corresponding KMC-generated files (with `.pre` and `.suf` extensions), while in `build-minhash`, min-hashed files (`.minhash`) are neccessary.
+ * `sample_list` (input) - file containing list of k-mer files, one entry per sample. In `build` mode, the tool requires corresponding KMC-generated files (with `.pre` and `.suf` extensions), while in `build-minhash`, minhashed files (`.minhash`) are neccessary.
  * `database` (output) - file with k-mer database for all samples.
  
  ### Calculating number of common k-mers ###
