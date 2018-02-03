@@ -4,13 +4,14 @@ import os
 import shutil
 import subprocess
 import queue
-import threading 
+import threading
+
 kmc="../../kmc/bin/kmc"
 kmc_tools="../../kmc/bin/kmc_tools"
-kmer_len = 18
-num_thread=32
 
-input_files = 'files.txt'
+kmer_len=int(sys.argv[1])
+num_thread=int(sys.argv[2])
+input_files=sys.argv[3]
 
 def count_file(src, tmp):
 	dest=src.split('/')[-1].split(".fna.gz")[0]
