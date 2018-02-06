@@ -13,7 +13,7 @@ Kmer-db operates in one of the following modes:
     
 Options:
 
-* `-t num-threads` - distributes processing over `num-threads`,
+* `-t <threads>` - distributes processing over specified number of threads,
 * `-mh-input` - loads samples from minhashed files (applies only to `build` and `one2all` modes).
     
 The meaning of the positional arguments depends on the selected mode.
