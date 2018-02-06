@@ -3,7 +3,7 @@
 ## USAGE
 `kmer-db <mode> [options] <positional arguments>`
 
-KmerDB operates in one of the following modes:
+Kmer-db operates in one of the following modes:
 
 * `minhash` - minhashing k-mers,
 * `build` - building a database from k-mers,
