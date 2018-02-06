@@ -355,8 +355,24 @@ int Console::runDistanceCalculation(const std::string& similarityFilename) {
 	cout << "OK" << endl;
 
 	cout << "Calculating distances...";
-	ofstream jaccardFile(similarityFilename + ".jaccard");
-	ofstream mashFile(similarityFilename + ".mash");
+
+	
+	std::vector<std::string> metricNames = { "jaccard", "min", "max", "cosine", "mash" };
+	std::vector<std::function<double(size_t, size_t, size_t, int)>> metrics = {
+		[](size_t common, size_t cnt1, size_t cnt2, int kmerLength) -> double { return (double)common / (cnt1 + cnt2 - common); }, // jaccard
+		[](size_t common, size_t cnt1, size_t cnt2, int kmerLength) -> double { return (double)common / std::min(cnt1,cnt2); }, // min
+		[](size_t common, size_t cnt1, size_t cnt2, int kmerLength) -> double { return (double)common / std::max(cnt1,cnt2); }, // max
+		[](size_t common, size_t cnt1, size_t cnt2, int kmerLength) -> double { return (double)common / sqrt(cnt1 * cnt2); }, // cosine
+		[](size_t common, size_t cnt1, size_t cnt2, int kmerLength) -> double {
+			double d_jaccard = (double)common / (cnt1 + cnt2 - common); 
+			return  (d_jaccard == 0) ? 1.0 : (-1.0 / kmerLength) * log((2 * d_jaccard) / (d_jaccard + 1)); } // mash distance
+	};
+
+	std::vector<std::ofstream> files(metricNames.size());
+	for (int i = 0; i < files.size(); ++i) {
+		files[i].open(similarityFilename + "." + metricNames[i]);
+	}
+
 
 	string in;
 	getline(similarityFile, in);  
@@ -367,12 +383,13 @@ int Console::runDistanceCalculation(const std::string& similarityFilename) {
 	if (in == "sample-kmers,") {
 		iss >> sampleKmersCount;
 		getline(similarityFile, in);
+		iss = istringstream(in);
+		iss >> in;
 	}
 
 	iss >> kmerLength; // get kmer length
 	getline(similarityFile, in); // copy sample names to outout file
-	jaccardFile << in << endl;
-	mashFile << in << endl;
+	for (auto & f : files) { f << in << endl; }
 	getline(similarityFile, in); // ignore
 
 	getline(similarityFile, in); // get number of kmers for all samples
@@ -390,16 +407,13 @@ int Console::runDistanceCalculation(const std::string& similarityFilename) {
 		uint64_t i_kmersCount = (sampleKmersCount > 0) ? sampleKmersCount : kmersCount[i];
 			
 		for (int j = 0; iss >> intersection; ++j) {
-			double d_jaccard = (double)intersection / (i_kmersCount + kmersCount[j] - intersection);
-			// fixme: fixed kmer length
-			double d_mash = (d_jaccard == 0) ? 1.0 : (-1.0 / kmerLength) * log((2 * d_jaccard) / (d_jaccard + 1)); 
-			
-			jaccardFile << d_jaccard << ",";
-			mashFile << d_mash << ",";
+			// calculate all metrices
+			for (int i = 0; i < metrics.size(); ++i) {
+				files[i] << metrics[i](intersection, i_kmersCount, kmersCount[j], kmerLength) << ","; 
+			}
 		}
 		
-		jaccardFile << endl;
-		mashFile << endl;
+		for (auto & f : files) { f << endl; }
 	}
 
 	cout << "OK" << endl;
