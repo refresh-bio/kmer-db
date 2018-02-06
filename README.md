@@ -9,7 +9,7 @@ KmerDB operates in one of the following modes:
 * `build` - building a database from k-mers,
 * `all2all` - calculating number of common k-mers between all samples in the database,
 * `one2all` - calculating number of common kmers between single sample and all the samples in the database,
-* `distance` - calculating distance metrices/vectors.
+* `distance` - calculating similarities/distances.
     
 Options:
 
@@ -37,7 +37,7 @@ Parameters:
   For each sample from the list, a binary file with `.minhash` extension containing filtered k-mers is created.
 
 ### Building the database from k-mers
-Construction of k-mers database is an obligatory step for further analyses. Both, raw [KMC-generated](https://github.com/refresh-bio/KMC) as well as minhashed k-mers are accepted as in input for the procedure.  
+Construction of k-mers database is an obligatory step for further analyses. Both, raw [KMC-generated](https://github.com/refresh-bio/KMC), as well as minhashed k-mers are accepted as an input for the procedure.  
 
 ```
 kmer-db build <sample_list> <database>
@@ -49,13 +49,13 @@ Parameters:
  * `database` (output) - file with k-mer database for all samples.
  
  ### Calculating number of common k-mers ###
-Calculating number of common k-mers for all the samples in a database:
+Calculating number of common k-mers for all the samples in the database:
  
  `kmer_db all2all <database> <common_matrix>`
  
 Parameters:
-* `database` (input) - k-mer database file,
-* `common_matrix` (output) - file containing matrix with common k-mer counts
+* `database` (input) - k-mer database file created by `build` mode,
+* `common_matrix` (output) - file containing matrix with common k-mer counts.
 
 Calculating number of common kmers between single sample and all the samples in the database:
 
@@ -63,18 +63,18 @@ Calculating number of common kmers between single sample and all the samples in 
 `kmer_db one2all -mh-input <database> <sample> <common_vector>`
 
 Parameters:
- * `database` (input) - k-mer database file
- * `sample` (input) - k-mer file for a sample (raw or minhashed, depending on the presence of `-mh-input` switch)
- * `common_vector` (output) - file containing vector with numbers of common k-mers
+ * `database` (input) - k-mer database file created by `build` mode,
+ * `sample` (input) - k-mer file for a sample (raw or minhashed, depending on the presence of `-mh-input` switch),
+ * `common_vector` (output) - file containing vector with numbers of common k-mers.
  
- ### Calculating distance metrices/vectors
+ ### Calculating similarities/distances
  
 `kmer_db distance <common_file>"`
 
 Parameters:
-* `common_file` (input) - file containing matrix/vector with numbers of common k-mers
+* `common_file` (input) - file containing matrix (vector) with numbers of common k-mers produced by `all2all` (`one2all`) mode.
 
-This mode generates set of files with matrices/vectors with different similarity measures:
+This mode generates a set of files containing matrices (vectors) with different similarity/distance measures:
 * `<common_file>.jaccard`
 * `<common_file>.min` 
 * `<common_file>.max` 
