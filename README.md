@@ -16,7 +16,7 @@ Options:
 * `-t num-threads` - distributes processing over `num-threads`,
 * `-mh-input` - loads samples from minhashed files (applies only to `build` and `one2all` modes).
     
-The meaning of the positional arguments depend on the selected mode.
+The meaning of the positional arguments depends on the selected mode.
     
 ### Minhashing k-mers
 This is an optional analysis step - it can be skipped if one wants to use all k-mers from samples for distance estimation. 
