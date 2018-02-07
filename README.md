@@ -81,4 +81,45 @@ This mode generates a set of files containing matrices (vectors) with different 
 * `<common_file>.cosine` 
 * `<common_file>.mash`
 
+### Toy examples
+
+Let `pathogens.list` be the file containing names of KMC-processed samples (there exist `.pre` and `.suf` files for each sample):
+```
+acinetobacter
+klebsiella
+e.coli
+...
+```
+
+Calculating similarities/distances between all samples listed in `pathogens.list` using all k-mers. 
+```
+kmer-db build pathogens.list pathogens.db
+kmer-db all2all pathogens.db matrix.csv
+kmer-db distance matrix.csv
+```
+
+Same as above, but using only 10% of k-mers.
+```
+kmer-db minhash pathogens.list 0.1
+kmer-db build -mh-input pathogens.list pathogens.db
+kmer-db all2all pathogens.db matrix.csv
+kmer-db distance matrix.csv
+```
+
+Calculating similarities/distances between samples listed in `pathogens.list` and `salmonella` using all k-mers. 
+```
+kmer-db build pathogens.list pathogens.db
+kmer-db one2all pathogens.db salmonella vector.csv
+kmer-db distance vector.csv
+```
+
+Same as above, but using only 10% of k-mers. File `salmonella.list` contains only `salmonella` sample.
+```
+kmer-db minhash pathogens.list 0.1
+kmer-db minhash salmonella.list 0.1
+kmer-db build -mh-input pathogens.list pathogens.db
+kmer-db one2all -mh-input pathogens.db salmonella vector.csv
+kmer-db distance vector.csv
+```
+
 
