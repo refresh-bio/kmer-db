@@ -219,12 +219,12 @@ FastKmerDb::~FastKmerDb() {
 
 
 /****************************************************************************************************************************************************/
-sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength)
+sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction)
 {
 #ifdef USE_PREFETCH
 	const size_t prefetch_dist = 48;
 #endif
-	sample_id_t sampleId = AbstractKmerDb::addKmers(sampleName, kmers, kmerLength);
+	sample_id_t sampleId = AbstractKmerDb::addKmers(sampleName, kmers, kmerLength, fraction);
 
 	size_t n_kmers = kmers.size();
 	
@@ -481,8 +481,10 @@ void FastKmerDb::serialize(std::ofstream& file) const {
 	file.write(reinterpret_cast<const char*>(&blockSize), sizeof(size_t)); // write size of block to facilitate deserialization
 	file.write(buffer, blockSize);
 
-	// save kmer length
+	// save kmer length and fraction
 	file.write(reinterpret_cast<const char*>(&kmerLength), sizeof(kmerLength)); // write size of block to facilitate deserialization
+
+	file.write(reinterpret_cast<const char*>(&fraction), sizeof(fraction)); // write size of block to facilitate deserialization
 }
 
 
@@ -558,9 +560,10 @@ bool FastKmerDb::deserialize(std::ifstream& file) {
 		return false;
 	}
 
-	// load kmer length (18 if not present in the file - backward compatibility)
-	kmerLength = 18;
+	// load kmer length and fraction
 	file.read(reinterpret_cast<char*>(&kmerLength), sizeof(kmerLength));
+
+	file.read(reinterpret_cast<char*>(&fraction), sizeof(fraction));
 
 	return true;
 }

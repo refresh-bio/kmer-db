@@ -36,60 +36,61 @@ void show_progress(const AbstractKmerDb &db)
 
 int Console::parse(int argc, char** argv) {
 
-	cout << "kmer-db version 1.0" << endl << endl;
+	cout << "kmer-db version 1.0" << endl 
+		<< "S. Deorowicz, A. Gudys, M. Dlugosz, M. Kokot, and A. Danek (c) 2018" << endl << endl;
 	
 	numThreads = 0;
 
 	std::vector<string> params(argc - 1);
 	std::transform(argv + 1, argv + argc, params.begin(), [](char* c)->string { return c; });
 
-	// search for switches
-	auto it = find(params.begin(), params.end(), "-v"); // verbose mode
-	if (it != params.end()) {
-		Log::getInstance(Log::LEVEL_VERBOSE).enable();
-		params.erase(it);
-	}
+	if (params.size()) {
 
-	it = find(params.begin(), std::prev(params.end()), "-t"); // number of threads
-	if (it != std::prev(params.end())) {
-		numThreads = atof(std::next(it)->c_str());
-		params.erase(it, it + 2);
-	}
+		// search for switches
+		auto it = find(params.begin(), params.end(), "-v"); // verbose mode
+		if (it != params.end()) {
+			Log::getInstance(Log::LEVEL_VERBOSE).enable();
+			params.erase(it);
+		}
 
-	bool useMinhash = false;
-	it = find(params.begin(), params.end(), "-mh-input"); // minhash mode
-	if (it != params.end()) {
-		useMinhash = true;
-		params.erase(it);
-	}
+		it = find(params.begin(), std::prev(params.end()), "-t"); // number of threads
+		if (it != std::prev(params.end())) {
+			numThreads = atof(std::next(it)->c_str());
+			params.erase(it, it + 2);
+		}
 
-	// all modes need at least 2 parameters
-	if (params.size() >= 2) {
-		const string& mode = params[0];
-		
-		if (params.size() == 3 && (mode == "build")) {
-			cout << "Database building mode" << endl;
-			return runBuildDatabase(params[1], params[2], useMinhash);
-		}
-		else if (params.size() == 3 && mode == "all2all") {
-			cout << "All versus all comparison" << endl;
-			return runAllVsAll(params[1], params[2]);
-		}
-		else if (params.size() == 4 && mode == "one2all") {
-			cout << "One versus all comparison" << endl;
-			return runOneVsAll(params[1], params[2], params[3], useMinhash);
-		}
-		else if (params.size() == 3 && mode == "list-patterns") {
-			cout << "Listing all patterns" << endl;
-			return runListPatterns(params[1], params[2]);
-		}
-		else if (params.size() == 3 && mode == "minhash" && std::atof(params[2].c_str()) > 0) {
-			cout << "Min-hashing k-mers" << endl;
-			return runMinHash(params[1], atof(params[2].c_str()));
-		}
-		else if (params.size() == 2 && mode == "distance") {
-			cout << "Calculating distance measures" << endl;
-			return runDistanceCalculation(params[1]);
+		// all modes need at least 2 parameters
+		if (params.size() >= 2) {
+			const string& mode = params[0];
+
+			if (params.size() == 3 && (mode == "build")) {
+				cout << "Database building mode" << endl;
+				return runBuildDatabase(params[1], params[2], false);
+			}
+			else if (params.size() == 3 && (mode == "build-mh")) {
+				cout << "Database building mode (mihashed samples)" << endl;
+				return runBuildDatabase(params[1], params[2], true);
+			}
+			else if (params.size() == 3 && mode == "all2all") {
+				cout << "All versus all comparison" << endl;
+				return runAllVsAll(params[1], params[2]);
+			}
+			else if (params.size() == 4 && mode == "one2all") {
+				cout << "One versus all comparison" << endl;
+				return runOneVsAll(params[1], params[2], params[3]);
+			}
+			else if (params.size() == 3 && mode == "list-patterns") {
+				cout << "Listing all patterns" << endl;
+				return runListPatterns(params[1], params[2]);
+			}
+			else if (params.size() == 3 && mode == "minhash" && std::atof(params[2].c_str()) > 0) {
+				cout << "Minhashing k-mers" << endl;
+				return runMinHash(params[1], atof(params[2].c_str()));
+			}
+			else if (params.size() == 2 && mode == "distance") {
+				cout << "Calculating distance measures" << endl;
+				return runDistanceCalculation(params[1]);
+			}
 		}
 	}
 
@@ -99,7 +100,7 @@ int Console::parse(int argc, char** argv) {
 
 
 
-int Console::runMinHash(const std::string& multipleKmcSamples, float fraction) {
+int Console::runMinHash(const std::string& multipleKmcSamples, double fraction) {
 	cout << "Minhashing samples..." << endl;
 
 	std::chrono::duration<double> loadingTime, processingTime;
@@ -131,7 +132,7 @@ int Console::runMinHash(const std::string& multipleKmcSamples, float fraction) {
 		for (const auto& entry : loader.getLoadedTasks()) {
 			auto task = entry.second;
 			KmcFileWrapper file(nullptr); 
-			file.store(task->filePath, *task->kmers, task->kmerLength);
+			file.store(task->filePath, *task->kmers, task->kmerLength, fraction);
 		}
 
 		loader.getLoadedTasks().clear();
@@ -178,7 +179,7 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 		
 		for (const auto& entry : loader.getLoadedTasks()) {
 			auto task = entry.second;
-			db->addKmers(task->sampleName, *task->kmers, task->kmerLength);
+			db->addKmers(task->sampleName, *task->kmers, task->kmerLength, task->fraction);
 			show_progress(*db);
 		}
 		
@@ -243,7 +244,8 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 		<< "Number of samples: " << db->getSamplesCount() << endl
 		<< "Number of patterns: " << db->getPatternsCount() << endl
 		<< "Number of k-mers: " << db->getKmersCount() << endl
-		<< "K-mer length: " << db->getKmerLength() << endl;
+		<< "K-mer length: " << db->getKmerLength() << endl
+		<< "Minhash fraction: " << db->getFraction() << endl;
 
 
 	cout << "Calculating matrix of common k-mers...";
@@ -276,31 +278,14 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 
 /****************************************************************************************************************************************************/
 
-int Console::runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFile, bool useMinhash) {
+int Console::runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFile) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
 	FastKmerDb db(numThreads);
 
 	std::chrono::duration<double> dt;
-	cout << "Loading sample kmers...";
-
-	auto start = std::chrono::high_resolution_clock::now();
-	FastKmerDb sampleDb(numThreads);
-
-	std::vector<kmer_t> kmers;
-	uint32_t kmerLength;
-	KmcFileWrapper file(nullptr);
-
-	if (!file.open(singleKmcSample, useMinhash) || !file.load(kmers, kmerLength)) {
-		cout << "FAILED";
-		return -1;
-	}
-	sampleDb.addKmers(singleKmcSample, kmers, kmerLength);
-	dt = std::chrono::high_resolution_clock::now() - start;
-	cout << "OK (" << dt.count() << " seconds)" << endl
-		<< "Number of k-mers: " << sampleDb.getKmersCount() << endl;
 
 	cout << "Loading k-mer database " << dbFilename << "...";
-	start = std::chrono::high_resolution_clock::now();
+	auto start = std::chrono::high_resolution_clock::now();
 	if (!dbFile || !db.deserialize(dbFile)) {
 		cout << "FAILED";
 		return -1;
@@ -310,7 +295,34 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 		<< "Number of samples: " << db.getSamplesCount() << endl
 		<< "Number of patterns: " << db.getPatternsCount() << endl
 		<< "Number of k-mers: " << db.getKmersCount() << endl
-		<< "K-mer length: " << db.getKmerLength() << endl;
+		<< "K-mer length: " << db.getKmerLength() << endl
+		<< "Minhash fraction: " << db.getFraction() << endl;
+
+
+	cout << "Loading sample kmers...";
+
+	start = std::chrono::high_resolution_clock::now();
+	FastKmerDb sampleDb(numThreads);
+
+	std::vector<kmer_t> kmers;
+	uint32_t kmerLength;
+	shared_ptr<IKmerFilter> filter = nullptr;
+
+	if (db.getFraction() < 1.0) {
+		filter = shared_ptr<IKmerFilter>(new MinHashFilter(db.getFraction(), db.getKmerLength()));
+	}
+
+	KmcFileWrapper file(filter);
+	double dummy;
+	if (!file.open(singleKmcSample, false) || !file.load(kmers, kmerLength, dummy)) {
+		cout << "FAILED";
+		return -1;
+	}
+	sampleDb.addKmers(singleKmcSample, kmers, kmerLength, db.getFraction() );
+	dt = std::chrono::high_resolution_clock::now() - start;
+	cout << "OK (" << dt.count() << " seconds)" << endl
+		<< "Number of k-mers: " << sampleDb.getKmersCount() << endl
+		<< "Minhash fraction: " << sampleDb.getFraction() << endl;
 
 
 	cout << "Calculating similarity vector...";
@@ -449,32 +461,51 @@ int Console::runListPatterns(const std::string& dbFilename, const std::string& p
 
 /****************************************************************************************************************************************************/
 void Console::showInstructions() {
-	cout	<< "USAGE" << endl
+	cout << "USAGE" << endl << endl
+		
+		<< "kmer-db <mode> [options] <positional arguments>" << endl << endl
+
+		<< "Modes:" << endl
+		<< "  minhash - minhashing k-mers," << endl
+		<< "  build - building a database from k-mers," << endl
+		<< "  build-mh - building a database from minhashed k-mers," << endl
+		<< "  all2all - calculating number of common k-mers between all samples in the database," << endl
+		<< "  one2all - calculating number of common kmers between single sample and all the samples in the database," << endl
+		<< "  distance - calculating similarities / distances." << endl
+		<< "Options:" << endl
+		<< "  -t <threads> -distributes processing over specified number of threads," << endl
+		<< "The meaning of the positional arguments depends on the selected mode." << endl << endl
 
 		<< "Building k-mer database:" << endl
-		<< "\t kmer_db build <sample_list> <database>" << endl
-		<< "\t   sample_list (input) - file containing list of k-mer files (raw or minhashed)" << endl
-		<< "\t   database (output) - file with generated k-mer database" << endl
+		<< "  kmer_db build <sample_list> <database>" << endl
+		<< "  kmer_db build-mh <sample_list> <database>" << endl
+		<< "    sample_list (input) - file containing list of samples, either raw KMC files (build mode) or minhashed (build-mh)" << endl
+		<< "    database (output) - file with generated k-mer database" << endl << endl
 
 		<< "Minhashing k-mers:" << endl
-		<< "\t kmer_db minhash <sample_list> <fraction>" << endl
-		<< "\t   sample_list (input) - file containing list of k-mer files (raw)" << endl
-		<< "\t   fraction (input) - fraction of kmers passing the filter" << endl
+		<< "  kmer_db minhash <sample_list> <fraction>" << endl
+		<< "    sample_list (input) - file containing list of KMC k-mer files (raw)" << endl
+		<< "    fraction (input) - fraction of kmers passing the filter" << endl << endl
 
 		<< "Calculating number of common k-mers for all the samples in the database:" << endl
-		<< "\t kmer_db all2all <database> <common_matrix>" << endl
-		<< "\t   database (input) - k-mer database file" << endl
-		<< "\t   commony_matrix (output) - file containing matrix with numbers of common k-mers" << endl
+		<< "  kmer_db all2all <database> <common_matrix>" << endl
+		<< "    database (input) - k-mer database file" << endl
+		<< "    commony_matrix (output) - file containing matrix with numbers of common k-mers" << endl << endl
 
 		<< "Calculating number of common kmers between single sample and all the samples in the database:" << endl
-		<< "\t kmer_db one2all <database> <sample> <common_vector>" << endl
-		<< "\t   database (input) - k-mer database file" << endl
-		<< "\t   sample (input) - k-mer file for a sample" << endl
-		<< "\t   common_vector (output) - file containing vector with numbers of common k-mers" << endl
+		<< "  kmer_db one2all <database> <sample> <common_vector>" << endl
+		<< "    database (input) - k-mer database file" << endl
+		<< "    sample (input) - k-mer file for a sample" << endl
+		<< "    common_vector (output) - file containing vector with numbers of common k-mers" << endl << endl
 
-		<< "Calculating similarity/distance metrices (jaccard index and Mash distance) on the basis of common k-mers:" << endl
-		<< "\t kmer_db distance <common_file>" << endl
-		<< "\t   common_file (input) - file containing matrix/vector with numbers of common k-mers" << endl
-		<< "This mode generates two files named <common_file>.jaccard and <common_file>.mash" << endl;
+		<< "Calculating similarity/distance metrices (vectors) on the basis of common k-mers:" << endl
+		<< "  kmer_db distance <common_file>" << endl
+		<< "    common_file (input) - file containing matrix/vector with numbers of common k-mers" << endl
+		<< "This mode generates set of files:" << endl
+		<< "  <common_file>.jaccard" << endl
+		<< "  <common_file>.min" << endl
+		<< "  <common_file>.max" << endl
+		<< "  <common_file>.cosine" << endl
+		<< "  <common_file>.mash" << endl;
 }
 

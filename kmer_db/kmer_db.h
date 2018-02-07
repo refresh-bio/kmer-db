@@ -24,6 +24,8 @@ protected:
 
 	uint32_t kmerLength;
 
+	double fraction;
+
 	std::vector<string> sampleNames;
 
 	std::vector<size_t> sampleKmersCount;
@@ -33,6 +35,8 @@ public:
 	AbstractKmerDb() : kmerLength(0) {}
 
 	const uint32_t getKmerLength() const { return kmerLength; }
+
+	const double getFraction() const { return fraction; }
 
 	const size_t getSamplesCount() const { return sampleNames.size(); }
 
@@ -50,18 +54,24 @@ public:
 
 	virtual std::vector<kmer_t> getKmers() const = 0;
 
-	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength) {
+	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction) {
 		sample_id_t newId = sampleNames.size();
 		sampleNames.push_back(sampleName);
 		sampleKmersCount.push_back(kmers.size());
 
 		if (this->kmerLength == 0) {
 			this->kmerLength = kmerLength;
+			this->fraction = fraction;
 		}
-		else if (this->kmerLength != kmerLength) {
-			throw std::runtime_error("ERROR in FastKmerDb::addKmers(): adding kmers of different length");
+		else {
+			if (this->kmerLength != kmerLength) {
+				throw std::runtime_error("ERROR in FastKmerDb::addKmers(): adding kmers of different length");
+			}
+			if (this->fraction != fraction) {
+				throw std::runtime_error("ERROR in FastKmerDb::addKmers(): adding kmers of different minhash fraction");
+			}
 		}
-
+		
 		return newId;
 	}
 
@@ -121,7 +131,7 @@ public:
 		return kmers;
 	}
 
-	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength);
+	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction);
 
 	virtual void mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const;
 

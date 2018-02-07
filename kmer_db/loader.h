@@ -18,6 +18,7 @@ struct Task {
 	std::shared_ptr<KmcFileWrapper> file;
 	std::vector<kmer_t>* kmers;
 	uint32_t kmerLength;
+	double fraction;
 
 	Task(size_t fileId, size_t threadId, const std::string& filePath) :
 		fileId(fileId), threadId(threadId), filePath(filePath), file(nullptr), kmers(nullptr) {

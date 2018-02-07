@@ -46,7 +46,7 @@ Loader::Loader(std::shared_ptr<IKmerFilter> filter, bool useMinhash, int _num_th
 				std::shared_ptr<Task> task;
 
 				if (this->readerQueue.Pop(task)) {
-					if (task->file->load(kmersCollections[task->threadId], task->kmerLength)) {
+					if (task->file->load(kmersCollections[task->threadId], task->kmerLength, task->fraction)) {
 						task->kmers = &kmersCollections[task->threadId];
 						std::unique_lock<std::mutex> lck(outputMutex, std::defer_lock);
 						lck.lock();

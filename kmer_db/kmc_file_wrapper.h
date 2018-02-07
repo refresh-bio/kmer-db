@@ -28,6 +28,7 @@ public:
 
 					file->read(reinterpret_cast<char*>(kmers.data()), sizeof(kmer_t) * numKmers);
 					file->read(reinterpret_cast<char*>(&kmerLength), sizeof(kmerLength));
+					file->read(reinterpret_cast<char*>(&fraction), sizeof(fraction));
 
 					if (*file) {
 						minhashFile = file;
@@ -49,10 +50,11 @@ public:
 		return false;
 	}
 
-	bool load(std::vector<kmer_t>& kmers, uint32_t& kmerLength) {
+	bool load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, double& fraction) {
 		if (minhashFile) {
 			kmers = std::move(this->kmers);
 			kmerLength = this->kmerLength;
+			fraction = this->fraction;
 			minhashFile->close();
 			return true;
 		}
@@ -68,7 +70,7 @@ public:
 			uint64 _total_kmers;
 
 			kmcfile->Info(kmerLength, _mode, _counter_size, _lut_prefix_length, _signature_len, _min_count, _max_count, _total_kmers);
-
+		
 			CKmerAPI kmer(kmerLength);
 			
 			uint64_t u_kmer;
@@ -94,7 +96,7 @@ public:
 				}
 			}
 			kmers.resize(passed);
-			double fraction = (double)kmers.size() / _total_kmers;
+			fraction = ((double)kmers.size() / _total_kmers); // this may differ from theoretical
 			LOG_VERBOSE << "Min-hash passed: " << passed << "/" << _total_kmers << "(" << fraction << ")" << endl;
 			return kmcfile->Close();
 		}
@@ -103,13 +105,14 @@ public:
 	}
 
 
-	bool store(const std::string& filename, const std::vector<kmer_t>& kmers, uint32_t kmerLength) {
+	bool store(const std::string& filename, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction) {
 		ofstream ofs(filename + ".minhash", std::ios_base::binary);
 		ofs.write(reinterpret_cast<const char*>(&MINHASH_FORMAT_SIGNATURE), sizeof(MINHASH_FORMAT_SIGNATURE));
 		size_t numKmers = kmers.size();
 		ofs.write(reinterpret_cast<const char*>(&numKmers), sizeof(size_t));
 		ofs.write(reinterpret_cast<const char*>(kmers.data()), kmers.size() * sizeof(kmer_t));
 		ofs.write(reinterpret_cast<const char*>(&kmerLength), sizeof(kmerLength));
+		ofs.write(reinterpret_cast<const char*>(&fraction), sizeof(fraction));
 		return true;
 	}
 
@@ -122,5 +125,7 @@ protected:
 	std::vector<kmer_t> kmers;
 
 	uint32_t kmerLength;
+
+	double fraction;
 
 };
