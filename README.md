@@ -7,6 +7,7 @@ Kmer-db operates in one of the following modes:
 
 * `minhash` - minhashing k-mers,
 * `build` - building a database from k-mers,
+* `build-mh` - building a database from minhashed k-mers,
 * `all2all` - calculating number of common k-mers between all samples in the database,
 * `one2all` - calculating number of common kmers between single sample and all the samples in the database,
 * `distance` - calculating similarities/distances.
