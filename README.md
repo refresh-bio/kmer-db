@@ -14,7 +14,6 @@ Kmer-db operates in one of the following modes:
 Options:
 
 * `-t <threads>` - distributes processing over specified number of threads,
-* `-mh-input` - loads samples from minhashed files (applies only to `build` and `one2all` modes).
     
 The meaning of the positional arguments depends on the selected mode.
     
@@ -41,11 +40,11 @@ Construction of k-mers database is an obligatory step for further analyses. Both
 
 ```
 kmer-db build <sample_list> <database>
-kmer-db build -mh-input <sample_list> <database>
+kmer-db build-mh <sample_list> <database>
 ```
 
 Parameters:
- * `sample_list` (input) - file containing list of k-mer files, one entry per sample. The tool requires corresponding KMC-generated files (with `.pre` and `.suf` extensions), or minhashed files (`.minhash`) if `-mh-input` switch is specified.
+ * `sample_list` (input) - file containing list of k-mer files, one entry per sample. In `build` mode, the tool requires corresponding KMC-generated files (with `.pre` and `.suf` extensions). In `build-mh`, minhashed files are required (`.minhash`).
  * `database` (output) - file with k-mer database for all samples.
  
  ### Calculating number of common k-mers ###
@@ -101,7 +100,7 @@ kmer-db distance matrix.csv
 Same as above, but using only 10% of k-mers.
 ```
 kmer-db minhash pathogens.list 0.1
-kmer-db build -mh-input pathogens.list pathogens.db
+kmer-db build-mh pathogens.list pathogens.db
 kmer-db all2all pathogens.db matrix.csv
 kmer-db distance matrix.csv
 ```
@@ -113,12 +112,11 @@ kmer-db one2all pathogens.db salmonella vector.csv
 kmer-db distance vector.csv
 ```
 
-Same as above, but using only 10% of k-mers. File `salmonella.list` contains only `salmonella` sample.
+Same as above, but using only 10% of k-mers. 
 ```
 kmer-db minhash pathogens.list 0.1
-kmer-db minhash salmonella.list 0.1
-kmer-db build -mh-input pathogens.list pathogens.db
-kmer-db one2all -mh-input pathogens.db salmonella vector.csv
+kmer-db build-mh pathogens.list pathogens.db
+kmer-db one2all pathogens.db salmonella vector.csv
 kmer-db distance vector.csv
 ```
 
