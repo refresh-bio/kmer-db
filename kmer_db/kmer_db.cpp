@@ -100,16 +100,12 @@ FastKmerDb::FastKmerDb(int _num_threads) :
 							kmers2patternIds.prefetch(prefetch_kmer);
 						}
 #endif
-
-						// ***** Sprawdzanie w slowniku czy taki k-mer juz istnieje
+						// Check whether k-mer exists in a dictionary
 						auto i_kmer = kmers2patternIds.find(u_kmer);
-						pattern_id_t p_id;				// tu bedzie id wzorca (pattern), ktory aktualnie jest przypisany do tego k-mera
+						pattern_id_t p_id;		
 
 						if (i_kmer == nullptr)
 						{
-							//i_kmer = kmers2patternIds.insert(u_kmer, 0);
-							//p_id = 0;						// Pierwsze wyst. k-mera, wiec przypisujemy taki sztuczny wzorzec 0
-
 							// do not add kmer to hashtable - just mark as to be added
 							samplePatterns[to_add_id].first = u_kmer;
 							--to_add_id;
@@ -152,7 +148,7 @@ FastKmerDb::FastKmerDb(int _num_threads) :
 						size_t j;
 						auto p_id = samplePatterns[i].first;
 
-						// zliczamy kmery z aktualnego pliku (osobnika) o tym samym wzorcu
+						// count k-mers from current sample with considered template 
 						for (j = i + 1; j < hi; ++j) {
 							if (p_id != samplePatterns[j].first) {
 								break;
@@ -161,18 +157,14 @@ FastKmerDb::FastKmerDb(int _num_threads) :
 						size_t pid_count = j - i;
 
 						if (patterns[p_id].get_num_kmers() == pid_count && !patterns[p_id].get_is_parrent()) {
-							// Wzorzec mozna po prostu rozszerzyæ, bo wszystkie wskazniki do niego beda rozszerzane (realokacja tablicy id próbek we wzorcu) 
+							// Extend pattern - all k-mers with considered template exist in the analyzed sample
 							mem -= patterns[p_id].get_bytes();
 							patterns[p_id].expand(task.sample_id);
 							mem += patterns[p_id].get_bytes();
 						}
 						else
 						{
-							// Trzeba wygenerowaæ nowy wzorzec (podczepiony pod wzorzec macierzysty)
-							//auto *pat = new subpattern_t<sample_id_t>(*(patterns[p_id].last_subpattern), sampleId);
-							//mem += pat->getMem();
-
-							//	patterns.push_back(pattern_t{ (uint32_t)pid_count, pat });
+							// Generate new template 
 							pattern_id_t local_pid = task.new_pid->fetch_add(1);
 
 							threadPatterns[task.block_id].emplace_back(local_pid, pattern_t(patterns[p_id], p_id, task.sample_id, (uint32_t)pid_count));
@@ -231,14 +223,10 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 	LOG_DEBUG << "Restructurizing hashtable (serial)..." << endl;
 	auto start = std::chrono::high_resolution_clock::now();
 
-	// Musimy miec poprawne wskazniki do HT po wstawieniu do n_kmers elementow, a wiec nie moze sie w tym czasie zrobic restrukturyzacja
-	// Jesli jest ryzyko, to niech zrobi sie wczesniej, przed wstawianiem elementow
+	// to prevent hashtable restructuring during k-mer addition
 	kmers2patternIds.reserve_for_additional(n_kmers);
 	
 	samplePatterns.resize(n_kmers);
-#ifdef USE_RADULS
-	tmp_samplePatterns.resize(n_kmers);
-#endif
 
 	std::vector<size_t> num_existing_kmers(num_threads);
 	hashtableResizeTime += std::chrono::high_resolution_clock::now() - start;
@@ -298,7 +286,7 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 		}
 #endif
 		int i = kmers_to_add_to_HT[j];
-		auto i_kmer = kmers2patternIds.insert(samplePatterns[i].first, 0); // Pierwsze wyst. k-mera, wiec przypisujemy taki sztuczny wzorzec 0
+		auto i_kmer = kmers2patternIds.insert(samplePatterns[i].first, 0); // First k-mer occurence - assign with temporary pattern 0
 		samplePatterns[i].first = 0;
 		samplePatterns[i].second = i_kmer;
 	}
@@ -308,20 +296,8 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 	LOG_DEBUG << "Sorting (parallel)..." << endl;
 	start = std::chrono::high_resolution_clock::now();
 
-#ifdef USE_RADULS
-	uint32_t raduls_key_size;
-	size_t raduls_tmp = patterns.size();
-	for (raduls_key_size = 1; raduls_tmp >= 256; raduls_tmp >>= 8)
-		++raduls_key_size;
-
-	ParallelSort(samplePatterns.data(), samplePatterns.size(), tmp_samplePatterns.data(), sizeof(std::pair<pattern_id_t, pattern_id_t*>), raduls_key_size, num_threads);
-//	raduls::RadixSortMSD(reinterpret_cast<uint8_t*>(samplePatterns.data()), reinterpret_cast<uint8_t*>(tmp_samplePatterns.data()),
-//		samplePatterns.size(), sizeof(std::pair<pattern_id_t, pattern_id_t*>), raduls_key_size, num_threads);
-	if (raduls_key_size & 1)
-		samplePatterns.swap(tmp_samplePatterns); 
-#else
 	ParallelSort(samplePatterns.data(), samplePatterns.size(), nullptr, 0, 0, num_threads);
-#endif
+
 	
 	sortTime += std::chrono::high_resolution_clock::now() - start;
 	LOG_VERBOSE << "sort time: " << sortTime.count() << "  " << samplePatterns.size() << endl;

@@ -148,8 +148,9 @@ public:
 protected:
 	static const size_t ioBufferBytes;
 	
-	size_t patternBytes;		// iloœæ pamiêci zajmowana przez wBuszystkie wzorce
-								// K-mer database structures
+	// memory needed for all templates
+	size_t patternBytes;
+								
 	hash_map_lp<kmer_t, pattern_id_t> kmers2patternIds;
 
 	// liczba wystapien wzorca w kmer_dict, wektor id osobnikow zawierajacych k - mer)
@@ -158,17 +159,11 @@ protected:
 	std::vector<std::vector<std::pair<pattern_id_t, pattern_t>>> threadPatterns;
 
 	// first element - pattern id, second element 
-//	std::vector<std::pair<pattern_id_t, pattern_id_t*>> samplePatterns;
 	aligned_vector<std::pair<pattern_id_t, pattern_id_t*>> samplePatterns;
-#ifdef USE_RADULS
-	aligned_vector<std::pair<pattern_id_t, pattern_id_t*>> tmp_samplePatterns;
-#endif
 
 	CRegisteringQueue<DictionarySearchTask> dictionarySearchQueue;
 	
 	CRegisteringQueue<PatternExtensionTask> patternExtensionQueue;
-
-//	CRegisteringQueue<
 
 	std::vector<std::thread> dictionarySearchWorkers;
 

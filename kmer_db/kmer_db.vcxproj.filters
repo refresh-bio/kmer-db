@@ -32,13 +32,6 @@
     <ClInclude Include="parallel_sorter.h" />
     <ClInclude Include="pattern.h" />
     <ClInclude Include="queue.h" />
-    <ClInclude Include="raduls\comp_and_swap.h" />
-    <ClInclude Include="raduls\defs.h" />
-    <ClInclude Include="raduls\exceptions.h" />
-    <ClInclude Include="raduls\raduls.h" />
-    <ClInclude Include="raduls\record.h" />
-    <ClInclude Include="raduls\small_sort.h" />
-    <ClInclude Include="raduls\sorting_network.h" />
     <ClInclude Include="filter.h" />
     <ClInclude Include="kmc_file_wrapper.h" />
     <ClInclude Include="row_add.h" />
