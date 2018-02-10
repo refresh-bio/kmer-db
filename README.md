@@ -14,7 +14,8 @@ Kmer-db operates in one of the following modes:
     
 Options:
 
-* `-t <threads>` - distributes processing over specified number of threads,
+* `-t <threads>` - number of threads (default: number of available cores),
+* `-c <size_mb>` - size of cache buffer in megabytes, applies to `all2all` mode (default: 8; use L2 size for Intel CPUs and L3 for AMD to maximize performance).
     
 The meaning of the positional arguments depends on the selected mode.
     
