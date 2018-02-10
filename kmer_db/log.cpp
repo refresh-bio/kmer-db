@@ -1,4 +1,13 @@
 #include "log.h"
+/*
+This file is a part of Kmer-db software distributed under GNU GPL 3 licence.
+The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
+
+Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka Danek
+
+Version: 1.0
+Date   : 2018-02-10
+*/
 
 #include <sstream>
 #include <iomanip>
@@ -9,12 +18,16 @@ const int Log::LEVEL_DEBUG = 0;
 const int Log::LEVEL_VERBOSE = 1;
 const int Log::LEVEL_NORMAL = 2;
 
-Log::Log() 
+// *****************************************************************************************
+//
+Log::Log()
 {
 	enabled = false;
 	out = &std::cerr;
 }
 
+// *****************************************************************************************
+//
 Log& Log::operator<< (std::ostream& (*pf)(std::ostream&))
 {
 	if (enabled) { 
@@ -24,6 +37,8 @@ Log& Log::operator<< (std::ostream& (*pf)(std::ostream&))
 	return *this;
 }
 
+// *****************************************************************************************
+//
 Log& Log::operator<< (std::ios& (*pf)(std::ios&))
 {
 	if (enabled) { 
@@ -34,6 +49,8 @@ Log& Log::operator<< (std::ios& (*pf)(std::ios&))
 	return *this;
 }
 
+// *****************************************************************************************
+//
 Log& Log::operator<< (std::ios_base& (*pf)(std::ios_base&))
 {
 	if (enabled) { 
@@ -44,6 +61,8 @@ Log& Log::operator<< (std::ios_base& (*pf)(std::ios_base&))
 	return *this;
 }
 
+// *****************************************************************************************
+//
 std::string Log::formatLargeNumber(uint64_t num) {
 	std::string out = "";
 

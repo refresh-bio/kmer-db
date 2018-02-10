@@ -1,5 +1,12 @@
-// kmer_db.cpp : Defines the entry point for the console application.
-//
+/*
+This file is a part of Kmer-db software distributed under GNU GPL 3 licence.
+The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
+
+Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka Danek
+
+Version: 1.0
+Date   : 2018-02-10
+*/
 
 #include <algorithm>
 #include <cstdio>
@@ -40,13 +47,9 @@ const size_t FastKmerDb::ioBufferBytes = (2 << 29); //512MB buffer
 //const size_t FastKmerDb::ioBufferBytes = 16000000; //16MB buffer 
 //const size_t FastKmerDb::ioBufferBytes = 100000; //100KB buffer 
 
-#define ALL2ALL_VER	0
 
-
-
-/****************************************************************************************************************************************************/
-
-
+// *****************************************************************************************
+//
 FastKmerDb::FastKmerDb(int _num_threads, size_t cacheBufferMb) :
 	kmers2patternIds((unsigned long long) - 1), 
 	dictionarySearchQueue(1), 
@@ -160,7 +163,7 @@ FastKmerDb::FastKmerDb(int _num_threads, size_t cacheBufferMb) :
 						if (patterns[p_id].get_num_kmers() == pid_count && !patterns[p_id].get_is_parrent()) {
 							// Extend pattern - all k-mers with considered template exist in the analyzed sample
 							mem -= patterns[p_id].get_bytes();
-							patterns[p_id].expand(task.sample_id);
+							patterns[p_id].expand((sample_id_t) (task.sample_id));
 							mem += patterns[p_id].get_bytes();
 						}
 						else
@@ -195,8 +198,8 @@ FastKmerDb::FastKmerDb(int _num_threads, size_t cacheBufferMb) :
 
 }
 
-
-/****************************************************************************************************************************************************/
+// *****************************************************************************************
+//
 FastKmerDb::~FastKmerDb() {
 	dictionarySearchQueue.MarkCompleted();
 	for (auto& t : dictionarySearchWorkers) {
@@ -209,9 +212,8 @@ FastKmerDb::~FastKmerDb() {
 	}
 }
 
-
-
-/****************************************************************************************************************************************************/
+// *****************************************************************************************
+//
 sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction)
 {
 #ifdef USE_PREFETCH
@@ -249,19 +251,6 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 	// add kmers to hashtable sequentially
 	LOG_DEBUG << "Adding kmers (serial)..." << endl;
 	start = std::chrono::high_resolution_clock::now();
-
-/*	for (int tid = 0; tid < num_threads; ++tid) {
-		size_t n_kmers = kmers.size();
-		size_t block = n_kmers / num_threads;
-		size_t lo = tid * block;
-		size_t hi = (tid == num_threads - 1) ? n_kmers : lo + block;
-
-		for (size_t i = num_existing_kmers[tid]; i < hi; ++i) {
-			auto i_kmer = kmers2patternIds.insert(samplePatterns[i].first, 0); // Pierwsze wyst. k-mera, wiec przypisujemy taki sztuczny wzorzec 0				
-			samplePatterns[i].first = 0;
-			samplePatterns[i].second = i_kmer;
-		}
-	}*/
 
 	kmers_to_add_to_HT.clear();
 	for (int tid = 0; tid < num_threads; ++tid) {
@@ -376,8 +365,8 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 	return sampleId;
 }
 
-
-/****************************************************************************************************************************************************/
+// *****************************************************************************************
+//
 void FastKmerDb::mapKmers2Samples(uint64_t kmer, std::vector<sample_id_t>& samples) const {
 	
 	// find corresponding pattern id
@@ -389,7 +378,8 @@ void FastKmerDb::mapKmers2Samples(uint64_t kmer, std::vector<sample_id_t>& sampl
 
 }
 
-/****************************************************************************************************************************************************/
+// *****************************************************************************************
+//
 void FastKmerDb::serialize(std::ofstream& file) const {
 	
 	size_t numHastableElements = ioBufferBytes / sizeof(hash_map_lp<kmer_t, pattern_id_t>::item_t);
@@ -464,8 +454,8 @@ void FastKmerDb::serialize(std::ofstream& file) const {
 	file.write(reinterpret_cast<const char*>(&fraction), sizeof(fraction)); // write size of block to facilitate deserialization
 }
 
-
-/****************************************************************************************************************************************************/
+// *****************************************************************************************
+//
 bool FastKmerDb::deserialize(std::ifstream& file) {
 	
 	size_t numHastableElements = ioBufferBytes / sizeof(hash_map_lp<kmer_t, pattern_id_t>::item_t);
@@ -545,8 +535,8 @@ bool FastKmerDb::deserialize(std::ifstream& file) {
 	return true;
 }
 
-
-/****************************************************************************************************************************************************/
+// *****************************************************************************************
+//
 void FastKmerDb::savePatterns(std::ofstream& file) const {
 	
 	std::vector<uint32_t> aux(getSamplesCount());
@@ -561,8 +551,8 @@ void FastKmerDb::savePatterns(std::ofstream& file) const {
 
 }
 
-
-/****************************************************************************************************************************************************/
+// *****************************************************************************************
+//
 void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //const 
 {
 	int samples_count = getSamplesCount();
@@ -749,285 +739,6 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 								row_add_avx2(row, p, num_samples, to_add);
 							else
 								row_add_avx(row, p, num_samples, to_add);
-								
-#if ALL2ALL_VER==055
-							__m128i _to_add = _mm_set1_epi32((int)to_add);
-
-							int j;
-
-							if(num_samples % 32 >= 16)
-							{
-								j = -16;
-								goto inner_start;
-							}
-
-							for (j = 0; j + 32 <= num_samples; j += 32)
-							{
-								if (*p + 15 == *(p + 15))
-								{
-									auto _q = (__m128i*) (row + *p);
-
-									_mm_storeu_si128(_q, _mm_add_epi32(_mm_loadu_si128(_q), _to_add));
-									_mm_storeu_si128(_q + 1, _mm_add_epi32(_mm_loadu_si128(_q + 1), _to_add));
-									_mm_storeu_si128(_q + 2, _mm_add_epi32(_mm_loadu_si128(_q + 2), _to_add));
-									_mm_storeu_si128(_q + 3, _mm_add_epi32(_mm_loadu_si128(_q + 3), _to_add));
-
-									p += 16;
-								}
-								else
-								{
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-								}
-
-inner_start:
-								if (*p + 15 == *(p + 15))
-								{
-									auto _q = (__m128i*) (row + *p);
-
-									_mm_storeu_si128(_q, _mm_add_epi32(_mm_loadu_si128(_q), _to_add));
-									_mm_storeu_si128(_q + 1, _mm_add_epi32(_mm_loadu_si128(_q + 1), _to_add));
-									_mm_storeu_si128(_q + 2, _mm_add_epi32(_mm_loadu_si128(_q + 2), _to_add));
-									_mm_storeu_si128(_q + 3, _mm_add_epi32(_mm_loadu_si128(_q + 3), _to_add));
-
-									p += 16;
-								}
-								else
-								{
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-								}
-							}
-							num_samples -= j;
-
-							switch (num_samples % 16)
-							{
-							case 15:	row[*p++] += to_add;
-							case 14:	row[*p++] += to_add;
-							case 13:	row[*p++] += to_add;
-							case 12:	row[*p++] += to_add;
-							case 11:	row[*p++] += to_add;
-							case 10:	row[*p++] += to_add;
-							case 9:		row[*p++] += to_add;
-							case 8:		row[*p++] += to_add;
-							case 7:		row[*p++] += to_add;
-							case 6:		row[*p++] += to_add;
-							case 5:		row[*p++] += to_add;
-							case 4:		row[*p++] += to_add;
-							case 3:		row[*p++] += to_add;
-							case 2:		row[*p++] += to_add;
-							case 1:		row[*p++] += to_add;
-							}
-#elif ALL2ALL_VER==1
-							switch (num_samples % 16)
-							{
-							case 15:	row[*p++] += to_add;
-							case 14:	row[*p++] += to_add;
-							case 13:	row[*p++] += to_add;
-							case 12:	row[*p++] += to_add;
-							case 11:	row[*p++] += to_add;
-							case 10:	row[*p++] += to_add;
-							case 9:		row[*p++] += to_add;
-							case 8:		row[*p++] += to_add;
-							case 7:		row[*p++] += to_add;
-							case 6:		row[*p++] += to_add;
-							case 5:		row[*p++] += to_add;
-							case 4:		row[*p++] += to_add;
-							case 3:		row[*p++] += to_add;
-							case 2:		row[*p++] += to_add;
-							case 1:		row[*p++] += to_add;
-							}
-
-							__m128i _to_add = _mm_set1_epi32((int)to_add);
-
-							for (int j = num_samples % 16; j < num_samples; j += 16)
-							{
-								if (*p + 15 == *(p + 15))
-								{
-									auto _q = (__m128i*) (row + *p);
-
-									_mm_storeu_si128(_q, _mm_add_epi32(_mm_loadu_si128(_q), _to_add));
-									_mm_storeu_si128(_q + 1, _mm_add_epi32(_mm_loadu_si128(_q + 1), _to_add));
-									_mm_storeu_si128(_q + 2, _mm_add_epi32(_mm_loadu_si128(_q + 2), _to_add));
-									_mm_storeu_si128(_q + 3, _mm_add_epi32(_mm_loadu_si128(_q + 3), _to_add));
-
-									p += 16;
-								}
-								else
-								{
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-								}
-							}
-#elif ALL2ALL_VER==2
-							switch (num_samples % 16)
-							{
-							case 15:	row[*p++] += to_add;
-							case 14:	row[*p++] += to_add;
-							case 13:	row[*p++] += to_add;
-							case 12:	row[*p++] += to_add;
-							case 11:	row[*p++] += to_add;
-							case 10:	row[*p++] += to_add;
-							case 9:		row[*p++] += to_add;
-							case 8:		row[*p++] += to_add;
-							case 7:		row[*p++] += to_add;
-							case 6:		row[*p++] += to_add;
-							case 5:		row[*p++] += to_add;
-							case 4:		row[*p++] += to_add;
-							case 3:		row[*p++] += to_add;
-							case 2:		row[*p++] += to_add;
-							case 1:		row[*p++] += to_add;
-							}
-
-							for (int j = num_samples % 16; j < num_samples; j += 16)
-							{
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-							}
-#elif ALL2ALL_VER==3
-							switch (num_samples % 8)
-							{
-							case 7:		row[*p++] += to_add;
-							case 6:		row[*p++] += to_add;
-							case 5:		row[*p++] += to_add;
-							case 4:		row[*p++] += to_add;
-							case 3:		row[*p++] += to_add;
-							case 2:		row[*p++] += to_add;
-							case 1:		row[*p++] += to_add;
-							}
-
-							for (int j = num_samples % 8; j < num_samples; j += 8)
-							{
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-								row[*p++] += to_add;
-							}
-#elif ALL2ALL_VER==4
-							switch (num_samples % 16)
-							{
-							case 15:	row[*p++] += to_add;
-							case 14:	row[*p++] += to_add;
-							case 13:	row[*p++] += to_add;
-							case 12:	row[*p++] += to_add;
-							case 11:	row[*p++] += to_add;
-							case 10:	row[*p++] += to_add;
-							case 9:		row[*p++] += to_add;
-							case 8:		row[*p++] += to_add;
-							case 7:		row[*p++] += to_add;
-							case 6:		row[*p++] += to_add;
-							case 5:		row[*p++] += to_add;
-							case 4:		row[*p++] += to_add;
-							case 3:		row[*p++] += to_add;
-							case 2:		row[*p++] += to_add;
-							case 1:		row[*p++] += to_add;
-							}
-
-							for (int j = num_samples % 16; j < num_samples; j += 16)
-							{
-								if (*p + 15 == *(p + 15))
-								{
-									auto q = row + *p;
-									q[0] += to_add;
-									q[1] += to_add;
-									q[2] += to_add;
-									q[3] += to_add;
-									q[4] += to_add;
-									q[5] += to_add;
-									q[6] += to_add;
-									q[7] += to_add;
-									q[8] += to_add;
-									q[9] += to_add;
-									q[10] += to_add;
-									q[11] += to_add;
-									q[12] += to_add;
-									q[13] += to_add;
-									q[14] += to_add;
-									q[15] += to_add;
-									p += 16;
-								}
-								else
-								{
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-									row[*p++] += to_add;
-								}
-							}
-#endif
-
 							++id;
 						}
 					}
@@ -1086,8 +797,6 @@ inner_start:
 
 	int pid_to_cout = 0;
 	for (int pid = 0; pid < patterns.size(); ) {
-//		if (pid > 10000000)
-//			break;
 		if (pid >= pid_to_cout)
 		{
 			std::cout << pid << " of " << patterns.size() << "\r";
@@ -1220,8 +929,8 @@ inner_start:
 #endif
 }
 
-
-/****************************************************************************************************************************************************/
+// *****************************************************************************************
+//
 void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<uint32_t>& similarities) const {
 	similarities.resize(this->getSamplesCount(), 0);
 
@@ -1287,8 +996,6 @@ void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<ui
 			
 			size_t n_patterns = patterns2countVector.size();
 			size_t block_size = n_patterns / num_threads;
-//			size_t lo = tid * block_size;
-//			size_t hi = (tid == num_threads - 1) ? n_patterns : lo + block_size;
 			size_t lo = range_boundaries[tid];
 			size_t hi = range_boundaries[tid+1];
 			auto &my_localSimilarities = localSimilarities[tid];

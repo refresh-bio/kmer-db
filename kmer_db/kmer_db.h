@@ -1,12 +1,21 @@
 #pragma once
+/*
+This file is a part of Kmer-db software distributed under GNU GPL 3 licence.
+The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
+
+Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka Danek
+
+Version: 1.0
+Date   : 2018-02-10
+*/
+
 #include "pattern.h"
 #include "hashmap_lp.h"
-#include "hashmap_dh.h"
 #include "array.h"
 #include "queue.h"
 #include "aligned_vector.h"
-#include "parallel_sorter.h"
 #include "row_add.h"
+#include "parallel_sorter.h"
 
 #include <map>
 #include <fstream>
@@ -55,7 +64,7 @@ public:
 	virtual std::vector<kmer_t> getKmers() const = 0;
 
 	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction) {
-		sample_id_t newId = sampleNames.size();
+		sample_id_t newId = (sample_id_t) sampleNames.size();
 		sampleNames.push_back(sampleName);
 		sampleKmersCount.push_back(kmers.size());
 

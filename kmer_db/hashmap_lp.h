@@ -1,6 +1,13 @@
 #pragma once
+/*
+This file is a part of Kmer-db software distributed under GNU GPL 3 licence.
+The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
 
-// Szablon klasy tablicy haszuj¹cej wykorzystujacy adresowanie liniowe
+Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka Danek
+
+Version: 1.0
+Date   : 2018-02-10
+*/
 
 #include <mmintrin.h>
 #include <cstdint>
@@ -11,27 +18,32 @@
 
 #include "log.h"
 
+// *****************************************************************************************
+//
 template<typename T>
 inline size_t my_hasher_lp(T x)
 {
 	return 0;			// !!! Fake impl.
 }
 
-
+// *****************************************************************************************
+//
 template<>
 inline size_t my_hasher_lp<uint64_t>(uint64_t x)
 {
 	return x * 0xc70f6907ull;
 }
 
-
+// *****************************************************************************************
+//
 template<>
 inline size_t my_hasher_lp<uint32_t>(uint32_t x)
 {
 	return x * 0xc70f6907ul;
 }
 
-
+// *****************************************************************************************
+//
 template <typename Key, typename Value>
 class hash_map_lp {
 public:
@@ -56,6 +68,8 @@ private:
 	size_t ht_total;
 	size_t ht_match;
 
+	// *****************************************************************************************
+	//
 	void restruct(void)
 	{
 		item_t *old_data = data;
@@ -73,8 +87,6 @@ private:
 
 		ht_memory += allocated * sizeof(item_t);
 
-		//cout << "\n--- Realloc to: " << allocated << std::endl;
-
 		for (size_t i = 0; i < old_allocated; ++i)
 			if (old_data[i].key != empty_key)
 				insert(old_data[i].key, old_data[i].val);
@@ -84,19 +96,26 @@ private:
 	}
 
 public:
+	// *****************************************************************************************
+	//
 	// fixme: iterator-like functionality - change to iterator
 	item_t* begin() { return data; }
 	const item_t* cbegin() const { return data; }
 	item_t* end() { return data + allocated; }
 	const item_t* cend() const { return data + allocated; }
 
+	// *****************************************************************************************
+	//
 	bool is_free(const item_t& item) const {
 		return item.key == empty_key;
 	}
 
-
+	// *****************************************************************************************
+	//
 	hash_map_lp() = delete;
 
+	// *****************************************************************************************
+	//
 	hash_map_lp(Key k_empty)
 	{
 		ht_memory = 0;
@@ -119,16 +138,22 @@ public:
 		set_special_keys(k_empty);
 	}
 
+	// *****************************************************************************************
+	//
 	~hash_map_lp()
 	{
 		if (data)
 			delete[] data;
 	}
 
+	// *****************************************************************************************
+	//
 	size_t get_bytes() const {
 		return ht_memory;
 	}
 
+	// *****************************************************************************************
+	//
 	void set_special_keys(Key k_empty)
 	{
 		empty_key = k_empty;
@@ -136,6 +161,8 @@ public:
 		clear();
 	}
 
+	// *****************************************************************************************
+	//
 	void clear(void)
 	{
 		size = 0;
@@ -150,7 +177,8 @@ public:
 		}
 	}
 
-
+	// *****************************************************************************************
+	//
 	void parallel_clear(void)
 	{
 		size = 0;
@@ -184,8 +212,8 @@ public:
 		LOG_DEBUG << std::endl;
 	}
 
-
-	// Mozna to przyspieszyc tak, zebyinsert wykorzystywal wiedze o tym gdzie skonczyl szukac find
+	// *****************************************************************************************
+	//
 	Value* insert(Key k, Value v)
 	{
 		if (size >= size_when_restruct)
@@ -212,10 +240,14 @@ public:
 		return &(data[h].val);
 	}
 
+	// *****************************************************************************************
+	//
 	const Value* cfind(Key k) const {
 		return find(k);
 	}
 
+	// *****************************************************************************************
+	//
 	Value* find(Key k) const
 	{
 		size_t h = my_hasher_lp<Key>(k) & allocated_mask;
@@ -227,12 +259,10 @@ public:
 
 		h = (h + 1) & allocated_mask;
 
-		//		++ht_total;
 		while (data[h].key != empty_key)
 		{
 			if (data[h].key == k)
 			{
-				//				++ht_match;
 				return &(data[h].val);
 			}
 			else
@@ -244,7 +274,8 @@ public:
 		return nullptr;
 	}
 
-	//	__declspec(noinline) 
+	// *****************************************************************************************
+	//
 	void prefetch(Key k)
 	{
 		size_t h = my_hasher_lp<Key>(k) & allocated_mask;
@@ -256,11 +287,15 @@ public:
 #endif
 	}
 
+	// *****************************************************************************************
+	//
 	size_t get_size(void) const
 	{
 		return filled;
 	}
 
+	// *****************************************************************************************
+	//
 	void reserve_for_additional(size_t n_elems)
 	{
 		if (filled + n_elems <= allocated * max_fill_factor)

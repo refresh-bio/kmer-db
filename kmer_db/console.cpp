@@ -1,3 +1,12 @@
+/*
+This file is a part of Kmer-db software distributed under GNU GPL 3 licence.
+The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
+
+Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka Danek
+
+Version: 1.0
+Date   : 2018-02-10
+*/
 
 #include <algorithm>
 #include <string>
@@ -18,11 +27,12 @@
 using namespace std;
 
 
-// Pokazuje stan
+// *****************************************************************************************
+//
 void show_progress(const AbstractKmerDb &db)
 {
 	size_t tot_pat_size = 0;
-	size_t num_calc = 0;			// Liczba operacji przy wyznaczaniu macierzy podobieñstwa
+	size_t num_calc = 0;			
 
 	LOG_VERBOSE << "dict= " << Log::formatLargeNumber(db.getKmersCount())
 		<< " (" << db.getKmersCount() * 2 * sizeof(uint64_t) / (1ull << 20) << " MB)   "
@@ -32,8 +42,8 @@ void show_progress(const AbstractKmerDb &db)
 		<< endl;
 }
 
-/****************************************************************************************************************************************************/
-
+// *****************************************************************************************
+//
 int Console::parse(int argc, char** argv) {
 
 	cout << "kmer-db version 1.0" << endl 
@@ -56,7 +66,7 @@ int Console::parse(int argc, char** argv) {
 
 		it = find(params.begin(), std::prev(params.end()), "-t"); // number of threads
 		if (it != std::prev(params.end())) {
-			numThreads = atof(std::next(it)->c_str());
+			numThreads = (int) (atof(std::next(it)->c_str()));
 			params.erase(it, it + 2);
 		}
 
@@ -108,8 +118,8 @@ int Console::parse(int argc, char** argv) {
 	return 0;
 }
 
-
-
+// *****************************************************************************************
+//
 int Console::runMinHash(const std::string& multipleKmcSamples, double fraction) {
 	cout << "Minhashing samples..." << endl;
 
@@ -152,10 +162,8 @@ int Console::runMinHash(const std::string& multipleKmcSamples, double fraction) 
 	return 0;
 }
 
-
-
-/****************************************************************************************************************************************************/
-
+// *****************************************************************************************
+//
 int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::string dbFilename, bool loadMinhash) {
 
 	cout << "Processing samples..." << endl;
@@ -235,8 +243,8 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 	return 0;
 }
 
-/****************************************************************************************************************************************************/
-
+// *****************************************************************************************
+//
 int Console::runAllVsAll(const std::string& dbFilename, const std::string& similarityFile) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
 	std::ofstream ofs(similarityFile);
@@ -285,9 +293,8 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 	return 0;
 }
 
-
-/****************************************************************************************************************************************************/
-
+// *****************************************************************************************
+//
 int Console::runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFile) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
 	FastKmerDb db(numThreads, cacheBufferMb);
@@ -359,9 +366,8 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 	return 0;
 }
 
-
-/****************************************************************************************************************************************************/
-
+// *****************************************************************************************
+//
 int Console::runDistanceCalculation(const std::string& similarityFilename) {
 
 	std::vector<size_t> kmersCount;
@@ -441,9 +447,8 @@ int Console::runDistanceCalculation(const std::string& similarityFilename) {
 	cout << "OK" << endl;
 }
 
-
-/****************************************************************************************************************************************************/
-
+// *****************************************************************************************
+//
 int Console::runListPatterns(const std::string& dbFilename, const std::string& patternFile) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
 	FastKmerDb db(numThreads, cacheBufferMb);
@@ -468,8 +473,8 @@ int Console::runListPatterns(const std::string& dbFilename, const std::string& p
 	return 0;
 }
 
-
-/****************************************************************************************************************************************************/
+// *****************************************************************************************
+//
 void Console::showInstructions() {
 	cout << "USAGE" << endl << endl
 
@@ -485,7 +490,7 @@ void Console::showInstructions() {
 		<< "Options:" << endl
 		<< "  -t <threads> - number of threads (default: number of available cores)," << endl
 		<< "  -buffer <size_mb> - size of cache buffer in megabytes, applies to all2all mode" << endl 
-		<< "                      (use L2 size for Intel CPUs and L3 for AMD to maximize performance)." << endl 
+		<< "                      (use L3 size for Intel CPUs and L2 for AMD to maximize performance; default: 8)." << endl 
 		<< "The meaning of the positional arguments depends on the selected mode." << endl << endl
 
 		<< "Building k-mer database:" << endl

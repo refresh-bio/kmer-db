@@ -1,5 +1,14 @@
-#ifndef _QUEUE_H
-#define _QUEUE_H
+#pragma once
+/*
+This file is a part of Kmer-db software distributed under GNU GPL 3 licence.
+The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
+
+Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka Danek
+
+Version: 1.0
+Date   : 2018-02-10
+*/
+
 // Generic multithreading queues
 
 #include <queue>
@@ -12,7 +21,8 @@
 
 using namespace std;
 
-
+// *****************************************************************************************
+//
 class Semaphore {
 protected:
 	int counter;
@@ -20,18 +30,26 @@ protected:
 	std::condition_variable cv;
 
 public:
+	// *****************************************************************************************
+	//
 	Semaphore() : counter(0) {}
 
+	// *****************************************************************************************
+	//
 	void inc() {
 		std::unique_lock<std::mutex> lk(mutex);
 		++counter;
 	}
 
+	// *****************************************************************************************
+	//
 	void inc(int num) {
 		std::unique_lock<std::mutex> lk(mutex);
 		counter += num;
 	}
 
+	// *****************************************************************************************
+	//
 	void dec() {
 		std::unique_lock<std::mutex> lk(mutex);
 		--counter;
@@ -39,6 +57,8 @@ public:
 		cv.notify_one();
 	}
 
+	// *****************************************************************************************
+	//
 	void dec_notify_all() {
 		std::unique_lock<std::mutex> lk(mutex);
 		--counter;
@@ -46,12 +66,13 @@ public:
 		cv.notify_all();
 	}
 
+	// *****************************************************************************************
+	//
 	void waitForZero() {
 		std::unique_lock<std::mutex> lk(mutex);
 		cv.wait(lk, [this] {return counter == 0; });
 	}
 };
-
 
 // ************************************************************************************
 // Multithreading queue with registering mechanism:
@@ -69,14 +90,20 @@ template<typename T> class CRegisteringQueue
 	condition_variable cv_queue_empty;
 
 public:
-	CRegisteringQueue(int _n_producers) 
+	// *****************************************************************************************
+	//
+	CRegisteringQueue(int _n_producers)
 	{
 		Restart(_n_producers);
 	};
 
-	~CRegisteringQueue() 
+	// *****************************************************************************************
+	//
+	~CRegisteringQueue()
 	{};
 
+	// *****************************************************************************************
+	//
 	void Restart(int _n_producers)
 	{
 		unique_lock<mutex> lck(mtx);
@@ -86,20 +113,26 @@ public:
 		n_elements = 0;
 	}
 
-	bool IsEmpty() 
+	// *****************************************************************************************
+	//
+	bool IsEmpty()
 	{
 		lock_guard<mutex> lck(mtx);
 		return n_elements == 0;
 	}
 
-	bool IsCompleted() 
+	// *****************************************************************************************
+	//
+	bool IsCompleted()
 	{
 		lock_guard<mutex> lck(mtx);
 
 		return n_elements == 0 && n_producers == 0;
 	}
 
-	void MarkCompleted() 
+	// *****************************************************************************************
+	//
+	void MarkCompleted()
 	{
 		lock_guard<mutex> lck(mtx);
 		n_producers--;
@@ -108,7 +141,9 @@ public:
 			cv_queue_empty.notify_all();
 	}
 
-	void Push(T data) 
+	// *****************************************************************************************
+	//
+	void Push(T data)
 	{
 		unique_lock<mutex> lck(mtx);
 		bool was_empty = n_elements == 0;
@@ -119,6 +154,8 @@ public:
 			cv_queue_empty.notify_all();
 	}
 
+	// *****************************************************************************************
+	//
 	void PushRange(vector<T> &data)
 	{
 		unique_lock<mutex> lck(mtx);
@@ -132,6 +169,8 @@ public:
 			cv_queue_empty.notify_all();
 	}
 
+	// *****************************************************************************************
+	//
 	bool Pop(T &data)
 	{
 		unique_lock<mutex> lck(mtx);
@@ -149,12 +188,10 @@ public:
 		return true;
 	}
 
-	uint32_t GetSize() 
+	// *****************************************************************************************
+	//
+	uint32_t GetSize()
 	{
 		return n_elements;
 	}
 };
-
-#endif
-
-// EOF

@@ -1,4 +1,14 @@
 #pragma once
+/*
+This file is a part of Kmer-db software distributed under GNU GPL 3 licence.
+The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
+
+Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka Danek
+
+Version: 1.0
+Date   : 2018-02-10
+*/
+
 #include "elias_gamma.h"
 
 #include <cstdint>
@@ -9,9 +19,10 @@
 typedef int64_t pattern_id_t;
 typedef uint32_t sample_id_t;
 
+// *****************************************************************************************
+//
 class pattern_t {
 private:
-
 	int64_t num_kmers;			// number of kmers with this pattern
 	int64_t parent_id;				// parrent pattern id
 
@@ -27,36 +38,69 @@ private:
 	static CEliasGamma elias;
 
 public:
-
+	// *****************************************************************************************
+	//
 	const uint64_t* get_data() const { return data; }
 
+	// *****************************************************************************************
+	//
 	int64_t get_num_kmers() const { return num_kmers; }
+
+	// *****************************************************************************************
+	//
 	void set_num_kmers(int64_t v) { num_kmers = v; }
+
+	// *****************************************************************************************
+	//
 	void add_num_kmers(int64_t v) { num_kmers += v; }
 
+	// *****************************************************************************************
+	//
 	sample_id_t get_num_samples() const { return num_samples; }
+
+	// *****************************************************************************************
+	//
 	sample_id_t get_num_local_samples() const { return num_local_samples; }
+
+	// *****************************************************************************************
+	//
 	size_t get_num_bits() const { return num_bits; }
 
+	// *****************************************************************************************
+	//
 	bool get_is_parrent() const { return is_parent; }
+
+	// *****************************************************************************************
+	//
 	int64_t get_parent_id() { return parent_id; }
+
+	// *****************************************************************************************
+	//
 	const int64_t get_parent_id() const { return parent_id; }
 
+	// *****************************************************************************************
+	//
 	size_t get_data_bytes() const {
 		return (num_bits == 0) ? 0 : ((num_bits + 127) / 128) * 16;
 	}
 
+	// *****************************************************************************************
+	//
 	size_t get_bytes(void) const {
 		return sizeof(pattern_t) + get_data_bytes();
 	}
 
-	pattern_t() : 
+	// *****************************************************************************************
+	//
+	pattern_t() :
 		num_samples(0), num_local_samples(0), last_sample_id(0),
 		parent_id(-1), num_kmers(0), num_bits(0),
 		data(nullptr), is_parent(false)
 	{
 	}
 
+	// *****************************************************************************************
+	//
 	pattern_t(sample_id_t x, uint64_t num_kmers) :
 		num_samples(1), num_local_samples(1), last_sample_id(x),
 		parent_id(-1), num_kmers(num_kmers), num_bits(0),
@@ -65,6 +109,8 @@ public:
 	{
 	}
 
+	// *****************************************************************************************
+	//
 	pattern_t(pattern_t &v, int64_t parent_id, sample_id_t x, uint64_t num_kmers) :
 		num_samples(v.num_samples + 1), num_local_samples(1), last_sample_id(x),
 		parent_id(-1), num_kmers(num_kmers), num_bits(0),
@@ -76,13 +122,19 @@ public:
 		}
 	}
 
+	// *****************************************************************************************
+	//
 	pattern_t(const pattern_t &v) = delete;
 
-	pattern_t(pattern_t &&v) 
+	// *****************************************************************************************
+	//
+	pattern_t(pattern_t &&v)
 	{
 		*this = std::move(v);
 	}
 
+	// *****************************************************************************************
+	//
 	~pattern_t()
 	{
 		if (data)
@@ -95,8 +147,12 @@ public:
 		}
 	}
 
+	// *****************************************************************************************
+	//
 	pattern_t& operator=(const pattern_t &v) = delete;
 	
+	// *****************************************************************************************
+	//
 	pattern_t& operator=(pattern_t &&v) {
 		is_parent = v.is_parent;
 		num_samples = v.num_samples;
@@ -118,7 +174,8 @@ public:
 		return *this;
 	}
 	
-
+	// *****************************************************************************************
+	//
 	bool operator==(const pattern_t &v)
 	{
 		if (v.num_samples != num_samples)
@@ -133,6 +190,8 @@ public:
 		return true;
 	}
 
+	// *****************************************************************************************
+	//
 	void release() {
 		if (data)
 		{
@@ -145,7 +204,8 @@ public:
 		}
 	}
 
-	// rozszerza listê genomów o now¹ pozycjê
+	// *****************************************************************************************
+	//
 	void expand(const sample_id_t x)
 	{
 		++num_samples;

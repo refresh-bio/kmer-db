@@ -150,7 +150,6 @@
     <ClInclude Include="console.h" />
     <ClInclude Include="elias_gamma.h" />
     <ClInclude Include="filter.h" />
-    <ClInclude Include="hashmap_dh.h" />
     <ClInclude Include="hashmap_lp.h" />
     <ClInclude Include="instrset.h" />
     <ClInclude Include="kmc_file_wrapper.h" />

@@ -1,4 +1,13 @@
 #pragma once
+/*
+This file is a part of Kmer-db software distributed under GNU GPL 3 licence.
+The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
+
+Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka Danek
+
+Version: 1.0
+Date   : 2018-02-10
+*/
 
 #include "kmc_file_wrapper.h"
 #include "queue.h"
@@ -9,7 +18,8 @@
 #include <map>
 #include <fstream>
 
-
+// *****************************************************************************************
+//
 struct Task {
 	size_t fileId;
 	size_t threadId;
@@ -20,6 +30,8 @@ struct Task {
 	uint32_t kmerLength;
 	double fraction;
 
+	// *****************************************************************************************
+	//
 	Task(size_t fileId, size_t threadId, const std::string& filePath) :
 		fileId(fileId), threadId(threadId), filePath(filePath), file(nullptr), kmers(nullptr) {
 	
@@ -33,11 +45,14 @@ struct Task {
 	}
 };
 
-
+// *****************************************************************************************
+//
 class Loader {
 public:
 	
 	Loader(std::shared_ptr<IKmerFilter> filter, bool tryMinHash, int _num_threads);
+	// *****************************************************************************************
+	//
 	~Loader() {
 		readerQueue.MarkCompleted();
 		prefetcherQueue.MarkCompleted();

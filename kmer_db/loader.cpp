@@ -1,3 +1,13 @@
+/*
+This file is a part of Kmer-db software distributed under GNU GPL 3 licence.
+The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
+
+Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka Danek
+
+Version: 1.0
+Date   : 2018-02-10
+*/
+
 #include "loader.h"
 
 #include <string>
@@ -6,7 +16,8 @@
 
 using namespace std;
 
-/****************************************************************************************************************************************************/
+// *****************************************************************************************
+//
 Loader::Loader(std::shared_ptr<IKmerFilter> filter, bool useMinhash, int _num_threads) :
 	prefetcherQueue(1), 
 	intermediateQueue(1),
@@ -16,8 +27,7 @@ Loader::Loader(std::shared_ptr<IKmerFilter> filter, bool useMinhash, int _num_th
 	useMinhash(useMinhash) {
 
 	kmersCollections.resize(numThreads);
-
-
+	
 	// generate preloader thread
 	prefetcher = std::thread([this, filter]() {
 		while (!this->prefetcherQueue.IsCompleted()) {
@@ -26,7 +36,8 @@ Loader::Loader(std::shared_ptr<IKmerFilter> filter, bool useMinhash, int _num_th
 				cout << "\r" << std::string(task->sampleName.size() + 100, ' ') << "\r";
 				ostringstream oss;
 				cout << task->sampleName << " (" << task->fileId + 1 << "/" << kmcFileList.size() << ")...";
-				
+				fflush(stdout);
+
 				task->file = std::make_shared<KmcFileWrapper>(filter ? filter->clone() : nullptr);
 				if (task->file->open(kmcFileList[task->fileId], this->useMinhash)) {
 					intermediateQueue.Push(task);
@@ -60,8 +71,8 @@ Loader::Loader(std::shared_ptr<IKmerFilter> filter, bool useMinhash, int _num_th
 	}
 }
 
-
-/****************************************************************************************************************************************************/
+// *****************************************************************************************
+//
 void Loader::configure(const std::string& multipleKmcSamples) {
 	std::ifstream ifs(multipleKmcSamples);
 
@@ -69,14 +80,10 @@ void Loader::configure(const std::string& multipleKmcSamples) {
 	while (ifs >> fname) {
 		kmcFileList.push_back(fname);
 	}
-
-//	sort(kmcFileList.begin(), kmcFileList.end());
-//	kmcFileList.erase(unique(kmcFileList.begin(), kmcFileList.end()), kmcFileList.end());
-
-//	kmcFileList.resize(3);
 }
 
-/****************************************************************************************************************************************************/
+// *****************************************************************************************
+//
 void Loader::initPrefetch() {
 	
 	for (int tid = 0; tid < numThreads; ++tid) {
@@ -93,8 +100,8 @@ void Loader::initPrefetch() {
 	currentFileId = std::min(kmcFileList.size(), currentFileId + numThreads);
 }
 
-
-/****************************************************************************************************************************************************/
+// *****************************************************************************************
+//
 void Loader::initLoad() {
 	// rewrite stuff from intermediate to reader queue
 	std::shared_ptr<Task> task;

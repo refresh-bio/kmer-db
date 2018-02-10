@@ -1,9 +1,19 @@
-#include "pattern.h"
+/*
+This file is a part of Kmer-db software distributed under GNU GPL 3 licence.
+The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
 
+Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka Danek
+
+Version: 1.0
+Date   : 2018-02-10
+*/
+
+#include "pattern.h"
 
 CEliasGamma pattern_t::elias;
 
-
+// *****************************************************************************************
+//
 char* pattern_t::pack(char* buffer) const {
 	// store members
 	*reinterpret_cast<decltype(num_kmers)*>(buffer) = num_kmers;
@@ -36,6 +46,8 @@ char* pattern_t::pack(char* buffer) const {
 	return buffer;
 }
 
+// *****************************************************************************************
+//
 char * pattern_t::unpack(char* buffer) {
 	if (num_local_samples) {
 		delete[] data;
@@ -74,6 +86,8 @@ char * pattern_t::unpack(char* buffer) {
 	return buffer;
 }
 
+// *****************************************************************************************
+//
 void pattern_t::decodeSamples(uint32_t* out) const {
 	if (num_local_samples) {
 		out[num_local_samples - 1] = last_sample_id;

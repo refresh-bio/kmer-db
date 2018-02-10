@@ -1,7 +1,15 @@
 #pragma once
+/*
+This file is a part of Kmer-db software distributed under GNU GPL 3 licence.
+The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
+
+Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka Danek
+
+Version: 1.0
+Date   : 2018-02-10
+*/
 
 #include <iostream>
-
 
 using namespace std;
 
@@ -14,6 +22,8 @@ using __int64 = long long int;
 
 #define USE_MALLOC
 
+// *****************************************************************************************
+//
 class CEliasGamma
 {
 	const uint32_t LEN_ILOG2 = 15;
@@ -24,18 +34,22 @@ class CEliasGamma
 	uint8_t *lut_ilog2;
 	uint8_t *lut_prefix_len;
 
+	// *****************************************************************************************
+	//
 	FORCE_INLINE
 	uint32_t round16(uint32_t x)
 	{
 		return (x + 15) / 16 * 16;
 	}
 	
+	// *****************************************************************************************
+	//
 	FORCE_INLINE
 	uint32_t ilog2(uint32_t x)
 	{
 		uint32_t r;
 
-		if (x < (1 << LEN_ILOG2))
+		if (x < (1u << LEN_ILOG2))
 			return lut_ilog2[x];
 		else
 		{
@@ -52,6 +66,8 @@ class CEliasGamma
 		return r;
 	}
 	
+	// *****************************************************************************************
+	//
 	FORCE_INLINE
 	uint32_t no_of_16B_blocks(uint32_t no_bits)
 	{
@@ -63,12 +79,16 @@ class CEliasGamma
 			return 3 * ((no_bits + 127 + 256) / (128 + 256));
 	}
 
+	// *****************************************************************************************
+	//
 	FORCE_INLINE
 	uint32_t calculate_size(uint32_t value)
 	{
 		return 2 * ilog2(value) - 1;
 	}
 	
+	// *****************************************************************************************
+	//
 	FORCE_INLINE
 	uint32_t calculate_size(uint32_t *input, uint32_t input_size)
 	{
@@ -80,16 +100,17 @@ class CEliasGamma
 		return r;
 	}
 	
-//	__declspec(noinline)
+	// *****************************************************************************************
+	//
 	FORCE_INLINE
 	void encode(uint32_t value, uint64_t *&output, uint32_t &output_size_in_bits)
 	{
 		uint32_t prefix_len = ilog2(value);
 		uint32_t code_len = 2 * prefix_len - 1;
 		
-		uint64_t code = masks[prefix_len - 1];				// odp. liczba jedynek
-		code <<= prefix_len;						// bit 0 i miejsce na pozostale bity
-		code += value - shifts[prefix_len - 1];		// pozostale bity
+		uint64_t code = masks[prefix_len - 1];				// necessary no. of 1s
+		code <<= prefix_len;								// 0 bit and space for remaining bits
+		code += value - shifts[prefix_len - 1];				// remaining bits
 
 		uint32_t current_block_filled_bits = output_size_in_bits % 64;
 		uint32_t current_block_word_id = output_size_in_bits / 64;
@@ -108,7 +129,8 @@ class CEliasGamma
 		output_size_in_bits += code_len;
 	}
 
-//	__declspec(noinline)
+	// *****************************************************************************************
+	//
 	FORCE_INLINE
 	uint32_t decode(uint64_t *input, uint32_t &input_pos_in_bits)
 	{
@@ -139,7 +161,7 @@ class CEliasGamma
 		uint32_t word_id = input_pos_in_bits / 64;
 		uint32_t bit_id = 63 - input_pos_in_bits % 64;
 
-		// 1 jest bardzo czeste, wiec szybki test dla niego
+		// 1 is frequent, so quick test for it
 		if (!(input[word_id] & shifts[bit_id]))
 		{
 			++input_pos_in_bits;
@@ -150,7 +172,7 @@ class CEliasGamma
 		bool prefix_ready = false;
 
 		while(!prefix_ready)
-			if (bit_id + 1 >= LEN_PREFIX_LEN)	// W s³owie miesci sie caly zakres LUTa
+			if (bit_id + 1 >= LEN_PREFIX_LEN)		
 			{
 				uint64_t lut_id = input[word_id] >> (bit_id - LEN_PREFIX_LEN + 1);
 				lut_id &= masks[LEN_PREFIX_LEN];
@@ -169,7 +191,7 @@ class CEliasGamma
 					prefix_len += iter_prefix_len;
 				}
 			}
-			else // Za malo bitow, wiec bierzemy te, ktore sa
+			else 
 			{
 				uint64_t lut_id = input[word_id] & masks[bit_id + 1];
 				lut_id <<= LEN_PREFIX_LEN - bit_id - 1;
@@ -190,7 +212,7 @@ class CEliasGamma
 				break;
 			}
 
-		if (!prefix_ready)	// Slowo sie skonczylo i nie znalezlismy tam calego prefiksu. Wobec tego szukamy w nastepnym slowie
+		if (!prefix_ready)	
 		{
 			++word_id;
 			bit_id = 63;
@@ -221,43 +243,45 @@ class CEliasGamma
 		if (bit_id + 1 >= prefix_len)
 		{
 			input_pos_in_bits += prefix_len;
-			r = shifts[prefix_len] + ((input[word_id] >> (bit_id - prefix_len + 1)) & masks[prefix_len]);
+			r = (uint32_t) (shifts[prefix_len] + ((input[word_id] >> (bit_id - prefix_len + 1)) & masks[prefix_len]));
 		}
 		else
 		{
 			input_pos_in_bits += prefix_len;
-			r = shifts[prefix_len];
+			r = (uint32_t) (shifts[prefix_len]);
 			prefix_len -= bit_id + 1;
-			r += (input[word_id] & masks[bit_id + 1]) << prefix_len;
-			r += input[word_id + 1] >> (64 - prefix_len);
+			r += (uint32_t) ((input[word_id] & masks[bit_id + 1]) << prefix_len);
+			r += (uint32_t) (input[word_id + 1] >> (64 - prefix_len));
 		}
 #endif
 		return r;
 	}
 
 public:
+	// *****************************************************************************************
+	//
 	CEliasGamma()
 	{
-		// Wartosci 1 << i
+		//  1 << i
 		shifts[0] = 1;
 		for (int i = 1; i < 64; ++i)
 			shifts[i] = shifts[i - 1] << 1;
 
-		// masks[i] ma ustawionych i najmlodszych bitow
+		// masks[i] contains i set bits
 		masks[0] = 0;
 		for (int i = 1; i < 65; ++i)
 			masks[i] = (masks[i - 1] << 1) + 1ull;
 
-		// lut_ilog2[i] = min. liczba bitow potrzebnych do zapisania liczby i
-		lut_ilog2 = new uint8_t[1 << LEN_ILOG2];
+		// lut_ilog2[i] = min. no. of bits for number i
+		lut_ilog2 = new uint8_t[1u << LEN_ILOG2];
 		lut_ilog2[0] = 0;
 		lut_ilog2[1] = 1;
 
 		for (int i = 2; i < (1 << LEN_ILOG2); ++i)
 			lut_ilog2[i] = lut_ilog2[i / 2] + 1;
 
-		// lut_prefix_len[i] - liczba wiodacych bitow 1 wsrod LEN_PREFIX_LEN najmlodszych bitow liczby i
-		lut_prefix_len = new uint8_t[1 << LEN_PREFIX_LEN];
+		// lut_prefix_len[i] - no. of leading 1 in LEN_PREFIX_LEN lower bits of i
+		lut_prefix_len = new uint8_t[1u << LEN_PREFIX_LEN];
 
 		uint32_t prefix_len = 0;
 		uint32_t pos = 0;
@@ -273,12 +297,16 @@ public:
 		lut_prefix_len[pos] = LEN_PREFIX_LEN;
 	}
 
+	// *****************************************************************************************
+	//
 	~CEliasGamma()
 	{
 		delete[] lut_ilog2;
 		delete[] lut_prefix_len;
 	}
 	
+	// *****************************************************************************************
+	//
 	FORCE_INLINE
 	void Encode(uint32_t *input, uint32_t input_size, uint64_t *&output, uint32_t &output_size_in_bits)
 	{
@@ -301,6 +329,8 @@ public:
 			encode(input[i], output, output_size_in_bits);
 	}
 
+	// *****************************************************************************************
+	//
 	FORCE_INLINE
 	void Encode(uint32_t value, uint64_t *&output, uint32_t &output_size_in_bits)
 	{
@@ -309,7 +339,7 @@ public:
 		uint32_t current_no_blocks = no_of_16B_blocks(output_size_in_bits);
 		uint32_t new_no_blocks = no_of_16B_blocks(predicted_size_in_bits);
 		
-		// Sprawdzanie czy trzeba przealokowac (zalozenie, ze alokacja jest na wielokrotnosc 16B)
+		// Do we need to reallocate?
 		if(current_no_blocks != new_no_blocks)
 		{
 #ifdef USE_MALLOC
@@ -328,13 +358,17 @@ public:
 		encode(value, output, output_size_in_bits);
 	}
 	
+	// *****************************************************************************************
+	//
 	FORCE_INLINE
 	uint32_t Decode(uint64_t *input, uint32_t &input_pos_in_bits)
 	{
 		return decode(input, input_pos_in_bits);
 	}
 	
-	// Zakladamy, ze pamiec wyjsciowa jest zaalokowana
+	// *****************************************************************************************
+	//
+	// Assumption: memory is allocated
 	FORCE_INLINE
 	void Decode(uint64_t *input, uint32_t input_size_in_bits, uint32_t *output)
 	{

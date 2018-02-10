@@ -1,5 +1,16 @@
 #pragma once
+/*
+This file is a part of Kmer-db software distributed under GNU GPL 3 licence.
+The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
 
+Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka Danek
+
+Version: 1.0
+Date   : 2018-02-10
+*/
+
+// *****************************************************************************************
+//
 template<typename T, unsigned ALIGNMENT = 4096> class aligned_vector
 {
 	T *data_aligned;
@@ -7,6 +18,8 @@ template<typename T, unsigned ALIGNMENT = 4096> class aligned_vector
 	size_t data_size;
 	size_t data_allocated;
 
+	// *****************************************************************************************
+	//
 	void allocate(void)
 	{
 		if (data_raw)
@@ -26,6 +39,8 @@ template<typename T, unsigned ALIGNMENT = 4096> class aligned_vector
 		data_aligned = reinterpret_cast<T*>(data_raw + offset);
 	}
 
+	// *****************************************************************************************
+	//
 	void free()
 	{
 		if (data_raw)
@@ -36,16 +51,22 @@ template<typename T, unsigned ALIGNMENT = 4096> class aligned_vector
 public:
 	typedef T value_type;
 
+	// *****************************************************************************************
+	//
 	aligned_vector(size_t _data_size = 0) : data_size(_data_size), data_aligned(nullptr), data_raw(nullptr)
 	{
 		allocate();
 	}
 
+	// *****************************************************************************************
+	//
 	~aligned_vector()
 	{
 		free();
 	}
 
+	// *****************************************************************************************
+	//
 	void swap(aligned_vector<T, ALIGNMENT> &x)
 	{
 		::swap(data_aligned, x.data_aligned);
@@ -54,11 +75,15 @@ public:
 		::swap(data_allocated, x.data_allocated);
 	}
 
+	// *****************************************************************************************
+	//
 	size_t size()
 	{
 		return data_size;
 	}
 
+	// *****************************************************************************************
+	//
 	void resize(size_t new_size)
 	{
 		if (new_size > data_allocated)
@@ -70,26 +95,36 @@ public:
 			data_size = new_size;
 	}
 
+	// *****************************************************************************************
+	//
 	T* begin()		// pseudo iterator
 	{
 		return data_aligned;
 	}
 
+	// *****************************************************************************************
+	//
 	T* end()		// pseudo iterator
 	{
 		return data_aligned + data_size;
 	}
 
+	// *****************************************************************************************
+	//
 	T* data()
 	{
 		return data_aligned;
 	}
 
+	// *****************************************************************************************
+	//
 	T& operator[](size_t pos)
 	{
 		return data_aligned[pos];
 	}
 
+	// *****************************************************************************************
+	//
 	const T& operator[](size_t pos) const
 	{
 		return data_aligned[pos];

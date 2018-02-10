@@ -1,4 +1,14 @@
 #pragma once
+/*
+This file is a part of Kmer-db software distributed under GNU GPL 3 licence.
+The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
+
+Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka Danek
+
+Version: 1.0
+Date   : 2018-02-10
+*/
+
 #include <iostream>
 #include <vector>
 #include <memory>
@@ -7,7 +17,8 @@
 #define LOG_VERBOSE Log::getInstance(Log::LEVEL_VERBOSE)
 #define LOG_DEBUG Log::getInstance(Log::LEVEL_DEBUG)
 
-
+// *****************************************************************************************
+//
 class Log
 {
 public:
@@ -15,10 +26,11 @@ public:
 	static const int LEVEL_VERBOSE;
 	static const int LEVEL_DEBUG;
 
-
 	void enable()	{ enabled = true; }
 	void disable()	{ enabled = false; }
 	
+	// *****************************************************************************************
+	//
 	static Log& getInstance(int level) {
 		static std::vector<std::shared_ptr<Log>> logs;
 		if (logs.size() == 0) {
@@ -30,6 +42,8 @@ public:
 		return *logs[level];
 	}
 
+	// *****************************************************************************************
+	//
 	template <class T>
 	Log& operator<<(T v) {
 		if (enabled) { *out << v; }
@@ -45,7 +59,6 @@ public:
 protected:
 	bool enabled;
 	std::ostream* out;
-
 
 	Log();
 };
