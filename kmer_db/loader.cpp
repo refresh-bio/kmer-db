@@ -33,9 +33,9 @@ Loader::Loader(std::shared_ptr<IKmerFilter> filter, bool useMinhash, int _num_th
 		while (!this->prefetcherQueue.IsCompleted()) {
 			std::shared_ptr<Task> task;
 			if (this->prefetcherQueue.Pop(task)) {
-				cout << "\r" << std::string(task->sampleName.size() + 100, ' ') << "\r";
+//				cout << "\r" << std::string(task->sampleName.size() + 100, ' ') << "\r";
 				ostringstream oss;
-				cout << task->sampleName << " (" << task->fileId + 1 << "/" << kmcFileList.size() << ")...";
+				cout << task->sampleName << " (" << task->fileId + 1 << "/" << kmcFileList.size() << ")...                      \r";
 				fflush(stdout);
 
 				task->file = std::make_shared<KmcFileWrapper>(filter ? filter->clone() : nullptr);
