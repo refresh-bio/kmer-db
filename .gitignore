@@ -1,9 +1,9 @@
-/kmer_db/Debug
-/kmer_db/Release
-/kmer_db/x64
-/kmer_db/.vs/kmer_db/v14/*.suo
-/kmer_db/kmer_db.VC.VC.opendb
-/kmer_db/kmer_db.VC.db
+/src/Debug
+/src/Release
+/src/x64
+/src/.vs/kmer_db/v14/*.suo
+/src/kmer_db.VC.VC.opendb
+/src/kmer_db.VC.db
 *.txt
 *.db
 *.stat
