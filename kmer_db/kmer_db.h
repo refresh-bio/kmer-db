@@ -107,7 +107,7 @@ public:
 
 	bool avx2_present;
 
-	FastKmerDb(int _num_threads = 0);
+	FastKmerDb(int _num_threads, size_t cacheBufferMb);
 
 	~FastKmerDb();
 
@@ -174,4 +174,6 @@ protected:
 	Semaphore semaphore;
 
 	int num_threads;
+
+	size_t cacheBufferMb;
 };

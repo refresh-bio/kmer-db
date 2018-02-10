@@ -10,6 +10,7 @@ public:
 
 protected:
 	int numThreads;
+	int cacheBufferMb;
 
 	int runBuildDatabase(const std::string& multipleKmcSamples, const std::string dbFilename, bool loadMinhash);
 	int runAllVsAll(const std::string& dbFilename, const std::string& similarityFile);

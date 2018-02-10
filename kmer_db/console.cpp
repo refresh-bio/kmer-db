@@ -40,6 +40,7 @@ int Console::parse(int argc, char** argv) {
 		<< "S. Deorowicz, A. Gudys, M. Dlugosz, M. Kokot, and A. Danek (c) 2018" << endl << endl;
 	
 	numThreads = 0;
+	cacheBufferMb = 8;
 
 	std::vector<string> params(argc - 1);
 	std::transform(argv + 1, argv + argc, params.begin(), [](char* c)->string { return c; });
@@ -56,6 +57,15 @@ int Console::parse(int argc, char** argv) {
 		it = find(params.begin(), std::prev(params.end()), "-t"); // number of threads
 		if (it != std::prev(params.end())) {
 			numThreads = atof(std::next(it)->c_str());
+			params.erase(it, it + 2);
+		}
+
+		it = find(params.begin(), std::prev(params.end()), "-buffer"); // size of temporary buffer in megabytes
+		if (it != std::prev(params.end())) {
+			cacheBufferMb = atoi(std::next(it)->c_str());
+			if (cacheBufferMb == 0) {
+				cacheBufferMb = 8;
+			}
 			params.erase(it, it + 2);
 		}
 
@@ -151,7 +161,7 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 	cout << "Processing samples..." << endl;
 	
 	LOG_DEBUG << "Creating FastKmerDb object" << endl;
-	FastKmerDb* db = new FastKmerDb(numThreads);
+	FastKmerDb* db = new FastKmerDb(numThreads, cacheBufferMb);
 
 	std::chrono::duration<double> loadingTime, processingTime;
 	
@@ -230,7 +240,7 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 int Console::runAllVsAll(const std::string& dbFilename, const std::string& similarityFile) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
 	std::ofstream ofs(similarityFile);
-	FastKmerDb* db = new FastKmerDb(numThreads);;
+	FastKmerDb* db = new FastKmerDb(numThreads, cacheBufferMb);;
 
 	std::chrono::duration<double> dt;
 	cout << "Loading k-mer database " << dbFilename << "...";
@@ -280,7 +290,7 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 
 int Console::runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFile) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
-	FastKmerDb db(numThreads);
+	FastKmerDb db(numThreads, cacheBufferMb);
 
 	std::chrono::duration<double> dt;
 
@@ -302,7 +312,7 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 	cout << "Loading sample kmers...";
 
 	start = std::chrono::high_resolution_clock::now();
-	FastKmerDb sampleDb(numThreads);
+	FastKmerDb sampleDb(numThreads, cacheBufferMb);
 
 	std::vector<kmer_t> kmers;
 	uint32_t kmerLength;
@@ -436,7 +446,7 @@ int Console::runDistanceCalculation(const std::string& similarityFilename) {
 
 int Console::runListPatterns(const std::string& dbFilename, const std::string& patternFile) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
-	FastKmerDb db(numThreads);
+	FastKmerDb db(numThreads, cacheBufferMb);
 
 	cout << "Loading k-mer database " << dbFilename << "...";
 	if (!dbFile || !db.deserialize(dbFile)) {
@@ -462,7 +472,7 @@ int Console::runListPatterns(const std::string& dbFilename, const std::string& p
 /****************************************************************************************************************************************************/
 void Console::showInstructions() {
 	cout << "USAGE" << endl << endl
-		
+
 		<< "kmer-db <mode> [options] <positional arguments>" << endl << endl
 
 		<< "Modes:" << endl
@@ -473,7 +483,9 @@ void Console::showInstructions() {
 		<< "  one2all - calculating number of common kmers between single sample and all the samples in the database," << endl
 		<< "  distance - calculating similarities / distances." << endl
 		<< "Options:" << endl
-		<< "  -t <threads> -distributes processing over specified number of threads," << endl
+		<< "  -t <threads> - number of threads (default: number of available cores)," << endl
+		<< "  -buffer <size_mb> - size of cache buffer in megabytes, applies to all2all mode" << endl 
+		<< "                      (use L2 size for Intel CPUs and L3 for AMD to maximize performance)." << endl 
 		<< "The meaning of the positional arguments depends on the selected mode." << endl << endl
 
 		<< "Building k-mer database:" << endl

@@ -47,11 +47,12 @@ const size_t FastKmerDb::ioBufferBytes = (2 << 29); //512MB buffer
 /****************************************************************************************************************************************************/
 
 
-FastKmerDb::FastKmerDb(int _num_threads) :
+FastKmerDb::FastKmerDb(int _num_threads, size_t cacheBufferMb) :
 	kmers2patternIds((unsigned long long) - 1), 
 	dictionarySearchQueue(1), 
 	patternExtensionQueue(1),
-	num_threads(_num_threads > 0 ? _num_threads : std::thread::hardware_concurrency()) {
+	num_threads(_num_threads > 0 ? _num_threads : std::thread::hardware_concurrency()),
+	cacheBufferMb(cacheBufferMb){
 
 	avx2_present = instrset_detect() >= 8;
 
@@ -568,7 +569,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 	matrix.resize(samples_count);
 	matrix.clear();
 	
-	size_t bufsize = 12000000 / sizeof(uint32_t);
+	size_t bufsize = cacheBufferMb * 1000000 / sizeof(uint32_t);
 	std::vector<uint32_t> patternsBuffer(bufsize);
 	uint32_t* currentPtr;
 
