@@ -1,4 +1,4 @@
-# kmer-db-dev
+# kmer-db
 
 ## USAGE
 `kmer-db <mode> [options] <positional arguments>`
