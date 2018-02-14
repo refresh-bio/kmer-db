@@ -61,11 +61,10 @@ Parameters:
 Calculating number of common kmers between single sample and all the samples in the database:
 
 `kmer_db one2all <database> <sample> <common_vector>`
-`kmer_db one2all -mh-input <database> <sample> <common_vector>`
 
 Parameters:
  * `database` (input) - k-mer database file created by `build` mode,
- * `sample` (input) - k-mer file for a sample (raw or minhashed, depending on the presence of `-mh-input` switch),
+ * `sample` (input) - raw k-mer file for a sample (minhashing is done automatically, if neccessary),
  * `common_vector` (output) - file containing vector with numbers of common k-mers.
  
  ### Calculating similarities/distances
