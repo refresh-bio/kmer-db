@@ -1,4 +1,4 @@
-# kmer-db-dev
+# kmer-db
 
 ## USAGE
 `kmer-db <mode> [options] <positional arguments>`
@@ -15,7 +15,7 @@ Kmer-db operates in one of the following modes:
 Options:
 
 * `-t <threads>` - number of threads (default: number of available cores),
-* `-buffer <size_mb>` - size of cache buffer in megabytes, applies to `all2all` mode (default: 8; use L2 size for Intel CPUs and L3 for AMD to maximize performance).
+* `-buffer <size_mb>` - size of cache buffer in megabytes, applies to `all2all` mode (use L3 size for Intel CPUs and L2 for AMD to maximize performance; default: 8).
     
 The meaning of the positional arguments depends on the selected mode.
     
@@ -61,11 +61,10 @@ Parameters:
 Calculating number of common kmers between single sample and all the samples in the database:
 
 `kmer_db one2all <database> <sample> <common_vector>`
-`kmer_db one2all -mh-input <database> <sample> <common_vector>`
 
 Parameters:
  * `database` (input) - k-mer database file created by `build` mode,
- * `sample` (input) - k-mer file for a sample (raw or minhashed, depending on the presence of `-mh-input` switch),
+ * `sample` (input) - raw k-mer file for a sample (minhashing is done automatically, if neccessary),
  * `common_vector` (output) - file containing vector with numbers of common k-mers.
  
  ### Calculating similarities/distances
