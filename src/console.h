@@ -1,4 +1,5 @@
 #pragma once
+#include "kmc_file_wrapper.h"
 /*
 This file is a part of Kmer-db software distributed under GNU GPL 3 licence.
 The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
@@ -20,7 +21,7 @@ protected:
 	int numThreads;
 	int cacheBufferMb;
 
-	int runBuildDatabase(const std::string& multipleKmcSamples, const std::string dbFilename, bool loadMinhash);
+	int runBuildDatabase(const std::string& multipleKmcSamples, const std::string dbFilename, KmcFileWrapper::Format inputFormat, double filterValue);
 	int runAllVsAll(const std::string& dbFilename, const std::string& similarityFile);
 	int runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFilename);
 	int runListPatterns(const std::string& dbFilename, const std::string& patternFile);

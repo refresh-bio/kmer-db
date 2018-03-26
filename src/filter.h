@@ -18,7 +18,7 @@ Date   : 2018-02-10
 //
 class IKmerFilter {
 public:
-	virtual bool operator()(uint64_t kmer) const = 0;
+	virtual bool operator()(uint64_t kmer, std::vector<uint64_t>& collection) const = 0;
 	virtual void setParams(uint64_t kmer_length) = 0;
 	virtual std::unique_ptr<IKmerFilter> clone() const = 0;
 };
@@ -26,6 +26,9 @@ public:
 // *****************************************************************************************
 //
 class MinHashFilter : public IKmerFilter {
+	
+	enum Mode {PASS_ALL, THRESHOLD_BASED, SKETCH_BASED};
+	
 	uint64_t rotl64(uint64 x, int32_t offset) const
 	{
 #ifdef WIN32
@@ -34,13 +37,44 @@ class MinHashFilter : public IKmerFilter {
 		return (x << offset) | (x >> (64 - offset));
 #endif
 	}
+
+	uint64_t hash(uint64_t kmer) const {
+		uint64_t h, h1, h2;
+
+		// calculate hash
+		h = kmer;
+		h *= 0x87c37b91114253d5ull;
+		h = rotl64(h, 31);
+		h *= 0x4cf5ad432745937full;
+		h1 = 42 ^ h;
+		h1 ^= k_div_4; //ceil(k / 4);
+		h2 = c42_xor_k_div_4; // 42 ^ ceil(k / 4);
+		h1 += h2;
+		h2 += h1;
+		h1 = fmix64(h1);
+		h2 = fmix64(h2);
+		h1 += h2;
+		h2 += h1;
+
+		return h1 ^ h2; // xor as final hash
+	}
+
+
 public:
 	
 	// *****************************************************************************************
 	//
-	MinHashFilter(double fraction, size_t kmer_length) :
-		threshold(fraction > 0.99999 ? std::numeric_limits<uint64_t>::max() : (uint64_t)((double)std::numeric_limits<uint64_t>::max() * fraction))
+	MinHashFilter(double filterValue, size_t kmer_length) : sketchSize(0), threshold(std::numeric_limits<uint64_t>::max()), mode(PASS_ALL)
 	{
+		if (filterValue <= 0.99999) {
+			threshold = (uint64_t)((double)std::numeric_limits<uint64_t>::max() * filterValue);
+			mode = THRESHOLD_BASED;
+		}
+		else if (filterValue >= 2.0) {
+			sketchSize = (int)std::round(filterValue);
+			mode = SKETCH_BASED;
+		}
+		
 		setParams(kmer_length);
 	}
 
@@ -59,28 +93,34 @@ public:
 
 	// *****************************************************************************************
 	//
-	virtual bool operator()(uint64_t kmer) const override {
-		uint64_t h, h1, h2;
+	virtual bool operator()(uint64_t kmer, std::vector<uint64_t>& collection) const override {
+		// perform hashing only when needed
+		if (mode == PASS_ALL) {
+		//	collection.push_back(kmer);
+			return true;
+		}
 
-		h = kmer;
-		h *= 0x87c37b91114253d5ull;
-		h = rotl64(h, 31);
-		h *= 0x4cf5ad432745937full;
-		h1 = 42 ^ h; 
-		h1 ^= k_div_4; //ceil(k / 4);
-		h2 = c42_xor_k_div_4; // 42 ^ ceil(k / 4);
-		h1 += h2;
-		h2 += h1;
-		h1 = fmix64(h1);
-		h2 = fmix64(h2);
-		h1 += h2;
-		h2 += h1;
+		uint64_t h = hash(kmer);
 
-		// make xor
-		return (h1 ^ h2) < threshold;
+		if (mode == THRESHOLD_BASED) {
+			// threshold-based filtering
+			if (h < threshold) {
+			//	collection.push_back(kmer);
+				return true;
+			}
+		}
+		else {
+			// TODO
+			
+			return false;
+		}
+
+		return false;
 	}
 
 private:
+	Mode mode;
+	int sketchSize;
 	uint64_t threshold;
 	uint64_t k_div_4;
 	uint64_t c42_xor_k_div_4;

@@ -50,7 +50,7 @@ struct Task {
 class Loader {
 public:
 	
-	Loader(std::shared_ptr<IKmerFilter> filter, bool tryMinHash, int _num_threads);
+	Loader(std::shared_ptr<IKmerFilter> filter, KmcFileWrapper::Format inputFormat, int _num_threads);
 	// *****************************************************************************************
 	//
 	~Loader() {
@@ -75,7 +75,7 @@ public:
 
 private:
 	
-	bool useMinhash;
+	KmcFileWrapper::Format inputFormat;
 
 	size_t currentFileId;
 

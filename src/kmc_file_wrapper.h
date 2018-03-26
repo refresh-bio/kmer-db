@@ -13,19 +13,25 @@ Date   : 2018-02-10
 #include "kmer_db.h"
 #include "filter.h"
 
+#include <zlib.h>
+
 #include <memory>
 #include <fstream>
+#include <string>
+
 
 class KmcFileWrapper {
 public:
+	enum Format {KMC, MIHASH, FASTA};
+
 
 	const uint32_t MINHASH_FORMAT_SIGNATURE = 0xfedcba98;
 
 	KmcFileWrapper(std::shared_ptr<IKmerFilter> filter) : filter(filter) {}
 
-	bool open(const std::string& filename, bool useMinhash) {
-		// try minhashed format
-		if (useMinhash) {
+	bool open(const std::string& filename, Format format) {
+		// minhashed format
+		if (format == MIHASH) {
 			auto file = std::make_shared<std::ifstream>(filename + ".minhash", std::ios_base::binary);
 			if (*file) {
 				uint32_t signature = 0;
@@ -48,12 +54,68 @@ public:
 				}
 			}
 		}
-		else {
-			// try KMC format
+		else if (format == KMC) {
+			// KMC format
 			auto file = std::make_shared<CKMCFile>();
 			if (file->OpenForListing(filename)) {
 				kmcfile = file;
 				return true;
+			}
+		}
+		else {
+			// FASTA genome
+			gzFile file = gzopen((filename + ".gz").c_str(), "rb"); // try .gz extension
+
+			if (!file) {
+				file = gzopen((filename + ".fasta").c_str(), "rb"); // try .fasta extension if .gz not found
+			}
+
+			if (file) {
+				size_t blockSize = 10;
+				char* data = reinterpret_cast<char*>(malloc(blockSize));
+				char *ptr = data;
+				
+				size_t got = 0;
+				size_t total = 0;
+				size_t allocated = blockSize;
+				// read file in portions
+				while ((got = gzread(file, ptr, blockSize)) > 0) {
+					total += got;
+					allocated += blockSize;
+					data = reinterpret_cast<char*>(realloc(data, allocated));
+					ptr = data + total;
+				}
+
+				std::vector<char*> contigs;
+
+				// extract contigs
+				char *header = nullptr;
+				ptr = data;
+				while (header = strchr(ptr, '>')) {
+					ptr = strchr(header, '\n');
+					*ptr = 0;
+					++ptr;
+					contigs.push_back(ptr);
+				}
+
+
+
+				// remove newline characters
+				char* end = data + total;
+				*end = 0;
+				end = std::remove_if(ptr, end, [](char c) -> bool { return c == '\n' || c == '\r';  });
+				*end = 0;
+				size_t n = strlen(ptr);
+
+			
+
+				// Marek:
+				// ekstrakcja kmerów ze zmiennej ptr do kolekcji kmers
+				
+
+				// free memory
+				free(reinterpret_cast<void*>(data));
+			
 			}
 		}
 
@@ -90,10 +152,8 @@ public:
 			kmers.resize(_total_kmers);
 			size_t passed = 0;
 			
-			if (filter) {
-				filter->setParams(kmerLength);
-			}
-
+			filter->setParams(kmerLength);
+			
 			while (!kmcfile->Eof())
 			{
 				if (!kmcfile->ReadNextKmer(kmer, counter))
@@ -101,7 +161,7 @@ public:
 				kmer.to_long(tmp);
 				u_kmer = tmp.front();
 
-				if (filter == nullptr || (*filter)(u_kmer)) {
+				if ((*filter)(u_kmer, kmers)) {
 					kmers[passed++] = u_kmer;
 				}
 			}

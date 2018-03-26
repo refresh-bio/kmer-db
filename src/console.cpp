@@ -82,14 +82,31 @@ int Console::parse(int argc, char** argv) {
 		// all modes need at least 2 parameters
 		if (params.size() >= 2) {
 			const string& mode = params[0];
+			// building from kmers or genomes
+			if ((params.size() == 3 || params.size() == 5) && (mode == "build" || mode == "build-genomes")) {
+				
+				double filter = 1.0;
 
-			if (params.size() == 3 && (mode == "build")) {
-				cout << "Database building mode" << endl;
-				return runBuildDatabase(params[1], params[2], false);
+				it = find(params.begin(), std::prev(params.end()), "-filter"); // minhash threshold
+				if (it != std::prev(params.end())) {
+					filter = atof(std::next(it)->c_str());
+					params.erase(it, it + 2);
+				}
+
+				if (filter > 0) {
+					if (mode == "build") {
+						cout << "Database building mode (kmers)" << endl;
+						return runBuildDatabase(params[1], params[2], KmcFileWrapper::Format::KMC, filter);
+					}
+					else {
+						cout << "Database building mode (fasta genomes)" << endl;
+						return runBuildDatabase(params[1], params[2], KmcFileWrapper::Format::FASTA, filter);
+					}
+				}
 			}
 			else if (params.size() == 3 && (mode == "build-mh")) {
-				cout << "Database building mode (mihashed samples)" << endl;
-				return runBuildDatabase(params[1], params[2], true);
+				cout << "Database building mode (mihashed kmers)" << endl;
+				return runBuildDatabase(params[1], params[2], KmcFileWrapper::Format::MIHASH, 1.0);
 			}
 			else if (params.size() == 3 && mode == "all2all") {
 				cout << "All versus all comparison" << endl;
@@ -103,9 +120,12 @@ int Console::parse(int argc, char** argv) {
 				cout << "Listing all patterns" << endl;
 				return runListPatterns(params[1], params[2]);
 			}
-			else if (params.size() == 3 && mode == "minhash" && std::atof(params[2].c_str()) > 0) {
-				cout << "Minhashing k-mers" << endl;
-				return runMinHash(params[1], atof(params[2].c_str()));
+			else if (params.size() == 3 && mode == "minhash") {
+				double filter = std::atof(params[2].c_str());
+				if (filter > 0) {
+					cout << "Minhashing k-mers" << endl;
+					return runMinHash(params[1], filter);
+				}
 			}
 			else if (params.size() == 2 && mode == "distance") {
 				cout << "Calculating distance measures" << endl;
@@ -120,16 +140,16 @@ int Console::parse(int argc, char** argv) {
 
 // *****************************************************************************************
 //
-int Console::runMinHash(const std::string& multipleKmcSamples, double fraction) {
+int Console::runMinHash(const std::string& multipleKmcSamples, double filterValue) {
 	cout << "Minhashing samples..." << endl;
 
 	std::chrono::duration<double> loadingTime, processingTime;
 
 	LOG_DEBUG << "Creating Loader object..." << endl;
 
-	auto filter = std::make_shared<MinHashFilter>(fraction, 0);
+	auto filter = std::make_shared<MinHashFilter>(filterValue, 0);
 
-	Loader loader(filter, false, numThreads);
+	Loader loader(filter, KmcFileWrapper::Format::KMC, numThreads);
 	loader.configure(multipleKmcSamples);
 
 	loader.initPrefetch();
@@ -152,7 +172,7 @@ int Console::runMinHash(const std::string& multipleKmcSamples, double fraction) 
 		for (const auto& entry : loader.getLoadedTasks()) {
 			auto task = entry.second;
 			KmcFileWrapper file(nullptr); 
-			file.store(task->filePath, *task->kmers, task->kmerLength, fraction);
+			file.store(task->filePath, *task->kmers, task->kmerLength, filterValue);
 		}
 
 		loader.getLoadedTasks().clear();
@@ -164,7 +184,7 @@ int Console::runMinHash(const std::string& multipleKmcSamples, double fraction) 
 
 // *****************************************************************************************
 //
-int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::string dbFilename, bool loadMinhash) {
+int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::string dbFilename, KmcFileWrapper::Format inputFormat, double filterValue) {
 
 	cout << "Processing samples..." << endl;
 	
@@ -175,7 +195,7 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 	
 	LOG_DEBUG << "Creating Loader object..." << endl;
 
-	Loader loader(nullptr, loadMinhash, numThreads);
+	Loader loader(std::make_shared<MinHashFilter>(filterValue, 0), inputFormat, numThreads);
 	loader.configure(multipleKmcSamples);
 
 	loader.initPrefetch();
@@ -331,7 +351,7 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 
 	KmcFileWrapper file(filter);
 	double dummy;
-	if (!file.open(singleKmcSample, false) || !file.load(kmers, kmerLength, dummy)) {
+	if (!file.open(singleKmcSample, KmcFileWrapper::KMC) || !file.load(kmers, kmerLength, dummy)) {
 		cout << "FAILED";
 		return -1;
 	}
