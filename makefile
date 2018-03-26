@@ -1,8 +1,8 @@
 all: kmer-db-1.0
 
 KMER_DB_ROOT_DIR = .
-KMER_DB_MAIN_DIR = kmer_db
-KMER_DB_LIBS_DIR = kmer_db/kmc_api
+KMER_DB_MAIN_DIR = src
+KMER_DB_LIBS_DIR = src/kmc_api
 
 CC 	= /usr/local/gcc62/bin/g++
 CFLAGS	= -Wall -O3 -m64 -std=c++14 -fopenmp -pthread -mavx -I $(KMER_DB_LIBS_DIR)
