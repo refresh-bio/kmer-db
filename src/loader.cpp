@@ -18,14 +18,14 @@ using namespace std;
 
 // *****************************************************************************************
 //
-Loader::Loader(std::shared_ptr<IKmerFilter> filter, KmcFileWrapper::Format inputFormat, int _num_threads) :
+Loader::Loader(std::shared_ptr<IKmerFilter> filter, InputFile::Format inputFormat, int _num_threads) :
 	prefetcherQueue(1), 
 	intermediateQueue(1),
 	readerQueue(1), 
 	currentFileId(0), 
 	numThreads(_num_threads > 0 ? _num_threads : std::thread::hardware_concurrency()),
-	inputFormat(inputFormat) {
-
+	inputFormat(inputFormat)
+	{
 	kmersCollections.resize(numThreads);
 	
 	// generate preloader thread
@@ -38,8 +38,17 @@ Loader::Loader(std::shared_ptr<IKmerFilter> filter, KmcFileWrapper::Format input
 				cout << task->sampleName << " (" << task->fileId + 1 << "/" << kmcFileList.size() << ")...                      \r";
 				fflush(stdout);
 
-				task->file = std::make_shared<KmcFileWrapper>(filter ? filter->clone() : nullptr);
-				if (task->file->open(kmcFileList[task->fileId], this->inputFormat)) {
+				if (this->inputFormat == InputFile::KMC) {
+					task->file = std::make_shared<KmcInputFile>(filter->clone());
+				}
+				else if (this->inputFormat == InputFile::MINHASH) {
+					task->file = std::make_shared<MihashedInputFile>(filter->clone());
+				}
+				else {
+					task->file = std::make_shared<GenomeInputFile>(filter->clone());
+				}
+
+				if (task->file->open(kmcFileList[task->fileId])) {
 					intermediateQueue.Push(task);
 				}
 				else {

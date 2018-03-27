@@ -25,7 +25,7 @@ struct Task {
 	size_t threadId;
 	std::string filePath;
 	std::string sampleName;
-	std::shared_ptr<KmcFileWrapper> file;
+	std::shared_ptr<InputFile> file;
 	std::vector<kmer_t>* kmers;
 	uint32_t kmerLength;
 	double fraction;
@@ -50,7 +50,7 @@ struct Task {
 class Loader {
 public:
 	
-	Loader(std::shared_ptr<IKmerFilter> filter, KmcFileWrapper::Format inputFormat, int _num_threads);
+	Loader(std::shared_ptr<IKmerFilter> filter, InputFile::Format inputFormat, int _num_threads);
 	// *****************************************************************************************
 	//
 	~Loader() {
@@ -75,7 +75,9 @@ public:
 
 private:
 	
-	KmcFileWrapper::Format inputFormat;
+	InputFile::Format inputFormat;
+
+	uint32_t kmerLength;
 
 	size_t currentFileId;
 

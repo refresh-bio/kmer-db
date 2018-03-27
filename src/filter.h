@@ -18,9 +18,16 @@ Date   : 2018-02-10
 //
 class IKmerFilter {
 public:
-	virtual bool operator()(uint64_t kmer, std::vector<uint64_t>& collection) const = 0;
+
+	IKmerFilter(uint64_t kmer_length) : kmer_length(kmer_length) {}
+
 	virtual void setParams(uint64_t kmer_length) = 0;
+	uint64_t getLength() const { return kmer_length; }
+	virtual bool operator()(uint64_t kmer) const = 0;
 	virtual std::unique_ptr<IKmerFilter> clone() const = 0;
+
+protected:
+	uint64_t kmer_length;
 };
 
 // *****************************************************************************************
@@ -64,7 +71,7 @@ public:
 	
 	// *****************************************************************************************
 	//
-	MinHashFilter(double filterValue, size_t kmer_length) : sketchSize(0), threshold(std::numeric_limits<uint64_t>::max()), mode(PASS_ALL)
+	MinHashFilter(double filterValue, uint64_t kmer_length) : IKmerFilter(kmer_length), sketchSize(0), threshold(std::numeric_limits<uint64_t>::max()), mode(PASS_ALL)
 	{
 		if (filterValue <= 0.99999) {
 			threshold = (uint64_t)((double)std::numeric_limits<uint64_t>::max() * filterValue);
@@ -87,13 +94,14 @@ public:
 	// *****************************************************************************************
 	//
 	virtual void setParams(uint64_t kmer_length) override {
+		this->kmer_length = kmer_length;
 		this->k_div_4 = (uint64_t)ceil((double)kmer_length / 4);
 		this->c42_xor_k_div_4 = 42 ^ k_div_4;
 	}
 
 	// *****************************************************************************************
 	//
-	virtual bool operator()(uint64_t kmer, std::vector<uint64_t>& collection) const override {
+	virtual bool operator()(uint64_t kmer) const override {
 		// perform hashing only when needed
 		if (mode == PASS_ALL) {
 		//	collection.push_back(kmer);

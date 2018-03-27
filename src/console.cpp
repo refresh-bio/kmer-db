@@ -79,34 +79,35 @@ int Console::parse(int argc, char** argv) {
 			params.erase(it, it + 2);
 		}
 
+		double filter = 1.0;
+		uint32_t kmerLength = 18;
+
+		it = find(params.begin(), std::prev(params.end()), "-filter"); // minhash threshold
+		if (it != std::prev(params.end())) {
+			filter = atof(std::next(it)->c_str());
+			params.erase(it, it + 2);
+		}
+
+		it = find(params.begin(), std::prev(params.end()), "-k"); // kmer length
+		if (it != std::prev(params.end())) {
+			kmerLength = atoi(std::next(it)->c_str());
+			params.erase(it, it + 2);
+		}
+
 		// all modes need at least 2 parameters
 		if (params.size() >= 2) {
 			const string& mode = params[0];
 			// building from kmers or genomes
-			if ((params.size() == 3 || params.size() == 5) && (mode == "build" || mode == "build-genomes")) {
-				
-				double filter = 1.0;
-
-				it = find(params.begin(), std::prev(params.end()), "-filter"); // minhash threshold
-				if (it != std::prev(params.end())) {
-					filter = atof(std::next(it)->c_str());
-					params.erase(it, it + 2);
-				}
-
-				if (filter > 0) {
-					if (mode == "build") {
-						cout << "Database building mode (kmers)" << endl;
-						return runBuildDatabase(params[1], params[2], KmcFileWrapper::Format::KMC, filter);
-					}
-					else {
-						cout << "Database building mode (fasta genomes)" << endl;
-						return runBuildDatabase(params[1], params[2], KmcFileWrapper::Format::FASTA, filter);
-					}
-				}
+			if (params.size() == 3 && mode == "build") {
+				cout << "Database building mode (kmers)" << endl;
+				return runBuildDatabase(params[1], params[2], InputFile::KMC, filter, 0);
+			} else if (params.size() == 3 && mode == "build-genomes") {
+				cout << "Database building mode (fasta genomes)" << endl;
+				return runBuildDatabase(params[1], params[2], InputFile::GENOME, filter, kmerLength);
 			}
 			else if (params.size() == 3 && (mode == "build-mh")) {
 				cout << "Database building mode (mihashed kmers)" << endl;
-				return runBuildDatabase(params[1], params[2], KmcFileWrapper::Format::MIHASH, 1.0);
+				return runBuildDatabase(params[1], params[2], InputFile::MINHASH, 1.0, 0);
 			}
 			else if (params.size() == 3 && mode == "all2all") {
 				cout << "All versus all comparison" << endl;
@@ -149,7 +150,7 @@ int Console::runMinHash(const std::string& multipleKmcSamples, double filterValu
 
 	auto filter = std::make_shared<MinHashFilter>(filterValue, 0);
 
-	Loader loader(filter, KmcFileWrapper::Format::KMC, numThreads);
+	Loader loader(filter, InputFile::KMC, numThreads);
 	loader.configure(multipleKmcSamples);
 
 	loader.initPrefetch();
@@ -171,7 +172,7 @@ int Console::runMinHash(const std::string& multipleKmcSamples, double filterValu
 
 		for (const auto& entry : loader.getLoadedTasks()) {
 			auto task = entry.second;
-			KmcFileWrapper file(nullptr); 
+			MihashedInputFile file(nullptr); 
 			file.store(task->filePath, *task->kmers, task->kmerLength, filterValue);
 		}
 
@@ -184,7 +185,12 @@ int Console::runMinHash(const std::string& multipleKmcSamples, double filterValu
 
 // *****************************************************************************************
 //
-int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::string dbFilename, KmcFileWrapper::Format inputFormat, double filterValue) {
+int Console::runBuildDatabase(
+	const std::string& multipleKmcSamples, 
+	const std::string dbFilename, 
+	InputFile::Format inputFormat, 
+	double filterValue,
+	uint32_t kmerLength){
 
 	cout << "Processing samples..." << endl;
 	
@@ -195,7 +201,9 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 	
 	LOG_DEBUG << "Creating Loader object..." << endl;
 
-	Loader loader(std::make_shared<MinHashFilter>(filterValue, 0), inputFormat, numThreads);
+	auto filter = std::make_shared<MinHashFilter>(filterValue, kmerLength);
+
+	Loader loader(filter, inputFormat, numThreads);
 	loader.configure(multipleKmcSamples);
 
 	loader.initPrefetch();
@@ -343,15 +351,11 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 
 	std::vector<kmer_t> kmers;
 	uint32_t kmerLength;
-	shared_ptr<IKmerFilter> filter = nullptr;
-
-	if (db.getFraction() < 1.0) {
-		filter = shared_ptr<IKmerFilter>(new MinHashFilter(db.getFraction(), db.getKmerLength()));
-	}
-
-	KmcFileWrapper file(filter);
+	shared_ptr<IKmerFilter> filter = shared_ptr<IKmerFilter>(new MinHashFilter(db.getFraction(), db.getKmerLength()));
+	
+	KmcInputFile file(filter);
 	double dummy;
-	if (!file.open(singleKmcSample, KmcFileWrapper::KMC) || !file.load(kmers, kmerLength, dummy)) {
+	if (!file.open(singleKmcSample) || !file.load(kmers, kmerLength, dummy)) {
 		cout << "FAILED";
 		return -1;
 	}
