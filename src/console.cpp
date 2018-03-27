@@ -82,7 +82,7 @@ int Console::parse(int argc, char** argv) {
 		double filter = 1.0;
 		uint32_t kmerLength = 18;
 
-		it = find(params.begin(), std::prev(params.end()), "-filter"); // minhash threshold
+		it = find(params.begin(), std::prev(params.end()), "-f"); // minhash threshold
 		if (it != std::prev(params.end())) {
 			filter = atof(std::next(it)->c_str());
 			params.erase(it, it + 2);
