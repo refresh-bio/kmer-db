@@ -18,6 +18,7 @@ Date   : 2018-02-10
 #include <memory>
 #include <fstream>
 #include <string>
+#include <cassert>
 
 
 class KmcFileWrapper {
@@ -71,7 +72,7 @@ public:
 			}
 
 			if (file) {
-				size_t blockSize = 10;
+				size_t blockSize = 1000000;
 				char* data = reinterpret_cast<char*>(malloc(blockSize));
 				char *ptr = data;
 				
@@ -86,32 +87,47 @@ public:
 					ptr = data + total;
 				}
 
-				std::vector<char*> contigs;
+				data[total] = 0;
+
+				std::vector<char*> chromosomes;
+				std::vector<size_t> lengths;
 
 				// extract contigs
 				char *header = nullptr;
 				ptr = data;
-				while (header = strchr(ptr, '>')) {
-					ptr = strchr(header, '\n');
-					*ptr = 0;
-					++ptr;
-					contigs.push_back(ptr);
+			
+				while (header = strchr(ptr, '>')) { // find begining of header
+					*header = 0; // put 0 as separator (end of previous chromosome)
+					if (chromosomes.size()) {
+						lengths.push_back(header - chromosomes.back());
+					}
+
+					++header;
+					ptr = strchr(header, '\n'); // find end of header
+					*ptr = 0; // put 0 as separator
+					++ptr; // move to next character (begin of chromosome)
+					chromosomes.push_back(ptr); // store chromosome
 				}
 
+				lengths.push_back(data + total - chromosomes.back());
 
-
-				// remove newline characters
-				char* end = data + total;
-				*end = 0;
-				end = std::remove_if(ptr, end, [](char c) -> bool { return c == '\n' || c == '\r';  });
-				*end = 0;
-				size_t n = strlen(ptr);
-
-			
+				// remove newline characters from chromosome
+				for (int i = 0; i < chromosomes.size(); ++i) {
+					// determine chromosome end
+					char* newend = std::remove_if(chromosomes[i], chromosomes[i] + lengths[i], [](char c) -> bool { return c == '\n' || c == '\r';  });
+					*newend = 0;
+					lengths[i] = newend - chromosomes[i];
+					assert(lengths[i] == strlen(chromosomes[i]));
+				}
 
 				// Marek:
-				// ekstrakcja kmerów ze zmiennej ptr do kolekcji kmers
+				// Ekstrakcja k-merów z chromosomów. Format danych:
+				// - chromosomes - wektor ³añcuchów zakoñczonych 0 przechowuj¹cych sekwencje chromosomów
+				// - lengths - wektor d³ugoœci
 				
+
+
+
 
 				// free memory
 				free(reinterpret_cast<void*>(data));
