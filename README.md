@@ -24,10 +24,10 @@ The meaning of the positional arguments depends on the selected mode.
 Construction of k-mers database is an obligatory step for further analyses. The procedure accepts several input types:
 * [KMC-generated](https://github.com/refresh-bio/KMC) k-mers: 
 
-    ```kmer-db build [options] <sample_list> <database>```
+    ```kmer-db build [-f <filter>] <sample_list> <database>```
 * compressed or uncompressed genomes:
 
-    ```kmer-db build-genomes [options] <sample_list> <database>```  
+    ```kmer-db build-genomes [-f <filter> -k <kmer-length>] <sample_list> <database>```  
 * minhashed k-mers produced by `minhash` mode:
 
     ```kmer-db build-mh <sample_list> <database>```
@@ -44,7 +44,7 @@ Parameters:
 
 Options:
 * `-f <filter>` - number from [0,1] interval determining a fraction of all k-mers to be accepted by the minhash filter during database construction (default: 1; applies to `build` and `build-genomes` modes).
-* `-k <kmer_length>` - length of k-mers (default: 18; applies to `build-genomes` mode). 
+* `-k <kmer-length>` - length of k-mers (default: 18; applies to `build-genomes` mode). 
 
  
 ### Minhashing k-mers
