@@ -119,7 +119,81 @@ public:
 		// - filter - obiekt filtruj¹cy k-mery, operator () zwraca true jeœli k-mer spe³nia warunek
 		// - kmerLength - d³ugoœæ k-mera
 
-		
+		static char* map = []() {
+			static char _map[256];
+			std::fill_n(_map, 256, -1);
+			_map['a'] = _map['A'] = 0;
+			_map['c'] = _map['C'] = 1;
+			_map['g'] = _map['G'] = 2;
+			_map['t'] = _map['T'] = 3;
+			return _map;
+		}();
+
+		size_t total_kmers = 0;
+
+		//przewidywana liczba k-merow, zeby tylko raz byla alokacja pamieci w wektorze
+		//przez 'N'ki i filtrowanie moze byc mniej faktycznie k-merow
+		size_t sum_sizes = 0;
+		for (auto e : lengths)
+			sum_sizes += e - kmerLength + 1;
+		kmers.resize(sum_sizes);
+
+		kmer_t kmer_str, kmer_rev, kmer_can;
+		uint32_t kmer_len_shift = (kmerLength - 1) * 2;
+		kmer_t kmer_mask = (1ull << (2 * kmerLength)) - 1;
+		int omit_next_n_kmers;
+		uint32_t i;
+		for (size_t j = 0 ; j < chromosomes.size() ; ++j)
+		{
+			char* seq = chromosomes[j];
+			size_t seq_size = lengths[j];
+
+			kmer_str = kmer_rev = 0;
+
+			uint32_t str_pos = kmer_len_shift - 2;
+			uint32_t rev_pos = 2;
+
+			omit_next_n_kmers = 0;
+
+			for (i = 0; i < kmerLength - 1; ++i, str_pos -= 2, rev_pos += 2)
+			{
+				char symb = map[seq[i]];
+				if (symb < 0)
+				{
+					symb = 0;
+					omit_next_n_kmers = i + 1;
+				}
+				kmer_str += (kmer_t)symb << str_pos;
+				kmer_rev += (kmer_t)(3 - symb) << rev_pos;
+			}
+
+			for (; i < seq_size; ++i)
+			{
+				char symb = map[seq[i]];
+				if (symb < 0)
+				{
+					symb  = 0;
+					omit_next_n_kmers = kmerLength;
+				}
+				kmer_str = (kmer_str << 2) + (kmer_t)symb;
+				kmer_str &= kmer_mask;
+
+				kmer_rev >>= 2;
+				kmer_rev += (kmer_t)(3 - symb) << kmer_len_shift;
+
+				if (omit_next_n_kmers > 0)
+				{
+					--omit_next_n_kmers;
+					continue;
+				}
+
+				kmer_can = (kmer_str < kmer_rev) ? kmer_str : kmer_rev;
+
+				if ((*filter)(kmer_can))
+					kmers[total_kmers++] = kmer_can;
+			}
+		}
+		kmers.resize(total_kmers);
 
 		// free memory
 		free(reinterpret_cast<void*>(data));
