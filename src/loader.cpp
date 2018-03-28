@@ -35,7 +35,7 @@ Loader::Loader(std::shared_ptr<IKmerFilter> filter, InputFile::Format inputForma
 			if (this->prefetcherQueue.Pop(task)) {
 //				cout << "\r" << std::string(task->sampleName.size() + 100, ' ') << "\r";
 				ostringstream oss;
-				cout << task->sampleName << " (" << task->fileId + 1 << "/" << kmcFileList.size() << ")...                      \r";
+				cout << "\r" << task->sampleName << " (" << task->fileId + 1 << "/" << kmcFileList.size() << ")...                      ";
 				fflush(stdout);
 
 				if (this->inputFormat == InputFile::KMC) {

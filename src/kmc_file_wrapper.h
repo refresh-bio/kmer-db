@@ -28,8 +28,8 @@ public:
 	InputFile(std::shared_ptr<IKmerFilter> filter) : filter(filter) {}
 
 	virtual bool open(const std::string& filename) = 0;
-	virtual bool load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, double& fraction) = 0;
-	virtual bool store(const std::string& filename, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction) = 0;
+	virtual bool load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, double& filterValue) = 0;
+	virtual bool store(const std::string& filename, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double filterValue) = 0;
 
 protected:
 	std::shared_ptr<IKmerFilter> filter;
@@ -73,7 +73,7 @@ public:
 		return status;
 	}
 
-	virtual bool load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, double& fraction) override {
+	virtual bool load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, double& filterValue) override {
 		if (!status) {
 			return false;
 		}
@@ -110,6 +110,7 @@ public:
 		}
 
 		kmerLength = filter->getLength();
+		filterValue = filter->getFilterValue();
 
 		// MAREK
 		// Ekstrakcja k-merów z chromosomów. Wa¿ne zmienne:
@@ -195,11 +196,15 @@ public:
 		}
 		kmers.resize(total_kmers);
 
+		std::sort(kmers.begin(), kmers.end());
+		auto it = std::unique(kmers.begin(), kmers.end());
+		kmers.erase(it, kmers.end());
+
 		// free memory
 		free(reinterpret_cast<void*>(data));
 	}
 
-	virtual bool store(const std::string& filename, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction) override {
+	virtual bool store(const std::string& filename, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double filterValue) override {
 		throw std::runtime_error("Unable to store this kind of file");
 	}
 
@@ -243,25 +248,25 @@ public:
 		return status;
 	}
 	
-	virtual bool load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, double& fraction) override {
+	virtual bool load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, double& filterValue) override {
 		if (!status) {
 			return false;
 		}
 
 		kmers = std::move(this->kmers);
 		kmerLength = this->kmerLength;
-		fraction = this->fraction;
+		filterValue = this->fraction;
 		return true;
 	}
 
-	virtual bool store(const std::string& filename, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction) override {
+	virtual bool store(const std::string& filename, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double filterValue) override {
 		ofstream ofs(filename + ".minhash", std::ios_base::binary);
 		ofs.write(reinterpret_cast<const char*>(&MINHASH_FORMAT_SIGNATURE), sizeof(MINHASH_FORMAT_SIGNATURE));
 		size_t numKmers = kmers.size();
 		ofs.write(reinterpret_cast<const char*>(&numKmers), sizeof(size_t));
 		ofs.write(reinterpret_cast<const char*>(kmers.data()), kmers.size() * sizeof(kmer_t));
 		ofs.write(reinterpret_cast<const char*>(&kmerLength), sizeof(kmerLength));
-		ofs.write(reinterpret_cast<const char*>(&fraction), sizeof(fraction));
+		ofs.write(reinterpret_cast<const char*>(&filterValue), sizeof(filterValue));
 		return true;
 	}
 
@@ -288,7 +293,7 @@ public:
 		return kmcfile->OpenForListing(filename);
 	}
 
-	virtual bool load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, double& fraction) override {
+	virtual bool load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, double& filterValue) override {
 		
 		uint32_t counter;
 
@@ -325,12 +330,12 @@ public:
 			}
 		}
 		kmers.resize(passed);
-		fraction = ((double)kmers.size() / _total_kmers); // this may differ from theoretical
-		LOG_VERBOSE << "Min-hash passed: " << passed << "/" << _total_kmers << "(" << fraction << ")" << endl;
+		filterValue = ((double)kmers.size() / _total_kmers); // this may differ from theoretical
+		LOG_VERBOSE << "Min-hash passed: " << passed << "/" << _total_kmers << "(" << filterValue << ")" << endl;
 		return kmcfile->Close();
 	}
 
-	virtual bool store(const std::string& filename, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction) override {
+	virtual bool store(const std::string& filename, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double filterValue) override {
 		throw std::runtime_error("Unable to store this kind of file");
 	}
 

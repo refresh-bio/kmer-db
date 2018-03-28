@@ -15,19 +15,23 @@ Date   : 2018-02-10
 
 // *****************************************************************************************
 /*
-build E:\Data\kmers\kmc250.list d:\kmer.db
+build-kmers E:\Data\kmers\kmc250.list d:\kmer.db
 all2all d:\kmer.db d:\matrix.csv
 one2all d:\kmer.db E:\Data\kmers\kmc250\GCF_000171975.1_ASM17197v1_genomic_s d:\vector.csv
 distance d:\matrix.csv
 list-patterns d:\kmer.db d:\patterns.txt
 
 minhash E:\Data\kmers\kmc250.list 0.1
-build-mh E:\Data\kmers\kmc250.list d:\kmer-mh.db
-all2all d:\kmer-mh.db d:\matrix-mh.csv
-one2all d:\kmer-mh.db E:\Data\kmers\kmc250\GCF_000171975.1_ASM17197v1_genomic_s d:\vector-mh.csv
+build-mh E:\Data\kmers\kmc250.list d:\kmerdb\kmer-mh.db
+all2all d:\kmerdb\kmer-mh.db d:\kmerdb\matrix-mh.csv
+one2all d:\kmerdb\kmer-mh.db E:\Data\kmers\kmc250\GCF_000171975.1_ASM17197v1_genomic_s d:\vector-mh.csv
 
 
-build-genomes E:\Data\kmers\genomes.list d:\genomes.db
+build E:\Data\kmers\genomes250.list d:\kmerdb\genomes.db
+all2all d:\kmerdb\genomes.db d:\kmerdb\matrix-genomes.csv
+
+build -f 0.1 E:\Data\kmers\genomes250.list d:\genomes_0.1.db
+all2all d:\kmerdb\genomes_0.1.db d:\kmerdb\matrix-genomes_0.1.csv
 
 */
 int main(int argc, char **argv)

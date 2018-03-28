@@ -99,12 +99,12 @@ int Console::parse(int argc, char** argv) {
 			const string& mode = params[0];
 			// building from kmers or genomes
 			if (params.size() == 3 && mode == "build") {
-				cout << "Database building mode (kmers)" << endl;
-				return runBuildDatabase(params[1], params[2], InputFile::KMC, filter, 0);
-			} else if (params.size() == 3 && mode == "build-genomes") {
 				cout << "Database building mode (fasta genomes)" << endl;
 				return runBuildDatabase(params[1], params[2], InputFile::GENOME, filter, kmerLength);
-			}
+			} else 	if (params.size() == 3 && mode == "build-kmers") {
+				cout << "Database building mode (kmers)" << endl;
+				return runBuildDatabase(params[1], params[2], InputFile::KMC, filter, 0);
+			} 
 			else if (params.size() == 3 && (mode == "build-mh")) {
 				cout << "Database building mode (mihashed kmers)" << endl;
 				return runBuildDatabase(params[1], params[2], InputFile::MINHASH, 1.0, 0);
@@ -505,23 +505,27 @@ void Console::showInstructions() {
 		<< "kmer-db <mode> [options] <positional arguments>" << endl << endl
 
 		<< "Modes:" << endl
-		<< "  minhash - minhashing k-mers," << endl
-		<< "  build - building a database from k-mers," << endl
+		<< "  build - building a database from genomes," << endl
+		<< "  build-kmer - building a database from k-mers," << endl
 		<< "  build-mh - building a database from minhashed k-mers," << endl
+		<< "  minhash - minhashing k-mers," << endl
 		<< "  all2all - calculating number of common k-mers between all samples in the database," << endl
 		<< "  one2all - calculating number of common kmers between single sample and all the samples in the database," << endl
 		<< "  distance - calculating similarities / distances." << endl
-		<< "Options:" << endl
+		<< "Global options:" << endl
 		<< "  -t <threads> - number of threads (default: number of available cores)," << endl
-		<< "  -buffer <size_mb> - size of cache buffer in megabytes, applies to all2all mode" << endl 
-		<< "                      (use L3 size for Intel CPUs and L2 for AMD to maximize performance; default: 8)." << endl 
+		<< "  -buffer <size_mb> - size of cache buffer in megabytes, applies to all2all mode" << endl
+		<< "                      (use L3 size for Intel CPUs and L2 for AMD to maximize performance; default: 8)." << endl
 		<< "The meaning of the positional arguments depends on the selected mode." << endl << endl
 
 		<< "Building k-mer database:" << endl
-		<< "  kmer_db build <sample_list> <database>" << endl
+		<< "  kmer-db build [-f <filter> -k <kmer-length>] <sample_list> <database>" << endl
+		<< "  kmer-db build-kmer [-f <filter>] <sample_list> <database>" << endl
 		<< "  kmer_db build-mh <sample_list> <database>" << endl
 		<< "    sample_list (input) - file containing list of samples, either raw KMC files (build mode) or minhashed (build-mh)" << endl
-		<< "    database (output) - file with generated k-mer database" << endl << endl
+		<< "    database (output) - file with generated k-mer database" << endl
+		<< "    -f <filter> - number from [0, 1] interval determining a fraction of all k-mers to be accepted by the minhash filter" << endl
+		<< "    -k <kmer_length> - length of k-mers (default: 18)." << endl << endl
 
 		<< "Minhashing k-mers:" << endl
 		<< "  kmer_db minhash <sample_list> <fraction>" << endl
