@@ -1,4 +1,4 @@
-all: kmer-db-1.0
+all: kmer-db-1.1
 
 KMER_DB_ROOT_DIR = .
 KMER_DB_MAIN_DIR = src
@@ -19,7 +19,7 @@ $(KMER_DB_MAIN_DIR)/row_add_avx2.o: $(KMER_DB_MAIN_DIR)/row_add_avx2.cpp
 %.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
-kmer-db-1.0: $(KMER_DB_MAIN_DIR)/kmer_db.o \
+kmer-db-1.1: $(KMER_DB_MAIN_DIR)/kmer_db.o \
 	$(KMER_DB_MAIN_DIR)/console.o \
 	$(KMER_DB_MAIN_DIR)/instrset_detect.o \
 	$(KMER_DB_MAIN_DIR)/row_add_avx.o \
@@ -54,5 +54,5 @@ kmer-db-1.0: $(KMER_DB_MAIN_DIR)/kmer_db.o \
 clean:
 	-rm $(KMER_DB_MAIN_DIR)/*.o
 	-rm $(KMER_DB_LIBS_DIR)/*.o
-	-rm kmer-db-1.0
+	-rm kmer-db-1.1
 	
