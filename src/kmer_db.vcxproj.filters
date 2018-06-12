@@ -14,6 +14,7 @@
     <ClCompile Include="row_add_avx2.cpp" />
     <ClCompile Include="instrset_detect.cpp" />
     <ClCompile Include="parallel_sorter.cpp" />
+    <ClCompile Include="kmc_file_wrapper.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="aligned_vector.h" />

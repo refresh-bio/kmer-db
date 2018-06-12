@@ -5,13 +5,15 @@ The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
 
 Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka Danek
 
-Version: 1.0
-Date   : 2018-02-10
+Version: 1.1
+Date   : 2018-06-12
 */
 
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <iterator>
+
 using namespace std;
 
 // *****************************************************************************************
@@ -176,3 +178,53 @@ protected:
 };
 
 
+// *****************************************************************************************
+//
+template <typename T>
+class heap {
+public:
+	heap() : currentEnd(data.begin()) {}
+	heap(size_t maxSize) : data(maxSize), currentEnd(data.begin()) {}
+	heap(const heap& ref) : data(ref.data) {
+		currentEnd = data.begin();
+	}
+
+	void resize(size_t size) {
+		data.resize(size);
+		currentEnd = data.begin();
+	}
+
+
+	size_t size() const { return currentEnd - data.begin(); }
+
+	bool push(const T& v) {
+		bool stillBuilding = currentEnd != data.end();
+		bool replaceMax = (currentEnd == data.end()) && (v < data.front());
+
+		if (stillBuilding || replaceMax) {
+
+			if (stillBuilding) {
+				*currentEnd = v;
+				++currentEnd;
+			}
+
+			if (replaceMax) {
+				pop_heap(data.begin(), currentEnd);
+				data.back() = v;
+			}
+
+			push_heap(data.begin(), currentEnd);
+			return true;
+		}
+
+		return false;
+	}
+
+	std::vector<T>& getData() { return data;  }
+	const std::vector<T>& getData() const { return data; }
+
+
+protected:
+	std::vector<T> data;
+	typename std::vector<T>::iterator currentEnd;
+};

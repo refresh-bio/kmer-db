@@ -4,8 +4,8 @@ The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
 
 Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka Danek
 
-Version: 1.0
-Date   : 2018-02-10
+Version: 1.1
+Date   : 2018-06-12
 */
 
 #include <algorithm>
@@ -18,6 +18,7 @@ Date   : 2018-02-10
 #include <iomanip>
 #include <fstream>
 #include <iterator>
+#include <functional>
 
 #include "console.h"
 #include "kmer_db.h"
@@ -79,17 +80,35 @@ int Console::parse(int argc, char** argv) {
 			params.erase(it, it + 2);
 		}
 
+		double filter = 1.0;
+		uint32_t kmerLength = 18;
+
+		it = find(params.begin(), std::prev(params.end()), "-f"); // minhash threshold
+		if (it != std::prev(params.end())) {
+			filter = atof(std::next(it)->c_str());
+			params.erase(it, it + 2);
+		}
+
+		it = find(params.begin(), std::prev(params.end()), "-k"); // kmer length
+		if (it != std::prev(params.end())) {
+			kmerLength = atoi(std::next(it)->c_str());
+			params.erase(it, it + 2);
+		}
+
 		// all modes need at least 2 parameters
 		if (params.size() >= 2) {
 			const string& mode = params[0];
-
-			if (params.size() == 3 && (mode == "build")) {
-				cout << "Database building mode" << endl;
-				return runBuildDatabase(params[1], params[2], false);
-			}
+			// building from kmers or genomes
+			if (params.size() == 3 && mode == "build") {
+				cout << "Database building mode (fasta genomes)" << endl;
+				return runBuildDatabase(params[1], params[2], InputFile::GENOME, filter, kmerLength);
+			} else 	if (params.size() == 3 && mode == "build-kmers") {
+				cout << "Database building mode (kmers)" << endl;
+				return runBuildDatabase(params[1], params[2], InputFile::KMC, filter, 0);
+			} 
 			else if (params.size() == 3 && (mode == "build-mh")) {
-				cout << "Database building mode (mihashed samples)" << endl;
-				return runBuildDatabase(params[1], params[2], true);
+				cout << "Database building mode (mihashed kmers)" << endl;
+				return runBuildDatabase(params[1], params[2], InputFile::MINHASH, 1.0, 0);
 			}
 			else if (params.size() == 3 && mode == "all2all") {
 				cout << "All versus all comparison" << endl;
@@ -103,9 +122,12 @@ int Console::parse(int argc, char** argv) {
 				cout << "Listing all patterns" << endl;
 				return runListPatterns(params[1], params[2]);
 			}
-			else if (params.size() == 3 && mode == "minhash" && std::atof(params[2].c_str()) > 0) {
-				cout << "Minhashing k-mers" << endl;
-				return runMinHash(params[1], atof(params[2].c_str()));
+			else if (params.size() == 3 && mode == "minhash") {
+				double filter = std::atof(params[1].c_str());
+				if (filter > 0) {
+					cout << "Minhashing k-mers" << endl;
+					return runMinHash(params[2], filter);
+				}
 			}
 			else if (params.size() == 2 && mode == "distance") {
 				cout << "Calculating distance measures" << endl;
@@ -120,39 +142,45 @@ int Console::parse(int argc, char** argv) {
 
 // *****************************************************************************************
 //
-int Console::runMinHash(const std::string& multipleKmcSamples, double fraction) {
+int Console::runMinHash(const std::string& multipleKmcSamples, double filterValue) {
 	cout << "Minhashing samples..." << endl;
 
 	std::chrono::duration<double> loadingTime, processingTime;
 
 	LOG_DEBUG << "Creating Loader object..." << endl;
 
-	auto filter = std::make_shared<MinHashFilter>(fraction, 0);
+	auto filter = std::make_shared<MinHashFilter>(filterValue, 0);
 
-	Loader loader(filter, false, numThreads);
+	Loader loader(filter, InputFile::KMC, numThreads);
 	loader.configure(multipleKmcSamples);
 
+	LOG_VERBOSE << "Init prefetch (group " << loader.getCurrentFileId() << ")" << endl;
 	loader.initPrefetch();
 
 	LOG_DEBUG << "Starting loop..." << endl;
 
 	for (;;) {
 		auto start = std::chrono::high_resolution_clock::now();
+		LOG_VERBOSE << "Wait for prefetcher... " << endl;
 		loader.waitForPrefetch();
+		LOG_VERBOSE << "Init Loading... " << endl;
 		loader.initLoad();
+		LOG_VERBOSE << "Load... " << endl;
 		loader.waitForLoad();
 		loadingTime += std::chrono::high_resolution_clock::now() - start;
 
 		start = std::chrono::high_resolution_clock::now();
+		LOG_VERBOSE << "Init prefetch (group " << loader.getCurrentFileId() << ")" << endl;
 		loader.initPrefetch();
 		if (!loader.getLoadedTasks().size()) {
 			break;
 		}
 
+		LOG_VERBOSE << "Process loaded tasks..." << endl;
 		for (const auto& entry : loader.getLoadedTasks()) {
 			auto task = entry.second;
-			KmcFileWrapper file(nullptr); 
-			file.store(task->filePath, *task->kmers, task->kmerLength, fraction);
+			MihashedInputFile file(nullptr); 
+			file.store(task->filePath, *task->kmers, task->kmerLength, filterValue);
 		}
 
 		loader.getLoadedTasks().clear();
@@ -164,7 +192,12 @@ int Console::runMinHash(const std::string& multipleKmcSamples, double fraction) 
 
 // *****************************************************************************************
 //
-int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::string dbFilename, bool loadMinhash) {
+int Console::runBuildDatabase(
+	const std::string& multipleKmcSamples, 
+	const std::string dbFilename, 
+	InputFile::Format inputFormat, 
+	double filterValue,
+	uint32_t kmerLength){
 
 	cout << "Processing samples..." << endl;
 	
@@ -175,13 +208,15 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 	
 	LOG_DEBUG << "Creating Loader object..." << endl;
 
-	Loader loader(nullptr, loadMinhash, numThreads);
+	auto filter = std::make_shared<MinHashFilter>(filterValue, kmerLength);
+
+	Loader loader(filter, inputFormat, numThreads);
 	loader.configure(multipleKmcSamples);
 
 	loader.initPrefetch();
 
 	LOG_DEBUG << "Starting loop..." << endl;
-
+	auto totalStart = std::chrono::high_resolution_clock::now();
 	for (;;) {
 		auto start = std::chrono::high_resolution_clock::now();
 		loader.waitForPrefetch();
@@ -207,7 +242,10 @@ int Console::runBuildDatabase(const std::string& multipleKmcSamples, const std::
 
 	loader.waitForPrefetch();
 
+	auto totalTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
+
 	cout << endl << endl << "EXECUTION TIMES" << endl
+		<< "Total: " << totalTime.count() << endl
 		<< "Loading k-mers: " << loadingTime.count() << endl
 		<< "Processing time: " << processingTime.count() << endl
 		<< "\tHashatable resizing (serial): " << db->hashtableResizeTime.count() << endl
@@ -323,15 +361,11 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 
 	std::vector<kmer_t> kmers;
 	uint32_t kmerLength;
-	shared_ptr<IKmerFilter> filter = nullptr;
-
-	if (db.getFraction() < 1.0) {
-		filter = shared_ptr<IKmerFilter>(new MinHashFilter(db.getFraction(), db.getKmerLength()));
-	}
-
-	KmcFileWrapper file(filter);
+	shared_ptr<MinHashFilter> filter = shared_ptr<MinHashFilter>(new MinHashFilter(db.getFraction(), db.getKmerLength()));
+	
+	KmcInputFile file(filter);
 	double dummy;
-	if (!file.open(singleKmcSample, false) || !file.load(kmers, kmerLength, dummy)) {
+	if (!file.open(singleKmcSample) || !file.load(kmers, kmerLength, dummy)) {
 		cout << "FAILED";
 		return -1;
 	}
@@ -481,23 +515,27 @@ void Console::showInstructions() {
 		<< "kmer-db <mode> [options] <positional arguments>" << endl << endl
 
 		<< "Modes:" << endl
-		<< "  minhash - minhashing k-mers," << endl
-		<< "  build - building a database from k-mers," << endl
+		<< "  build - building a database from genomes," << endl
+		<< "  build-kmer - building a database from k-mers," << endl
 		<< "  build-mh - building a database from minhashed k-mers," << endl
+		<< "  minhash - minhashing k-mers," << endl
 		<< "  all2all - calculating number of common k-mers between all samples in the database," << endl
 		<< "  one2all - calculating number of common kmers between single sample and all the samples in the database," << endl
 		<< "  distance - calculating similarities / distances." << endl
-		<< "Options:" << endl
+		<< "Global options:" << endl
 		<< "  -t <threads> - number of threads (default: number of available cores)," << endl
-		<< "  -buffer <size_mb> - size of cache buffer in megabytes, applies to all2all mode" << endl 
-		<< "                      (use L3 size for Intel CPUs and L2 for AMD to maximize performance; default: 8)." << endl 
+		<< "  -buffer <size_mb> - size of cache buffer in megabytes, applies to all2all mode" << endl
+		<< "                      (use L3 size for Intel CPUs and L2 for AMD to maximize performance; default: 8)." << endl
 		<< "The meaning of the positional arguments depends on the selected mode." << endl << endl
 
 		<< "Building k-mer database:" << endl
-		<< "  kmer_db build <sample_list> <database>" << endl
+		<< "  kmer-db build [-f <filter> -k <kmer-length>] <sample_list> <database>" << endl
+		<< "  kmer-db build-kmer [-f <filter>] <sample_list> <database>" << endl
 		<< "  kmer_db build-mh <sample_list> <database>" << endl
 		<< "    sample_list (input) - file containing list of samples, either raw KMC files (build mode) or minhashed (build-mh)" << endl
-		<< "    database (output) - file with generated k-mer database" << endl << endl
+		<< "    database (output) - file with generated k-mer database" << endl
+		<< "    -f <filter> - number from [0, 1] interval determining a fraction of all k-mers to be accepted by the minhash filter" << endl
+		<< "    -k <kmer_length> - length of k-mers (default: 18)." << endl << endl
 
 		<< "Minhashing k-mers:" << endl
 		<< "  kmer_db minhash <sample_list> <fraction>" << endl

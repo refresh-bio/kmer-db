@@ -5,8 +5,8 @@ The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
 
 Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka Danek
 
-Version: 1.0
-Date   : 2018-02-10
+Version: 1.1
+Date   : 2018-06-12
 */
 
 #include "pattern.h"
@@ -64,6 +64,7 @@ public:
 	virtual std::vector<kmer_t> getKmers() const = 0;
 
 	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction) {
+		LOG_VERBOSE << "Adding sample: " << sampleName << " (" << kmers.size() << " kmers)" << endl;
 		sample_id_t newId = (sample_id_t) sampleNames.size();
 		sampleNames.push_back(sampleName);
 		sampleKmersCount.push_back(kmers.size());

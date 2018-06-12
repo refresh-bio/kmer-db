@@ -4,8 +4,8 @@ The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
 
 Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka Danek
 
-Version: 1.0
-Date   : 2018-02-10
+Version: 1.1
+Date   : 2018-06-12
 */
 
 #include "parallel_sorter.h"

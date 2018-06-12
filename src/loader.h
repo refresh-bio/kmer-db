@@ -5,8 +5,8 @@ The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
 
 Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka Danek
 
-Version: 1.0
-Date   : 2018-02-10
+Version: 1.1
+Date   : 2018-06-12
 */
 
 #include "kmc_file_wrapper.h"
@@ -25,7 +25,7 @@ struct Task {
 	size_t threadId;
 	std::string filePath;
 	std::string sampleName;
-	std::shared_ptr<KmcFileWrapper> file;
+	std::shared_ptr<InputFile> file;
 	std::vector<kmer_t>* kmers;
 	uint32_t kmerLength;
 	double fraction;
@@ -50,7 +50,9 @@ struct Task {
 class Loader {
 public:
 	
-	Loader(std::shared_ptr<IKmerFilter> filter, bool tryMinHash, int _num_threads);
+	size_t getCurrentFileId() const { return currentFileId; }
+
+	Loader(std::shared_ptr<MinHashFilter> filter, InputFile::Format inputFormat, int _num_threads);
 	// *****************************************************************************************
 	//
 	~Loader() {
@@ -75,7 +77,9 @@ public:
 
 private:
 	
-	bool useMinhash;
+	InputFile::Format inputFormat;
+
+	uint32_t kmerLength;
 
 	size_t currentFileId;
 
