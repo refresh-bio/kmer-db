@@ -76,6 +76,7 @@
     <LinkIncremental>true</LinkIncremental>
     <LibraryPath>../libs;$(LibraryPath)</LibraryPath>
     <IncludePath>../libs;$(IncludePath)</IncludePath>
+    <TargetName>kmer-db-1.1</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -84,6 +85,7 @@
     <LinkIncremental>false</LinkIncremental>
     <LibraryPath>../libs;$(LibraryPath)</LibraryPath>
     <IncludePath>../libs;$(IncludePath)</IncludePath>
+    <TargetName>kmer-db-1.1</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
