@@ -130,7 +130,7 @@ kmer-db distance vector.csv
 ```
 
 ## Datasets
-List of the pathogens ivestigated in Kmer-db study can be found [here](https://github.com/refresh-bio/kmer-db/tree/master/data)
+List of the pathogens investigated in Kmer-db study can be found [here](https://github.com/refresh-bio/kmer-db/tree/master/data)
 
 ## Citing
 [Deorowicz, S., Gudyś, A., Długosz, M., Kokot, M., Danek, A. (2018) Kmer-db: instant evolutionary distance estimation, doi: https://doi.org/10.1101/263590](https://www.biorxiv.org/content/early/2018/02/12/263590)
