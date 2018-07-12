@@ -39,7 +39,7 @@ protected:
 
 class GenomeInputFile : public InputFile {
 public:
-	GenomeInputFile(std::shared_ptr<MinHashFilter> filter) : InputFile(filter), status(false) {}
+	GenomeInputFile(std::shared_ptr<MinHashFilter> filter) : InputFile(filter), status(false), isGzipped(false) {}
 
 	virtual bool open(const std::string& filename) override;
 
@@ -54,6 +54,7 @@ protected:
 	char* compressedData;
 
 	bool status;
+	bool isGzipped;
 };
 
 class MihashedInputFile : public InputFile {
