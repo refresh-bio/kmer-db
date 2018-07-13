@@ -13,8 +13,6 @@ Date   : 2018-06-12
 #include "kmer_db.h"
 #include "filter.h"
 
-#include <zlib.h>
-
 #include <memory>
 #include <fstream>
 #include <string>
