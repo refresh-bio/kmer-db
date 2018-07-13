@@ -47,7 +47,7 @@ void show_progress(const AbstractKmerDb &db)
 //
 int Console::parse(int argc, char** argv) {
 
-	cout << "Kmer-db version 1.0" << endl 
+	cout << "Kmer-db version 1.11" << endl 
 		<< "S. Deorowicz, A. Gudys, M. Dlugosz, M. Kokot, and A. Danek (c) 2018" << endl << endl;
 	
 	numThreads = 0;
