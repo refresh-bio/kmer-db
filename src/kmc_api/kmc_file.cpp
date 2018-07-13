@@ -8,7 +8,6 @@
   Date   : 2017-01-28
 */
 
-#include "stdafx.h"
 #include "mmer.h"
 #include "kmc_file.h"
 #include <iostream>
