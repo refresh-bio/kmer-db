@@ -1,5 +1,15 @@
 # Kmer-db
 
+## INSTALLATION
+
+Kmer-db comes with a set of precompiled binaries for Windows and Linux. 
+The software can be also built from the sources distributed as:
+
+* Visual Studio 2015 solution for Windows,
+* MAKE project (G++ 4.8 required) for Linux and OS X.
+
+Kmer-db uses *zlib* for handling gzipped inputs. Under Linux, the software is by default linked against system-installed *zlib*. Due to issues with some library versions, precompiled *zlib* is also present the repository. In order to use it, one needs to modify variable INTERNAL_ZLIB at the top of the makefile. 
+
 ## USAGE
 `kmer-db <mode> [options] <positional arguments>`
 
