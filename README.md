@@ -8,6 +8,8 @@ The software can be also built from the sources distributed as:
 * Visual Studio 2015 solution for Windows,
 * MAKE project (G++ 4.8 required) for Linux and OS X.
 
+Kmer-db requires a CPU supporting AVX extensions (AVX2 is also used, though it is not obligatory).
+
 At the top of the Linux makefile there are several switches controlling building process. These are:
 
 * INTERNAL_ZLIB
@@ -16,7 +18,7 @@ Kmer-db uses *zlib* for handling gzipped inputs. Under Linux, the software is by
 
 * NO_AVX2
 
-Kmer-db by default takes advantage of AVX and AVX2 CPU extensions. Pre-built binary detetermines supported instructions at runtime, thus it is multiplatform. However, one may encounter a problem when building default Kmer-db version on a CPU without AVX2. Modify NO_AVX2 switch to prevent from using AVX2 during compilation.
+Kmer-db by default takes advantage of AVX and AVX2 CPU extensions. Pre-built binary detetermines supported instructions at runtime, thus it is multiplatform. However, one may encounter a problem when building default Kmer-db version on a CPU without AVX2. Modify NO_AVX2 switch to prevent from using AVX2 during compilation (AVX must be present, though).
 
 
 ## USAGE
