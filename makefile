@@ -2,6 +2,7 @@ all: kmer-db-1.11
 
 ## USER'S OPTIONS
 INTERNAL_ZLIB = false
+NO_AVX2 = false
 
 ## ###################
 KMER_DB_ROOT_DIR = .
@@ -22,8 +23,6 @@ CLINK	= -lm -O3 -std=c++14 -lpthread -fopenmp -mavx -fabi-version=6
 OBJS := $(KMER_DB_MAIN_DIR)/kmer_db.o \
 	$(KMER_DB_MAIN_DIR)/console.o \
 	$(KMER_DB_MAIN_DIR)/instrset_detect.o \
-	$(KMER_DB_MAIN_DIR)/row_add_avx.o \
-	$(KMER_DB_MAIN_DIR)/row_add_avx2.o \
 	$(KMER_DB_MAIN_DIR)/loader.o \
 	$(KMER_DB_MAIN_DIR)/log.o \
 	$(KMER_DB_MAIN_DIR)/main.o \
@@ -37,18 +36,33 @@ OBJS := $(KMER_DB_MAIN_DIR)/kmer_db.o \
 $(KMER_DB_MAIN_DIR)/parallel_sorter.o: $(KMER_DB_MAIN_DIR)/parallel_sorter.cpp
 	$(CC) -O3 -mavx -m64 -std=c++14 -pthread -fopenmp -c $< -o $@
 
+ifeq ($(NO_AVX2),true)
+## no avx2 support
+AVX_OBJS := $(KMER_DB_MAIN_DIR)/row_add_avx.o 
+$(KMER_DB_MAIN_DIR)/row_add_avx.o: $(KMER_DB_MAIN_DIR)/row_add_avx.cpp
+	$(CC) $(CFLAGS) -DNO_AVX2 -c $< -o $@
+
+else
+# with avx2 support
+AVX_OBJS := $(KMER_DB_MAIN_DIR)/row_add_avx.o \
+	$(KMER_DB_MAIN_DIR)/row_add_avx2.o 
+$(KMER_DB_MAIN_DIR)/row_add_avx.o: $(KMER_DB_MAIN_DIR)/row_add_avx.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
 $(KMER_DB_MAIN_DIR)/row_add_avx2.o: $(KMER_DB_MAIN_DIR)/row_add_avx2.cpp
 	$(CC) $(CFLAGS_AVX2) -c $< -o $@
+
+endif
+
 
 %.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 ifeq ($(INTERNAL_ZLIB),true)
-kmer-db-1.11: $(OBJS)
-	$(CC) $(CLINK) -o $(KMER_DB_ROOT_DIR)/$@ $(OBJS) $(EXTRA_LIBS_DIR)/libz.a
+kmer-db-1.11: $(OBJS) $(AVX_OBJS)
+	$(CC) $(CLINK) -o $(KMER_DB_ROOT_DIR)/$@ $(OBJS) $(AVX_OBJS) $(EXTRA_LIBS_DIR)/libz.a
 else
-kmer-db-1.11: $(OBJS)
-	$(CC) $(CLINK) -o $(KMER_DB_ROOT_DIR)/$@ $(OBJS) -lz
+kmer-db-1.11: $(OBJS) $(AVX_OBJS)
+	$(CC) $(CLINK) -o $(KMER_DB_ROOT_DIR)/$@ $(OBJS) $(AVX_OBJS) -lz
 endif	
 
 clean:
