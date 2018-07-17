@@ -12,6 +12,19 @@ Date   : 2018-06-12
 #include <emmintrin.h>
 #include <immintrin.h>
 
+// prevent from compiling following functions when NO_AVX2 is defined
+#ifndef NO_AVX2
+
+// *****************************************************************************************
+//
+void row_add(uint32_t *row, uint32_t *src_ids, uint32_t num_elems, uint32_t to_add, bool avx2_present) {
+	if (avx2_present)
+		row_add_avx2(row, src_ids, num_elems, to_add);
+	else
+		row_add_avx(row, src_ids, num_elems, to_add);
+}
+
+
 // *****************************************************************************************
 //
 void row_add_avx2(uint32_t *row, uint32_t *src_ids, uint32_t num_elems, uint32_t to_add)
@@ -109,3 +122,5 @@ void row_add_avx2(uint32_t *row, uint32_t *src_ids, uint32_t num_elems, uint32_t
 	case 1:		row[*p++] += to_add;
 	}
 }
+
+#endif

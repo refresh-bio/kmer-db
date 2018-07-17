@@ -11,6 +11,16 @@ Date   : 2018-06-12
 #include "row_add.h"
 #include <emmintrin.h>
 
+
+// *****************************************************************************************
+//
+#ifdef NO_AVX2
+void row_add(uint32_t *row, uint32_t *src_ids, uint32_t num_elems, uint32_t to_add, bool avx2_present) {
+	row_add_avx(row, src_ids, num_elems, to_add);
+}
+#endif
+
+
 // *****************************************************************************************
 //
 void row_add_avx(uint32_t *row, uint32_t *src_ids, uint32_t num_elems, uint32_t to_add)

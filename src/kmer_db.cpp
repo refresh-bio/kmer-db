@@ -735,10 +735,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 
 							auto *p = rawData;
 
-							if (avx2_present)
-								row_add_avx2(row, p, num_samples, to_add);
-							else
-								row_add_avx(row, p, num_samples, to_add);
+							row_add(row, p, num_samples, to_add, avx2_present);	
 							++id;
 						}
 					}
