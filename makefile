@@ -1,4 +1,4 @@
-all: kmer-db-1.11
+all: kmer-db
 
 ## USER'S OPTIONS
 INTERNAL_ZLIB = false
@@ -58,15 +58,15 @@ endif
 	$(CC) $(CFLAGS) -c $< -o $@
 
 ifeq ($(INTERNAL_ZLIB),true)
-kmer-db-1.11: $(OBJS) $(AVX_OBJS)
+kmer-db: $(OBJS) $(AVX_OBJS)
 	$(CC) $(CLINK) -o $(KMER_DB_ROOT_DIR)/$@ $(OBJS) $(AVX_OBJS) $(EXTRA_LIBS_DIR)/libz.a
 else
-kmer-db-1.11: $(OBJS) $(AVX_OBJS)
+kmer-db: $(OBJS) $(AVX_OBJS)
 	$(CC) $(CLINK) -o $(KMER_DB_ROOT_DIR)/$@ $(OBJS) $(AVX_OBJS) -lz
 endif	
 
 clean:
 	-rm $(KMER_DB_MAIN_DIR)/*.o
 	-rm $(KMER_DB_LIBS_DIR)/*.o
-	-rm kmer-db-1.11
+	-rm kmer-db
 	
