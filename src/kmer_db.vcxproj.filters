@@ -36,5 +36,6 @@
     <ClInclude Include="row_add.h" />
     <ClInclude Include="instrset.h" />
     <ClInclude Include="parallel_sorter.h" />
+    <ClInclude Include="version.h" />
   </ItemGroup>
 </Project>

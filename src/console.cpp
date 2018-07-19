@@ -4,8 +4,6 @@ The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
 
 Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka Danek
 
-Version: 1.1
-Date   : 2018-06-12
 */
 
 #include <algorithm>
@@ -23,6 +21,7 @@ Date   : 2018-06-12
 #include "console.h"
 #include "kmer_db.h"
 #include "loader.h"
+#include "version.h"
 
 
 using namespace std;
@@ -47,7 +46,7 @@ void show_progress(const AbstractKmerDb &db)
 //
 int Console::parse(int argc, char** argv) {
 
-	cout << "Kmer-db version 1.11" << endl 
+	cout << "Kmer-db version " << VERSION << " (" << DATE << ")" << endl 
 		<< "S. Deorowicz, A. Gudys, M. Dlugosz, M. Kokot, and A. Danek (c) 2018" << endl << endl;
 	
 	numThreads = 0;
