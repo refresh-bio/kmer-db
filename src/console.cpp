@@ -407,7 +407,7 @@ int Console::runDistanceCalculation(const std::string& similarityFilename) {
 	uint32_t kmerLength;
 	uint64_t sampleKmersCount = 0;
 
-	cout << "Loading file with common k-mer counts" << similarityFilename << "...";
+	cout << "Loading file with common k-mer counts: " << similarityFilename << "...";
 	ifstream similarityFile(similarityFilename);
 	if (!similarityFile) {
 		cout << "FAILED" << endl;
@@ -468,9 +468,13 @@ int Console::runDistanceCalculation(const std::string& similarityFilename) {
 		uint64_t i_kmersCount = (sampleKmersCount > 0) ? sampleKmersCount : kmersCount[i];
 			
 		for (int j = 0; iss >> intersection; ++j) {
+			if (j >= kmersCount.size()) {
+				cout << "Invalid file format!";
+				return 0;
+			}
 			// calculate all metrices
-			for (int i = 0; i < metrics.size(); ++i) {
-				files[i] << metrics[i](intersection, i_kmersCount, kmersCount[j], kmerLength) << ","; 
+			for (int m = 0; m < metrics.size(); ++m) {
+				files[m] << metrics[m](intersection, i_kmersCount, kmersCount[j], kmerLength) << ","; 
 			}
 		}
 		
@@ -478,6 +482,8 @@ int Console::runDistanceCalculation(const std::string& similarityFilename) {
 	}
 
 	cout << "OK" << endl;
+
+	return 0;
 }
 
 // *****************************************************************************************
