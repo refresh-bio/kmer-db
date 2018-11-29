@@ -94,17 +94,25 @@ bool GenomeInputFile::load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, dou
 				}
 
 				if (ret == Z_STREAM_END) {
-					break;
+					total += stream.total_out;
+					//multistream detection
+					if (stream.avail_in >= 2 && stream.next_in[0] == 0x1f && stream.next_in[1] == 0x8b) {
+						if (inflateReset(&stream) != Z_OK) {
+							LOG_NORMAL << "Error while reading gzip file\n";
+							exit(1);
+						}
+					}
+					else
+						break;
 				}
 
 				// reallocate only when some data left
 				allocated += blockSize;
 				data = reinterpret_cast<char*>(realloc(data, allocated));
-				ptr = data + stream.total_out;
+				ptr = data + total;
 			}
 
 			inflateEnd(&stream);
-			total = stream.total_out;
 		}
 		else {
 			status = false;
