@@ -89,7 +89,7 @@ bool GenomeInputFile::load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, dou
 				case Z_DATA_ERROR:
 				case Z_MEM_ERROR:
 					status = false;
-					ret == Z_STREAM_END;
+					ret = Z_STREAM_END;
 					break;
 				}
 
