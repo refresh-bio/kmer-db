@@ -27,7 +27,7 @@ Kmer-db by default takes advantage of AVX and AVX2 CPU extensions. Pre-built bin
 Kmer-db operates in one of the following modes:
 
 * `build` - building a database from genomes,
-* `build-kmer` - building a database from k-mers,
+* `build-kmers` - building a database from k-mers,
 * `build-mh` - building a database from minhashed k-mers,
 * `minhash` - minhashing k-mers,
 * `all2all` - calculating number of common k-mers between all samples in the database,
@@ -48,7 +48,7 @@ Construction of k-mers database is an obligatory step for further analyses. The 
     ```kmer-db build [-f <filter> -k <kmer-length>] <sample_list> <database>```
 * [KMC-generated](https://github.com/refresh-bio/KMC) k-mers: 
 
-    ```kmer-db build-kmer [-f <filter>] <sample_list> <database>```
+    ```kmer-db build-kmers [-f <filter>] <sample_list> <database>```
   
 * minhashed k-mers produced by `minhash` mode:
 
