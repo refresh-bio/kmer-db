@@ -535,7 +535,7 @@ void Console::showInstructions() {
 
 		<< "Building k-mer database:" << endl
 		<< "  kmer-db build [-f <filter> -k <kmer-length>] <sample_list> <database>" << endl
-		<< "  kmer-db build-kmer [-f <filter>] <sample_list> <database>" << endl
+		<< "  kmer-db build-kmers [-f <filter>] <sample_list> <database>" << endl
 		<< "  kmer_db build-mh <sample_list> <database>" << endl
 		<< "    sample_list (input) - file containing list of samples, either raw KMC files (build mode) or minhashed (build-mh)" << endl
 		<< "    database (output) - file with generated k-mer database" << endl
