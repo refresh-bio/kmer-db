@@ -521,7 +521,7 @@ void Console::showInstructions() {
 
 		<< "Modes:" << endl
 		<< "  build - building a database from genomes," << endl
-		<< "  build-kmer - building a database from k-mers," << endl
+		<< "  build-kmers - building a database from k-mers," << endl
 		<< "  build-mh - building a database from minhashed k-mers," << endl
 		<< "  minhash - minhashing k-mers," << endl
 		<< "  all2all - calculating number of common k-mers between all samples in the database," << endl
@@ -555,7 +555,7 @@ void Console::showInstructions() {
 		<< "Calculating number of common kmers between single sample and all the samples in the database:" << endl
 		<< "  kmer_db one2all <database> <sample> <common_vector>" << endl
 		<< "    database (input) - k-mer database file" << endl
-		<< "    sample (input) - k-mer file for a sample" << endl
+		<< "    sample (input) - sample name (corresponding KMC k-mer files must exist)" << endl
 		<< "    common_vector (output) - file containing vector with numbers of common k-mers" << endl << endl
 
 		<< "Calculating similarity/distance metrices (vectors) on the basis of common k-mers:" << endl
