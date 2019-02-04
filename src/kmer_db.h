@@ -9,6 +9,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 
 #include "pattern.h"
 #include "hashmap_lp.h"
+//#include "hashset_lp.h"
 #include "array.h"
 #include "queue.h"
 #include "aligned_vector.h"
@@ -20,8 +21,11 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include <chrono>
 #include <vector>
 #include <map>
+#include <sstream>
 
 
+
+#define KMER_MSB (1ULL << 63)
 
 typedef uint64_t kmer_t;
 
@@ -50,16 +54,6 @@ public:
 	const std::vector<string>& getSampleNames() const { return sampleNames; }
 
 	const std::vector<size_t>& getSampleKmersCount() const { return sampleKmersCount; }
-
-	virtual const size_t getKmersCount() const = 0;
-
-	virtual const size_t getPatternsCount() const = 0;
-
-	virtual const size_t getPatternBytes() const = 0;
-
-	virtual const size_t getHashtableBytes() const = 0;
-
-	virtual std::vector<kmer_t> getKmers() const = 0;
 
 	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction) {
 		LOG_VERBOSE << "Adding sample: " << sampleName << " (" << kmers.size() << " kmers)" << endl;
@@ -91,8 +85,7 @@ struct DictionarySearchTask {
 	int block_id;
 	int num_blocks;
 	const std::vector<kmer_t>* kmers;
-	std::vector<size_t>* num_existing_kmers;
-
+	size_t* num_existing_kmers;
 };
 
 struct PatternExtensionTask {
@@ -106,38 +99,25 @@ struct PatternExtensionTask {
 
 class FastKmerDb : public AbstractKmerDb {
 public:
-
-	std::chrono::duration<double> hashtableResizeTime;
-	std::chrono::duration<double> hashtableFindTime;
-	std::chrono::duration<double> hashtableAddTime;
-	std::chrono::duration<double> sortTime;
-	std::chrono::duration<double> extensionTime;
-
-	bool avx2_present;
-
 	FastKmerDb(int _num_threads, size_t cacheBufferMb);
 
 	~FastKmerDb();
 
-	virtual const size_t getKmersCount() const { return kmers2patternIds.get_size(); }
+	const size_t getKmersCount() const { return kmers2patternIds.get_size(); }
 
-	virtual const size_t getPatternsCount() const { return patterns.size(); }
+	const size_t getPatternsCount() const { return patterns.size(); }
 
-	virtual const size_t getPatternBytes() const { return patternBytes; }
+	const size_t getPatternBytes() const { return patternBytes; }
 
-	virtual const size_t getHashtableBytes() const { return kmers2patternIds.get_bytes(); };
+	const size_t getHashtableBytes() const { return kmers2patternIds.get_bytes(); };
 
-	virtual std::vector<kmer_t> getKmers() const {
-		std::vector<kmer_t> kmers(kmers2patternIds.get_size());
-		size_t i = 0;
-		for (auto it = kmers2patternIds.cbegin(); it < kmers2patternIds.cend(); ++it) {
-			if (kmers2patternIds.is_free(*it)) {
-				continue;
-			}
-			kmers[i++] = it->key;
-		}
-		return kmers;
-	}
+	const size_t getRepeatedKmersCount() const { return 0; }
+
+//	const hash_set_lp<kmer_t>& getRepeatedKmers() const { return repeatedKmers; }
+
+	const hash_map_lp<kmer_t, pattern_id_t>& getKmers2patternIds() const { return kmers2patternIds; }
+
+	const std::vector<pattern_t>& getPatterns() const { return patterns; }
 
 	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction);
 
@@ -153,13 +133,59 @@ public:
 
 	virtual void savePatterns(std::ofstream& file) const;
 
+	std::vector<kmer_t> extractKmers() const {
+		std::vector<kmer_t> kmers(kmers2patternIds.get_size());
+		size_t i = 0;
+		for (auto it = kmers2patternIds.cbegin(); it < kmers2patternIds.cend(); ++it) {
+			if (kmers2patternIds.is_free(*it)) {
+				continue;
+			}
+			kmers[i++] = it->key;
+		}
+		return kmers;
+	}
+
+	std::string printStats() const {
+		std::ostringstream oss;
+		oss << "Number of samples: " << Log::formatLargeNumber(getSamplesCount()) << endl
+			<< "Number of patterns: " << Log::formatLargeNumber(getPatternsCount()) << endl
+			<< "Number of k-mers: " << Log::formatLargeNumber(getKmersCount()) << endl
+			<< "Number of sample-repeated k-mers: " << Log::formatLargeNumber(getRepeatedKmersCount()) << endl
+			<< "K-mer length: " << Log::formatLargeNumber(getKmerLength()) << endl
+			<< "Minhash fraction: " << getFraction() << endl;
+		return oss.str();
+	}
+
+	std::string printDetailedTimes() const {
+		std::ostringstream oss;
+		oss << "\tHashatable resizing (serial): " << hashtableResizeTime.count() << endl
+			<< "\tHashtable searching (parallel): " << hashtableFindTime.count() << endl
+			<< "\tHashatable insertion (serial): " << hashtableAddTime.count() << endl
+			<< "\tSort time (parallel): " << sortTime.count() << endl
+			<< "\tPattern extension time (serial): " << extensionTime.count() << endl;
+		return oss.str();
+	}
+
 protected:
+	
+	std::chrono::duration<double> hashtableResizeTime;
+	std::chrono::duration<double> hashtableFindTime;
+	std::chrono::duration<double> hashtableAddTime;
+	std::chrono::duration<double> sortTime;
+	std::chrono::duration<double> extensionTime;
+
+	bool avx2_present;
+
 	static const size_t ioBufferBytes;
 	
 	// memory needed for all templates
 	size_t patternBytes;
 								
 	hash_map_lp<kmer_t, pattern_id_t> kmers2patternIds;
+
+	//hash_set_lp<kmer_t> repeatedKmers;
+
+	//std::vector<std::vector<kmer_t>> threadRepeatedKmers;
 
 	// liczba wystapien wzorca w kmer_dict, wektor id osobnikow zawierajacych k - mer)
 	std::vector<pattern_t> patterns;

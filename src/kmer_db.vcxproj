@@ -156,6 +156,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="aligned_vector.h" />
+    <ClInclude Include="analyzer.h" />
     <ClInclude Include="array.h" />
     <ClInclude Include="console.h" />
     <ClInclude Include="elias_gamma.h" />
@@ -168,6 +169,7 @@
     <ClInclude Include="kmc_api\kmer_api.h" />
     <ClInclude Include="kmc_api\kmer_defs.h" />
     <ClInclude Include="kmc_api\mmer.h" />
+    <ClInclude Include="kmer_extract.h" />
     <ClInclude Include="loader.h" />
     <ClInclude Include="log.h" />
     <ClInclude Include="parallel_sorter.h" />
@@ -177,6 +179,7 @@
     <ClInclude Include="version.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="analyzer.cpp" />
     <ClCompile Include="console.cpp" />
     <ClCompile Include="instrset_detect.cpp" />
     <ClCompile Include="kmc_api\kmc_file.cpp" />

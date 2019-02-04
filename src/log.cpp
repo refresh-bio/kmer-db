@@ -61,7 +61,7 @@ Log& Log::operator<< (std::ios_base& (*pf)(std::ios_base&))
 
 // *****************************************************************************************
 //
-std::string Log::formatLargeNumber(uint64_t num) {
+std::string Log::formatLargeNumber(uint64_t num, int minWidth) {
 	std::string out = "";
 
 	do {
@@ -78,6 +78,12 @@ std::string Log::formatLargeNumber(uint64_t num) {
 		}
 
 	} while (num > 0);
+
+	int initialSpaces = minWidth - out.length();
+
+	if (initialSpaces > 0) {
+		out = string(initialSpaces, ' ') + out;
+	}
 
 	return out;
 }

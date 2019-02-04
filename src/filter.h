@@ -11,10 +11,45 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include <limits>
 #include <cstdint>
 #include <cstdlib>
+#include <algorithm>
+#include <set>
+
+//#include "hashset_lp.h"
+
+class AbstractFilter {
+public:
+	virtual std::unique_ptr<AbstractFilter> clone() const = 0;
+	virtual void setParams(uint64_t kmerLength) { this->kmerLength = kmerLength; }
+	virtual ~AbstractFilter() {}
+
+protected:
+	uint64_t kmerLength;
+};
 
 // *****************************************************************************************
 //
-class MinHashFilter {
+
+class SetFilter : public AbstractFilter {
+public:
+	SetFilter(size_t initialSize) {
+		//kmers.reserve_for_additional(initialSize);
+	}
+	void add(kmer_t kmer) { kmers.insert(kmer); }
+	bool operator()(kmer_t kmer) { return kmers.find(kmer) != kmers.end(); }
+	
+	std::unique_ptr<AbstractFilter> clone() const override {
+		return std::unique_ptr<AbstractFilter>(new SetFilter(*this));
+		return nullptr;
+	}
+
+protected:
+	std::set<kmer_t> kmers;
+};
+
+
+// *****************************************************************************************
+//
+class MinHashFilter : public AbstractFilter {
 public:
 
 	uint64_t getLength() const { return kmer_length; }
@@ -41,14 +76,14 @@ public:
 		return (h < threshold);
 	}
 	
-	void setParams(uint64_t kmer_length) {
-		this->kmer_length = kmer_length;
+	void setParams(uint64_t kmer_length) override {
+		AbstractFilter::setParams(kmer_length);
 		this->k_div_4 = (uint64_t)ceil((double)kmer_length / 4);
 		this->c42_xor_k_div_4 = 42 ^ k_div_4;
 	}
 
-	std::unique_ptr<MinHashFilter> clone() const {
-		return unique_ptr<MinHashFilter>(new MinHashFilter(*this));
+	std::unique_ptr<AbstractFilter> clone() const override {
+		return unique_ptr<AbstractFilter>(new MinHashFilter(*this));
 	}
 
 
@@ -77,7 +112,7 @@ protected:
 	}
 
 
-	uint64_t rotl64(uint64 x, int32_t offset) const
+	uint64_t rotl64(uint64_t x, int32_t offset) const
 	{
 #ifdef WIN32
 		return _rotl64(x, offset);

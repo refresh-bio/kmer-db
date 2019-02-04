@@ -25,13 +25,14 @@ struct Task {
 	std::string sampleName;
 	std::shared_ptr<InputFile> file;
 	std::vector<kmer_t>* kmers;
+	std::vector<uint32_t>* positions;
 	uint32_t kmerLength;
 	double fraction;
 
 	// *****************************************************************************************
 	//
 	Task(size_t fileId, size_t threadId, const std::string& filePath) :
-		fileId(fileId), threadId(threadId), filePath(filePath), file(nullptr), kmers(nullptr) {
+		fileId(fileId), threadId(threadId), filePath(filePath), file(nullptr), kmers(nullptr), positions(nullptr) {
 	
 		size_t pos = filePath.find_last_of("/\\");
 		if (pos != string::npos) {
@@ -50,7 +51,7 @@ public:
 	
 	size_t getCurrentFileId() const { return currentFileId; }
 
-	Loader(std::shared_ptr<MinHashFilter> filter, InputFile::Format inputFormat, int _num_threads);
+	Loader(std::shared_ptr<AbstractFilter> filter, InputFile::Format inputFormat, int _num_threads, bool storePositions = false);
 	// *****************************************************************************************
 	//
 	~Loader() {
@@ -79,6 +80,8 @@ private:
 
 	uint32_t kmerLength;
 
+	bool storePositions;
+
 	size_t currentFileId;
 
 	int numThreads;
@@ -86,6 +89,8 @@ private:
 	std::vector<std::string> kmcFileList;
 
 	std::vector<std::vector<kmer_t>> kmersCollections;
+
+	std::vector<std::vector<uint32_t>> positionsCollections;
 
 	std::thread prefetcher;
 

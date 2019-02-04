@@ -10,6 +10,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include <iostream>
 #include <vector>
 #include <memory>
+#include <string>
 
 #define LOG_NORMAL Log::getInstance(Log::LEVEL_NORMAL)
 #define LOG_VERBOSE Log::getInstance(Log::LEVEL_VERBOSE)
@@ -52,7 +53,7 @@ public:
 	Log& operator<< (std::ios& (*pf)(std::ios&));
 	Log& operator<< (std::ios_base& (*pf)(std::ios_base&));
 
-	static std::string formatLargeNumber(uint64_t num);
+	static std::string formatLargeNumber(uint64_t num, int minWidth = 0);
 
 protected:
 	bool enabled;

@@ -21,6 +21,7 @@ CFLAGS_AVX2	= -Wall -O3 -m64 -std=c++14 -fopenmp -pthread -mavx2 -I $(KMER_DB_LI
 CLINK	= -lm -O3 -std=c++14 -lpthread -fopenmp -mavx -fabi-version=6 
 
 OBJS := $(KMER_DB_MAIN_DIR)/kmer_db.o \
+	$(KMER_DB_MAIN_DIR)/analyzer.o \
 	$(KMER_DB_MAIN_DIR)/console.o \
 	$(KMER_DB_MAIN_DIR)/instrset_detect.o \
 	$(KMER_DB_MAIN_DIR)/loader.o \

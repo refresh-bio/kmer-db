@@ -16,31 +16,32 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include <string>
 #include <cassert>
 
-
 class InputFile {
 public:
 	enum Format { KMC, MINHASH, GENOME };
 
-	InputFile(std::shared_ptr<MinHashFilter> filter) : filter(filter) {}
+	InputFile(std::shared_ptr<AbstractFilter> filter) : filter(filter) {}
 
 	virtual bool open(const std::string& filename) = 0;
-	virtual bool load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, double& filterValue) = 0;
+	virtual bool load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& positions, uint32_t& kmerLength, double& filterValue) = 0;
 	virtual bool store(const std::string& filename, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double filterValue) = 0;
 
 protected:
-	std::shared_ptr<MinHashFilter> filter;
+	std::shared_ptr<AbstractFilter> filter;
 
 };
 
 
 class GenomeInputFile : public InputFile {
 public:
-	GenomeInputFile(std::shared_ptr<MinHashFilter> filter) : InputFile(filter), status(false), isGzipped(false) {}
+	GenomeInputFile(std::shared_ptr<AbstractFilter> filter, bool storePositions)
+		: InputFile(filter), status(false), isGzipped(false), storePositions(storePositions) {}
 
 	virtual bool open(const std::string& filename) override;
+	
+	virtual bool load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& positions, uint32_t& kmerLength, double& filterValue) override;
 
-	virtual bool load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, double& filterValue) override;
-
+	
 	virtual bool store(const std::string& filename, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double filterValue) override {
 		throw std::runtime_error("Unable to store this kind of file");
 	}
@@ -51,15 +52,18 @@ protected:
 
 	bool status;
 	bool isGzipped;
+	bool storePositions;
+	
+
 };
 
 class MihashedInputFile : public InputFile {
 public:
-	MihashedInputFile(std::shared_ptr<MinHashFilter> filter) : InputFile(filter), status(false) {}
+	MihashedInputFile(std::shared_ptr<AbstractFilter> filter) : InputFile(filter), status(false) {}
 
 	virtual bool open(const std::string& filename) override;
 	
-	virtual bool load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, double& filterValue) override;
+	virtual bool load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& positions, uint32_t& kmerLength, double& filterValue) override;
 
 	virtual bool store(const std::string& filename, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double filterValue) override;
 
@@ -79,14 +83,14 @@ protected:
 class KmcInputFile : public InputFile {
 public:
 	
-	KmcInputFile(std::shared_ptr<MinHashFilter> filter) : InputFile(filter) {}
+	KmcInputFile(std::shared_ptr<AbstractFilter> filter) : InputFile(filter) {}
 
 	virtual bool open(const std::string& filename) override {
 		kmcfile = std::make_shared<CKMCFile>();
 		return kmcfile->OpenForListing(filename);
 	}
 
-	virtual bool load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, double& filterValue) override;
+	virtual bool load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& positions, uint32_t& kmerLength, double& filterValue) override;
 
 	virtual bool store(const std::string& filename, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double filterValue) override {
 		throw std::runtime_error("Unable to store this kind of file");

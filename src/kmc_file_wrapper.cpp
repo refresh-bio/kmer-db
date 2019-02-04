@@ -12,6 +12,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include "kmc_api/kmc_file.h"
 #include "kmer_db.h"
 #include "filter.h"
+#include "kmer_extract.h"
 
 #include <zlib.h>
 
@@ -49,7 +50,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 	return status;
 }
 
-bool GenomeInputFile::load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, double& filterValue) {
+bool GenomeInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& positions, uint32_t& kmerLength, double& filterValue) {
 	if (!status) {
 		return false;
 	}
@@ -155,8 +156,19 @@ bool GenomeInputFile::load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, dou
 			assert(lengths[i] == strlen(chromosomes[i]));
 		}
 
-		kmerLength = filter->getLength();
-		filterValue = filter->getFilterValue();
+		std::shared_ptr<MinHashFilter> minhashFilter = dynamic_pointer_cast<MinHashFilter>(filter);
+		std::shared_ptr<SetFilter> setFilter = dynamic_pointer_cast<SetFilter>(filter);
+
+		if (minhashFilter) {
+			kmerLength = minhashFilter->getLength();
+			filterValue = minhashFilter->getFilterValue();
+		}
+		else if (setFilter) {
+		
+		}
+		else {
+			throw std::runtime_error("unsupported filter type!");
+		}
 
 		// MAREK
 		// Ekstrakcja k-merów z chromosomów. Wa¿ne zmienne:
@@ -166,91 +178,45 @@ bool GenomeInputFile::load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, dou
 		// - filter - obiekt filtruj¹cy k-mery, operator () zwraca true jeœli k-mer spe³nia warunek
 		// - kmerLength - d³ugoœæ k-mera
 
-		static char* map = []() {
-			static char _map[256];
-			std::fill_n(_map, 256, -1);
-			_map['a'] = _map['A'] = 0;
-			_map['c'] = _map['C'] = 1;
-			_map['g'] = _map['G'] = 2;
-			_map['t'] = _map['T'] = 3;
-			return _map;
-		}();
-
-		size_t total_kmers = 0;
-
+		
 		//przewidywana liczba k-merow, zeby tylko raz byla alokacja pamieci w wektorze
 		//przez 'N'ki i filtrowanie moze byc mniej faktycznie k-merow
 		size_t sum_sizes = 0;
 		for (auto e : lengths)
 			sum_sizes += e - kmerLength + 1;
 
-		//filter->initialize(sum_sizes);
-		size_t kmersCount = 0;
 		kmers.clear();
 		kmers.reserve(sum_sizes);
 
-		kmer_t kmer_str, kmer_rev, kmer_can;
-		uint32_t kmer_len_shift = (kmerLength - 1) * 2;
-		kmer_t kmer_mask = (1ull << (2 * kmerLength)) - 1;
-		int omit_next_n_kmers;
-		uint32_t i;
-		for (size_t j = 0; j < chromosomes.size(); ++j)
-		{
-			char* seq = chromosomes[j];
-			size_t seq_size = lengths[j];
-
-			kmer_str = kmer_rev = 0;
-
-			uint32_t str_pos = kmer_len_shift - 2;
-			uint32_t rev_pos = 2;
-
-			omit_next_n_kmers = 0;
-
-			for (i = 0; i < kmerLength - 1; ++i, str_pos -= 2, rev_pos += 2)
-			{
-				char symb = map[seq[i]];
-				if (symb < 0)
-				{
-					symb = 0;
-					omit_next_n_kmers = i + 1;
-				}
-				kmer_str += (kmer_t)symb << str_pos;
-				kmer_rev += (kmer_t)(3 - symb) << rev_pos;
-			}
-
-			for (; i < seq_size; ++i)
-			{
-				char symb = map[seq[i]];
-				if (symb < 0)
-				{
-					symb = 0;
-					omit_next_n_kmers = kmerLength;
-				}
-				kmer_str = (kmer_str << 2) + (kmer_t)symb;
-				kmer_str &= kmer_mask;
-
-				kmer_rev >>= 2;
-				kmer_rev += (kmer_t)(3 - symb) << kmer_len_shift;
-
-				if (omit_next_n_kmers > 0)
-				{
-					--omit_next_n_kmers;
-					continue;
-				}
-
-				kmer_can = (kmer_str < kmer_rev) ? kmer_str : kmer_rev;
-
-				//filter->add(kmer_can);	
-				if ((*filter)(kmer_can)) {
-					kmers.push_back(kmer_can);
-				}
-			}
+		if (storePositions) {
+			positions.reserve(sum_sizes);
 		}
-		//kmers = std::move(filter->finalize());
+
+		if (minhashFilter) {
+			extractKmers(chromosomes, lengths, kmerLength, minhashFilter, kmers, positions, storePositions);
+		}
+		else {
+			extractKmers(chromosomes, lengths, kmerLength, setFilter, kmers, positions, storePositions);
+		}
 
 		std::sort(kmers.begin(), kmers.end());
-		auto it = std::unique(kmers.begin(), kmers.end());
-		kmers.erase(it, kmers.end());
+
+		// iterate over kmers to select repeated ones
+/*		size_t repeated = 0;
+		auto nixt = std::next(kmers.begin());
+		auto end = std::prev(kmers.end()); // the last kmer is either unique or will be reduced in std::unique operation
+		for (auto it = kmers.begin(); it != end; ++it, ++nixt) {
+			if (*it == *nixt) {
+				*it |= KMER_MSB;
+				++repeated;
+			}
+		}
+*/
+	//	cout << "Repeated kmers: " << repeated << endl;
+		auto it = std::unique(kmers.begin(), kmers.end(), 
+			[](kmer_t a, kmer_t b)->bool { return (a << 1) == (b << 1);  }); // ignore MSB during comparison
+		
+		kmers.erase(it, kmers.end());	
 	}
 	
 	// free memory
@@ -291,7 +257,7 @@ bool MihashedInputFile::open(const std::string& filename)  {
 	return status;
 }
 
-bool MihashedInputFile::load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, double& filterValue) {
+bool MihashedInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& positions, uint32_t& kmerLength, double& filterValue) {
 	if (!status) {
 		return false;
 	}
@@ -316,7 +282,7 @@ bool MihashedInputFile::store(const std::string& filename, const std::vector<kme
 
 
 
-bool KmcInputFile::load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, double& filterValue)  {
+bool KmcInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& positions, uint32_t& kmerLength, double& filterValue)  {
 
 	uint32_t counter;
 
@@ -343,6 +309,8 @@ bool KmcInputFile::load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, double
 
 	size_t passed = 0;
 
+	std::shared_ptr<MinHashFilter> minhashFilter = std::dynamic_pointer_cast<MinHashFilter>(filter);
+
 	while (!kmcfile->Eof())
 	{
 		if (!kmcfile->ReadNextKmer(kmer, counter))
@@ -350,7 +318,7 @@ bool KmcInputFile::load(std::vector<kmer_t>& kmers, uint32_t& kmerLength, double
 		kmer.to_long(tmp);
 		u_kmer = tmp.front();
 
-		if ((*filter)(u_kmer)) {
+		if ((*minhashFilter)(u_kmer)) {
 			kmers[kmersCount++] = u_kmer;
 		}
 	}

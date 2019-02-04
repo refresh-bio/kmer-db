@@ -22,6 +22,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include "kmer_db.h"
 #include "loader.h"
 #include "version.h"
+#include "analyzer.h"
 
 
 using namespace std;
@@ -29,7 +30,7 @@ using namespace std;
 
 // *****************************************************************************************
 //
-void show_progress(const AbstractKmerDb &db)
+void show_progress(const FastKmerDb &db)
 {
 	size_t tot_pat_size = 0;
 	size_t num_calc = 0;			
@@ -131,6 +132,10 @@ int Console::parse(int argc, char** argv) {
 			else if (params.size() == 2 && mode == "distance") {
 				cout << "Calculating distance measures" << endl;
 				return runDistanceCalculation(params[1]);
+			}
+			else if (params.size() == 3 && mode == "analyze") {
+				cout << "Analyzing database" << endl;
+				return runAnalyzeDatabase(params[1], params[2]);
 			}
 		}
 	}
@@ -247,16 +252,8 @@ int Console::runBuildDatabase(
 		<< "Total: " << totalTime.count() << endl
 		<< "Loading k-mers: " << loadingTime.count() << endl
 		<< "Processing time: " << processingTime.count() << endl
-		<< "\tHashatable resizing (serial): " << db->hashtableResizeTime.count() << endl
-		<< "\tHashtable searching (parallel): " << db->hashtableFindTime.count() << endl
-		<< "\tHashatable insertion (serial): " << db->hashtableAddTime.count() << endl
-		<< "\tSort time (parallel): " << db->sortTime.count() << endl
-		<< "\tPattern extension time (serial): " << db->extensionTime.count() << endl << endl
-		<< "STATISTICS" << endl
-		<< "Number of samples: " << db->getSamplesCount() << endl
-		<< "Number of patterns: " << db->getPatternsCount() << endl
-		<< "Number of k-mers: " << db->getKmersCount() << endl
-		<< "K-mer length: " << db->getKmerLength() << endl;
+		<< db->printDetailedTimes() << endl
+		<< "STATISTICS" << endl << db->printStats() << endl;
 
 	std::chrono::duration<double> dt;
 
@@ -295,12 +292,7 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 		return -1;
 	}
 	dt = std::chrono::high_resolution_clock::now() - start;
-	cout << "OK (" << dt.count() << " seconds)" << endl
-		<< "Number of samples: " << db->getSamplesCount() << endl
-		<< "Number of patterns: " << db->getPatternsCount() << endl
-		<< "Number of k-mers: " << db->getKmersCount() << endl
-		<< "K-mer length: " << db->getKmerLength() << endl
-		<< "Minhash fraction: " << db->getFraction() << endl;
+	cout << "OK (" << dt.count() << " seconds)" << endl << db->printStats() << endl;
 
 
 	cout << "Calculating matrix of common k-mers...";
@@ -345,26 +337,21 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 		return -1;
 	}
 	dt = std::chrono::high_resolution_clock::now() - start;
-	cout << "OK (" << dt.count() << " seconds)" << endl
-		<< "Number of samples: " << db.getSamplesCount() << endl
-		<< "Number of patterns: " << db.getPatternsCount() << endl
-		<< "Number of k-mers: " << db.getKmersCount() << endl
-		<< "K-mer length: " << db.getKmerLength() << endl
-		<< "Minhash fraction: " << db.getFraction() << endl;
-
-
+	cout << "OK (" << dt.count() << " seconds)" << endl << db.printStats() << endl;
+		
 	cout << "Loading sample kmers...";
 
 	start = std::chrono::high_resolution_clock::now();
 	FastKmerDb sampleDb(numThreads, cacheBufferMb);
 
 	std::vector<kmer_t> kmers;
+	std::vector<uint32_t> positions;
 	uint32_t kmerLength;
 	shared_ptr<MinHashFilter> filter = shared_ptr<MinHashFilter>(new MinHashFilter(db.getFraction(), db.getKmerLength()));
 	
 	KmcInputFile file(filter);
 	double dummy;
-	if (!file.open(singleKmcSample) || !file.load(kmers, kmerLength, dummy)) {
+	if (!file.open(singleKmcSample) || !file.load(kmers, positions, kmerLength, dummy)) {
 		cout << "FAILED";
 		return -1;
 	}
@@ -486,6 +473,67 @@ int Console::runDistanceCalculation(const std::string& similarityFilename) {
 	return 0;
 }
 
+
+
+// *****************************************************************************************
+//
+int Console::runAnalyzeDatabase(const std::string & multipleKmcSamples, const std::string & dbFilename)
+{
+	std::chrono::duration<double> loadingTime, processingTime;
+
+	std::ifstream dbFile(dbFilename, std::ios::binary);
+	FastKmerDb db(numThreads, cacheBufferMb);
+
+	cout << "Loading k-mer database " << dbFilename << "...";
+	if (!dbFile || !db.deserialize(dbFile)) {
+		cout << "FAILED";
+		return -1;
+	}
+	cout << "OK" << endl << db.printStats();
+
+	Analyzer aligner;
+	
+	aligner.printStats(db);
+
+	std::shared_ptr<AbstractFilter> filter = aligner.selectSeedKmers(db, std::max((size_t)1, db.getSamplesCount() / 100));
+	return 0;
+	Loader loader(filter, InputFile::GENOME, numThreads, true);
+	loader.configure(multipleKmcSamples);
+
+	loader.initPrefetch();
+	
+	LOG_DEBUG << "Starting loop..." << endl;
+	auto totalStart = std::chrono::high_resolution_clock::now();
+	for (;;) {
+		auto start = std::chrono::high_resolution_clock::now();
+		loader.waitForPrefetch();
+		loader.initLoad();
+		loader.waitForLoad();
+		loadingTime += std::chrono::high_resolution_clock::now() - start;
+
+		start = std::chrono::high_resolution_clock::now();
+		loader.initPrefetch();
+		if (!loader.getLoadedTasks().size()) {
+			break;
+		}
+
+		for (const auto& entry : loader.getLoadedTasks()) {
+			auto task = entry.second;
+			
+			// use task result
+		}
+
+		loader.getLoadedTasks().clear();
+		processingTime += std::chrono::high_resolution_clock::now() - start;
+	}
+
+	loader.waitForPrefetch();
+
+	aligner(db);
+
+	return 0;
+}
+
 // *****************************************************************************************
 //
 int Console::runListPatterns(const std::string& dbFilename, const std::string& patternFile) {
@@ -497,12 +545,8 @@ int Console::runListPatterns(const std::string& dbFilename, const std::string& p
 		cout << "FAILED";
 		return -1;
 	}
-	cout << "OK" << endl
-		<< "Number of samples: " << db.getSamplesCount() << endl
-		<< "Number of patterns: " << db.getPatternsCount() << endl
-		<< "Number of k-mers: " << db.getKmersCount() << endl
-		<< "K-mer length: " << db.getKmerLength() << endl;
-
+	cout << "OK" << endl << db.printStats() << endl;
+		
 	cout << "Storing patterns in " << patternFile << "...";
 	std::ofstream ofs(patternFile);
 	db.savePatterns(ofs);

@@ -15,6 +15,7 @@
     <ClCompile Include="instrset_detect.cpp" />
     <ClCompile Include="parallel_sorter.cpp" />
     <ClCompile Include="kmc_file_wrapper.cpp" />
+    <ClCompile Include="analyzer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="aligned_vector.h" />
@@ -37,5 +38,7 @@
     <ClInclude Include="instrset.h" />
     <ClInclude Include="parallel_sorter.h" />
     <ClInclude Include="version.h" />
+    <ClInclude Include="kmer_extract.h" />
+    <ClInclude Include="analyzer.h" />
   </ItemGroup>
 </Project>

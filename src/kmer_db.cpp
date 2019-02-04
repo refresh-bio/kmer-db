@@ -49,26 +49,30 @@ const size_t FastKmerDb::ioBufferBytes = (2 << 29); //512MB buffer
 // *****************************************************************************************
 //
 FastKmerDb::FastKmerDb(int _num_threads, size_t cacheBufferMb) :
-	kmers2patternIds((unsigned long long) - 1), 
+	kmers2patternIds(), 
+//	repeatedKmers(),
 	dictionarySearchQueue(1), 
 	patternExtensionQueue(1),
 	num_threads(_num_threads > 0 ? _num_threads : std::thread::hardware_concurrency()),
-	cacheBufferMb(cacheBufferMb){
+	cacheBufferMb(cacheBufferMb) {
 
 	avx2_present = instrset_detect() >= 8;
 
 	patternBytes = 0;
-	patterns.reserve(1024);
+	patterns.reserve(2 << 20);
 	patterns.push_back(pattern_t());
 	
+//	threadRepeatedKmers.resize(num_threads);
 	threadPatterns.resize(num_threads);
-	for (auto & tp : threadPatterns) {
-		tp.reserve(1024);
+	
+	for (int tid = 0; tid < num_threads; ++tid) {
+//		threadRepeatedKmers[tid].reserve(2 << 20);
+		threadPatterns[tid].reserve(2 << 20);
 	}
 
 	dictionarySearchWorkers.resize(num_threads);
 	patternExtensionWorkers.resize(num_threads);
-
+	
 	for (auto& t : dictionarySearchWorkers) {
 		t = std::thread([this]() {
 			while (!this->dictionarySearchQueue.IsCompleted()) {
@@ -83,9 +87,12 @@ FastKmerDb::FastKmerDb(int _num_threads, size_t cacheBufferMb) :
 					size_t lo = task.block_id * block_size;
 					size_t hi = (task.block_id == task.num_blocks - 1) ? n_kmers : lo + block_size;
 
+//					threadRepeatedKmers[task.block_id].clear();
+//					threadRepeatedKmers[task.block_id].reserve(hi - lo);
+
 					size_t existing_id = lo;
 					size_t to_add_id = hi - 1;
-
+					
 					kmer_t u_kmer;
 #ifdef USE_PREFETCH
 					kmer_t prefetch_kmer;
@@ -95,10 +102,15 @@ FastKmerDb::FastKmerDb(int _num_threads, size_t cacheBufferMb) :
 					for (size_t i = lo; i < hi; ++i)
 					{
 						u_kmer = kmers[i];
+						if (u_kmer & KMER_MSB) {
+							u_kmer &= ~KMER_MSB; // disable non-uniqueness flag
+//							threadRepeatedKmers[task.block_id].push_back(u_kmer); // mark as sample-repeated
+						} 
+
 #ifdef USE_PREFETCH
 						if (i + prefetch_dist < hi)
 						{
-							prefetch_kmer = kmers[i + prefetch_dist];
+							prefetch_kmer = kmers[i + prefetch_dist] & (~KMER_MSB);
 							kmers2patternIds.prefetch(prefetch_kmer);
 						}
 #endif
@@ -121,7 +133,7 @@ FastKmerDb::FastKmerDb(int _num_threads, size_t cacheBufferMb) :
 						}
 					}
 
-					(*task.num_existing_kmers)[task.block_id] = existing_id;
+					*(task.num_existing_kmers) = existing_id;
 					//cout << "Thread " << tid << ", existing: " << existing_id - lo << ", to add: " << hi - existing_id << endl;
 
 					LOG_DEBUG << "Block " << task.block_id << " finished" << endl;
@@ -226,6 +238,7 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 
 	// to prevent hashtable restructuring during k-mer addition
 	kmers2patternIds.reserve_for_additional(n_kmers);
+	// repeatedKmers.reserve_for_additional(n_kmers);
 	
 	samplePatterns.resize(n_kmers);
 
@@ -240,7 +253,7 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 	for (int tid = 0; tid < num_threads; ++tid) {
 		semaphore.inc();
 		LOG_DEBUG << "Block " << tid << " scheduled" << endl;
-		dictionarySearchQueue.Push(DictionarySearchTask{ tid, num_threads, &kmers, &num_existing_kmers });
+		dictionarySearchQueue.Push(DictionarySearchTask{ tid, num_threads, &kmers, &num_existing_kmers[tid] });
 	}
 	// wait for the task to complete
 	semaphore.waitForZero();
@@ -257,6 +270,13 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 		size_t lo = tid * block;
 		size_t hi = (tid == num_threads - 1) ? n_kmers : lo + block;
 
+		// copy repeated k-mers from thread to global collection
+/*		for (auto it = threadRepeatedKmers[tid].cbegin(); it != threadRepeatedKmers[tid].cend(); ++it) {
+			if (!repeatedKmers.is_free(*it)) {
+				repeatedKmers.insert(*it);
+			}
+		}
+*/		
 		for (size_t i = num_existing_kmers[tid]; i < hi; ++i)
 			kmers_to_add_to_HT.push_back(i);
 	}

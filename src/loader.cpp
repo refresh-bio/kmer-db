@@ -16,20 +16,24 @@ using namespace std;
 
 // *****************************************************************************************
 //
-Loader::Loader(std::shared_ptr<MinHashFilter> filter, InputFile::Format inputFormat, int _num_threads) :
+Loader::Loader(std::shared_ptr<AbstractFilter> filter, InputFile::Format inputFormat, int _num_threads, bool storePositions) :
 	prefetcherQueue(1), 
 	intermediateQueue(1),
 	readerQueue(1), 
 	currentFileId(0), 
 	numThreads(_num_threads > 0 ? _num_threads : std::thread::hardware_concurrency()),
-	inputFormat(inputFormat)
+	inputFormat(inputFormat),
+	storePositions(storePositions)
 	{
 	kmersCollections.resize(numThreads);
+	positionsCollections.resize(numThreads);
 	
-	for (auto& col : kmersCollections) {
-		col.reserve(10000000);
+	for (int tid = 0; tid < numThreads; ++tid) {
+		kmersCollections[tid].reserve(10000000);
+		if (storePositions) {
+			positionsCollections[tid].reserve(10000000);
+		}
 	}
-
 
 	// generate preloader thread
 	prefetcher = std::thread([this, filter]() {
@@ -52,7 +56,7 @@ Loader::Loader(std::shared_ptr<MinHashFilter> filter, InputFile::Format inputFor
 					task->file = std::make_shared<MihashedInputFile>(filter->clone());
 				}
 				else {
-					task->file = std::make_shared<GenomeInputFile>(filter->clone());
+					task->file = std::make_shared<GenomeInputFile>(filter->clone(), this->storePositions);
 				}
 
 				if (task->file->open(kmcFileList[task->fileId])) {
@@ -74,7 +78,7 @@ Loader::Loader(std::shared_ptr<MinHashFilter> filter, InputFile::Format inputFor
 				std::shared_ptr<Task> task;
 
 				if (this->readerQueue.Pop(task)) {
-					if (task->file->load(kmersCollections[task->threadId], task->kmerLength, task->fraction)) {
+					if (task->file->load(kmersCollections[task->threadId], positionsCollections[task->threadId], task->kmerLength, task->fraction)) {
 						LOG_VERBOSE << "Sample loaded successfully: " << task->fileId + 1 << endl;
 						task->kmers = &kmersCollections[task->threadId];
 						std::unique_lock<std::mutex> lck(outputMutex, std::defer_lock);
