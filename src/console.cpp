@@ -115,9 +115,14 @@ int Console::parse(int argc, char** argv) {
 				return runAllVsAll(params[1], params[2]);
 			}
 			else if (params.size() == 4 && mode == "one2all") {
-				cout << "One versus all comparison" << endl;
+				cout << "One new sample versus all database samples comparison" << endl;
 				return runOneVsAll(params[1], params[2], params[3]);
 			}
+			else if (params.size() == 4 && mode == "new2all") {
+				cout << "Set of new samples versus all database samples comparison" << endl;
+				return runOneVsAll(params[1], params[2], params[3]);
+			}
+
 			else if (params.size() == 3 && mode == "list-patterns") {
 				cout << "Listing all patterns" << endl;
 				return runListPatterns(params[1], params[2]);
@@ -197,7 +202,7 @@ int Console::runMinHash(const std::string& multipleKmcSamples, double filterValu
 // *****************************************************************************************
 //
 int Console::runBuildDatabase(
-	const std::string& multipleKmcSamples, 
+	const std::string& multipleSamples, 
 	const std::string dbFilename, 
 	InputFile::Format inputFormat, 
 	double filterValue,
@@ -215,7 +220,7 @@ int Console::runBuildDatabase(
 	auto filter = std::make_shared<MinHashFilter>(filterValue, kmerLength);
 
 	Loader loader(filter, inputFormat, numThreads);
-	loader.configure(multipleKmcSamples);
+	loader.configure(multipleSamples);
 
 	loader.initPrefetch();
 
@@ -305,11 +310,19 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 	cout << "Storing matrix of common k-mers in " << similarityFile << "...";
 	start = std::chrono::high_resolution_clock::now();
 	ofs << "kmer-length, " << db->getKmerLength() << endl;
+
+	ofs << ", samples,";
 	std::copy(db->getSampleNames().cbegin(), db->getSampleNames().cend(), ostream_iterator<string>(ofs, ","));
-	ofs << endl <<  "total-kmers:" << endl;
+	ofs << endl << "samples, total-kmers, ";
 	std::copy(db->getSampleKmersCount().cbegin(), db->getSampleKmersCount().cend(), ostream_iterator<size_t>(ofs, ","));
-	ofs << endl << "common-kmers:" << endl;
-	matrix.save(ofs);
+	ofs << endl;
+
+	for (int sid = 0; sid < db->getSamplesCount(); ++sid) {
+		ofs << db->getSampleNames()[sid] << ", " << db->getSampleKmersCount()[sid] << ", ";
+		matrix.saveRow(sid, ofs);
+		ofs << endl;
+	}
+
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "OK (" << dt.count() << " seconds)" << endl;
 
@@ -342,8 +355,7 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 	cout << "Loading sample kmers...";
 
 	start = std::chrono::high_resolution_clock::now();
-	FastKmerDb sampleDb(numThreads, cacheBufferMb);
-
+	
 	std::vector<kmer_t> kmers;
 	std::vector<uint32_t> positions;
 	uint32_t kmerLength;
@@ -355,24 +367,23 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 		cout << "FAILED";
 		return -1;
 	}
-	sampleDb.addKmers(singleKmcSample, kmers, kmerLength, db.getFraction() );
+
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "OK (" << dt.count() << " seconds)" << endl
-		<< "Number of k-mers: " << sampleDb.getKmersCount() << endl
-		<< "Minhash fraction: " << sampleDb.getFraction() << endl;
-
+		<< "Number of k-mers: " << kmers.size() << endl
+		<< "Minhash fraction: " << db.getFraction() << endl;
 
 	cout << "Calculating similarity vector...";
 	start = std::chrono::high_resolution_clock::now();
 	std::vector<uint32_t> sims;
-	db.calculateSimilarity(sampleDb, sims);
+	db.calculateSimilarity(kmers, sims);
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "OK (" << dt.count() << " seconds)" << endl;
 
 	cout << "Storing similarity vector in " << similarityFile << "...";
 	std::ofstream ofs(similarityFile);
 	
-	ofs << "sample-kmers, " << sampleDb.getSampleKmersCount().front() << endl
+	ofs << "sample-kmers, " << kmers.size() << endl
 		<< "kmer-length, " << db.getKmerLength() << endl;
 	std::copy(db.getSampleNames().cbegin(), db.getSampleNames().cend(), ostream_iterator<string>(ofs, ","));
 	ofs << endl << "total-kmers:" << endl;
@@ -383,6 +394,86 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 	ofs.close();
 	cout << "OK" << endl;
 
+	return 0;
+}
+
+
+// *****************************************************************************************
+//
+int Console::runNewVsAll(const std::string& dbFilename, const std::string& multipleSamples, const std::string& similarityFile) {
+	std::ifstream dbFile(dbFilename, std::ios::binary);
+	FastKmerDb db(numThreads, cacheBufferMb);
+/*
+	std::chrono::duration<double> dt;
+	cout << "Loading k-mer database " << dbFilename << "...";
+	auto start = std::chrono::high_resolution_clock::now();
+	if (!dbFile || !db.deserialize(dbFile)) {
+		cout << "FAILED";
+		return -1;
+	}
+	dt = std::chrono::high_resolution_clock::now() - start;
+	cout << "OK (" << dt.count() << " seconds)" << endl << db.printStats() << endl;
+
+	// Opening file
+	std::ofstream ofs(similarityFile);
+	
+	
+	ofs << "db-samples,";
+	std::copy(db.getSampleNames().cbegin(), db.getSampleNames().cend(), ostream_iterator<string>(ofs, ","));
+	ofs << endl << "total-kmers:" << endl;
+	std::copy(db.getSampleKmersCount().cbegin(), db.getSampleKmersCount().cend(), ostream_iterator<size_t>(ofs, ","));
+	ofs << endl << "common-kmers:" << endl;
+	std::copy(sims.begin(), sims.end(), ostream_iterator<uint32_t>(ofs, ","));
+
+	cout << "Loading sample kmers...";
+	start = std::chrono::high_resolution_clock::now();
+
+	LOG_DEBUG << "Creating Loader object..." << endl;
+	auto filter = std::make_shared<MinHashFilter>(filterValue, kmerLength);
+
+	Loader loader(filter, inputFormat, numThreads);
+	loader.configure(multipleSamples);
+
+	loader.initPrefetch();
+
+	LOG_DEBUG << "Starting loop..." << endl;
+
+	auto totalStart = std::chrono::high_resolution_clock::now();
+	for (;;) {
+		auto start = std::chrono::high_resolution_clock::now();
+		loader.waitForPrefetch();
+		loader.initLoad();
+		loader.waitForLoad();
+		loadingTime += std::chrono::high_resolution_clock::now() - start;
+
+		start = std::chrono::high_resolution_clock::now();
+		loader.initPrefetch();
+		if (!loader.getLoadedTasks().size()) {
+			break;
+		}
+
+		for (const auto& entry : loader.getLoadedTasks()) {
+			auto task = entry.second;
+
+			// use position vector for storing common kmer counts
+			db.calculateSimilarity(task->kmers, task->positions);
+		}
+
+		loader.getLoadedTasks().clear();
+		processingTime += std::chrono::high_resolution_clock::now() - start;
+	}
+
+	loader.waitForPrefetch();
+
+	auto totalTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
+
+	cout << endl << endl << "EXECUTION TIMES" << endl
+		<< "Total: " << totalTime.count() << endl
+		<< "Loading k-mers: " << loadingTime.count() << endl
+		<< "Processing time: " << processingTime.count() << endl;
+
+
+*/
 	return 0;
 }
 

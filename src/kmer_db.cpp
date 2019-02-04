@@ -946,7 +946,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 
 // *****************************************************************************************
 //
-void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<uint32_t>& similarities) const {
+void  FastKmerDb::calculateSimilarity(const std::vector<kmer_t>& kmers, std::vector<uint32_t>& similarities) const {
 	similarities.resize(this->getSamplesCount(), 0);
 
 	std::vector<std::vector<uint32_t>> localSimilarities(num_threads, std::vector<uint32_t>(this->getSamplesCount()));
@@ -957,13 +957,9 @@ void  FastKmerDb::calculateSimilarity(const FastKmerDb& sampleDb, std::vector<ui
 	auto start = std::chrono::high_resolution_clock::now();
 
 	// iterate over kmers in analyzed sample
-	for (auto it = sampleDb.kmers2patternIds.cbegin(); it < sampleDb.kmers2patternIds.cend(); ++it) {
-		if (sampleDb.kmers2patternIds.is_free(*it)) {
-			continue;
-		}
-
+	for (const auto& kmer: kmers) {
 		// check if kmer exists in a database
-		auto entry = kmers2patternIds.find(it->key);
+		auto entry = kmers2patternIds.find(kmer);
 
 		if (entry != nullptr) {
 			auto pid = *entry;

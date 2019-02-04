@@ -34,10 +34,12 @@ protected:
 	int numThreads;
 	int cacheBufferMb;
 
-	int runBuildDatabase(const std::string& multipleKmcSamples, const std::string dbFilename, 
+	int runBuildDatabase(const std::string& multipleSamples, const std::string dbFilename, 
 		InputFile::Format inputFormat, double filterValue, uint32_t kmerLength);
 	int runAllVsAll(const std::string& dbFilename, const std::string& similarityFile);
 	int runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFilename);
+	int runNewVsAll(const std::string& dbFilename, const std::string& multipleSamples, const std::string& similarityFilename);
+
 	int runMinHash(const std::string& multipleKmcSamples, double fraction);
 	int runDistanceCalculation(const std::string& similarityFilename);
 

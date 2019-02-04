@@ -169,6 +169,19 @@ public:
 		}
 	}
 
+	void saveRow(size_t row, std::ofstream & file) {
+		size_t offset = row * (row - 1) / 2;
+		T * ptr = data.data() + offset;
+
+		for (int j = 0; j < row; ++j) {
+			file << *ptr++ << ',';
+		}
+
+		for (int j = row; j < size; ++j) {
+			file << "0,";
+		}
+	}
+
 protected:
 	size_t size;
 	std::vector<T> data;

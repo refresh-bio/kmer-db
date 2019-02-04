@@ -125,7 +125,7 @@ public:
 
 	virtual void calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix);// const;
 
-	virtual void calculateSimilarity(const FastKmerDb& sampleDb, std::vector<uint32_t>& vector) const;
+	virtual void calculateSimilarity(const std::vector<kmer_t>& kmers, std::vector<uint32_t>& vector) const;
 	
 	virtual void serialize(std::ofstream& file) const;
 
