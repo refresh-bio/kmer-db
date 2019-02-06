@@ -20,6 +20,16 @@ class InputFile {
 public:
 	enum Format { KMC, MINHASH, GENOME };
 
+	static std::string format2string(enum Format f) {
+		switch (f) {
+		case GENOME: return "fasta genomes";
+		case KMC: return "k-mers";
+		case MINHASH: return "minhashed k-mers";
+		}
+
+		return "";
+	}
+
 	InputFile(std::shared_ptr<AbstractFilter> filter) : filter(filter) {}
 
 	virtual bool open(const std::string& filename) = 0;
