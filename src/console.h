@@ -37,8 +37,8 @@ protected:
 	int runBuildDatabase(const std::string& multipleSamples, const std::string dbFilename, 
 		InputFile::Format inputFormat, double filterValue, uint32_t kmerLength);
 	int runAllVsAll(const std::string& dbFilename, const std::string& similarityFile);
+	int runNewVsAll(const std::string& dbFilename, const std::string& multipleSamples, const std::string& similarityFilename, InputFile::Format inputFormat);
 	int runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFilename);
-	int runNewVsAll(const std::string& dbFilename, const std::string& multipleSamples, const std::string& similarityFilename);
 
 	int runMinHash(const std::string& multipleKmcSamples, double fraction);
 	int runDistanceCalculation(const std::string& similarityFilename);

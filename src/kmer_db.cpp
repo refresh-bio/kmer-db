@@ -856,8 +856,7 @@ void FastKmerDb::calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix) //
 
 		int last_pid = pid;
 		int num_samples = getSamplesCount();
-		auto &sum_hist_sample_ids = hist_sample_ids[num_threads];
-
+		
 		auto t2 = std::chrono::high_resolution_clock::now();
 
 		semaphore_hist_first.inc(num_threads);
