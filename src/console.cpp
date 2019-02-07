@@ -92,7 +92,7 @@ int Console::parse(int argc, char** argv) {
 		InputFile::Format inputFormat = InputFile::GENOME;
 
 		findOption(params, Params::OPTION_FILTER, filter);	// minhash threshold
-		findOption(params, Params::OPTION_LENGTH, filter); // kmer length
+		findOption(params, Params::OPTION_LENGTH, kmerLength); // kmer length
 		
 		if (findSwitch(params, Params::SWITCH_KMC_SAMPLES)) {
 			inputFormat = InputFile::KMC;
@@ -113,14 +113,15 @@ int Console::parse(int argc, char** argv) {
 		if (params.size() >= 2) {
 			const string& mode = params[0];
 
+			// detect obsolete modes
 			if (mode == "build-kmers" || mode == "build-mh") {
 				cout << "Error: build-kmers/build-mh modes are obsolete, use " << Params::SWITCH_KMC_SAMPLES << "/" << Params::SWITCH_MINHASH_SAMPLES << " switches instead." << endl;
 				return 0;
 			}
 
-			// building from kmers or genomes
+			// main modes
 			if (params.size() == 3 && mode == Params::MODE_BUILD) {
-				cout << "Database building mode (from" << InputFile::format2string(inputFormat) << ")" << endl;
+				cout << "Database building mode (from " << InputFile::format2string(inputFormat) << ")" << endl;
 				return runBuildDatabase(params[1], params[2], inputFormat, filter, kmerLength);
 			}
 			else if (params.size() == 3 && mode == Params::MODE_ALL_2_ALL) {
@@ -128,16 +129,12 @@ int Console::parse(int argc, char** argv) {
 				return runAllVsAll(params[1], params[2]);
 			}
 			else if (params.size() == 4 && mode == Params::MODE_NEW_2_ALL) {
-				cout << "Set of new samples  (from" << InputFile::format2string(inputFormat) << ") versus entire database comparison" << endl;
+				cout << "Set of new samples  (from " << InputFile::format2string(inputFormat) << ") versus entire database comparison" << endl;
 				return runNewVsAll(params[1], params[2], params[3], inputFormat);
 			}
 			else if (params.size() == 4 && mode == Params::MODE_ONE_2_ALL) {
-				cout << "One new sample  (from" << InputFile::format2string(inputFormat) << ") versus entire database comparison" << endl;
+				cout << "One new sample  (from " << InputFile::format2string(inputFormat) << ") versus entire database comparison" << endl;
 				return runOneVsAll(params[1], params[2], params[3], inputFormat);
-			}
-			else if (params.size() == 3 && mode == "list-patterns") {
-				cout << "Listing all patterns" << endl;
-				return runListPatterns(params[1], params[2]);
 			}
 			else if (params.size() == 3 && mode == Params::MODE_MINHASH) {
 				double filter = std::atof(params[1].c_str());
@@ -149,6 +146,11 @@ int Console::parse(int argc, char** argv) {
 			else if (params.size() == 2 && mode == Params::MODE_DISTANCE) {
 				cout << "Calculating distance measures" << endl;
 				return runDistanceCalculation(params[1]);
+			}
+			// debug modes
+			else if (params.size() == 3 && mode == "list-patterns") {
+				cout << "Listing all patterns" << endl;
+				return runListPatterns(params[1], params[2]);
 			}
 			else if (params.size() == 3 && mode == "analyze") {
 				cout << "Analyzing database" << endl;
@@ -389,6 +391,11 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 		return -1;
 	}
 
+	if (kmerLength != db.getKmerLength()) {
+		cout << "Error: sample and database k-mer length differ." << endl;
+		return -1;
+	}
+
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "OK (" << dt.count() << " seconds)" << endl
 		<< "Number of k-mers: " << queryKmers.size() << endl
@@ -478,6 +485,11 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 
 		for (const auto& entry : loader.getLoadedTasks()) {
 			auto task = entry.second;
+
+			if (task->kmerLength != db.getKmerLength()) {
+				cout << "Error: sample and database k-mer length differ." << endl;
+				return -1;
+			}
 
 			// use position vector for storing common kmer counts
 			sims.clear();

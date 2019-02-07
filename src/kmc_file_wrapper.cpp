@@ -327,6 +327,7 @@ bool KmcInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& posit
 
 	filterValue = ((double)kmers.size() / _total_kmers); // this may differ from theoretical
 	LOG_VERBOSE << "Filter passed: " << kmers.size() << "/" << _total_kmers << "(" << filterValue << ")" << endl;
+	filterValue = minhashFilter->getFilterValue(); // use proper value
 	return kmcfile->Close();
 }
 
