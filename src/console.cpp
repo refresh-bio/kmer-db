@@ -684,58 +684,60 @@ void Console::showInstructions() {
 		<< "kmer-db <mode> [options] <positional arguments>" << endl << endl
 		
 		<< "Modes:" << endl
-		<< "  " << Params::MODE_BUILD << " - building a database from genomes, k-mers, or minhashed k-mers" << endl
+		<< "  " << Params::MODE_BUILD << " - building a database from genomes, k-mers, or minhashed k-mers," << endl
 		<< "  " << Params::MODE_MINHASH << " - minhashing k-mers," << endl
 		<< "  " << Params::MODE_ALL_2_ALL << " - counting common k-mers - all samples in the database," << endl
 		<< "  " << Params::MODE_NEW_2_ALL << " - counting common k-mers - set of new samples versus database," << endl
 		<< "  " << Params::MODE_ONE_2_ALL << " - counting common k-mers - single sample versus database," << endl
-		<< "  " << Params::MODE_DISTANCE << " - calculating similarities / distances." << endl
-		<< "Global options:" << endl
+		<< "  " << Params::MODE_DISTANCE << " - calculating similarities/distances." << endl
+		<< "Common options:" << endl
 		<< "  " << Params::OPTION_THREADS << " <threads> - number of threads (default: number of available cores)," << endl
-		<< "  " << Params::OPTION_BUFFER << " <size_mb> - size of cache buffer in megabytes, applies to all2all mode" << endl
-		<< "                      (use L3 size for Intel CPUs and L2 for AMD to maximize performance; default: 8)." << endl
-		<< "The meaning of the positional arguments depends on the selected mode." << endl << endl
+		<< "The meaning of other options and positional arguments depends on the selected mode." << endl << endl
 
 		<< "Building a database:" << endl
 		<< "  kmer-db " << Params::MODE_BUILD << " [" << Params::OPTION_FILTER << " <filter> " << Params::OPTION_LENGTH << " <kmer-length>] <sample_list> <database>" << endl
 		<< "  kmer-db " << Params::MODE_BUILD << " " << Params::SWITCH_KMC_SAMPLES << " [" << Params::OPTION_FILTER << " <filter>] <sample_list> <database>" << endl
 		<< "  kmer-db " << Params::MODE_BUILD << " " << Params::SWITCH_MINHASH_SAMPLES << " <sample_list> <database>" << endl
 		<< "    sample_list (input) - file containing list of samples in one of the following formats:" << endl
-		<< "                          fasta genomes, KMC k-mers (" << Params::SWITCH_KMC_SAMPLES << "), or minhashed k-mers (" << Params::SWITCH_MINHASH_SAMPLES << ")" << endl
-		<< "    database (output) - file with generated k-mer database" << endl
-		<< "    " << Params::OPTION_FILTER << " <filter> - number from [0, 1] interval determining a fraction of all k-mers to be accepted by the minhash filter" << endl
+		<< "                          fasta genomes, KMC k-mers (" << Params::SWITCH_KMC_SAMPLES << "), or minhashed k-mers (" << Params::SWITCH_MINHASH_SAMPLES << ")," << endl
+		<< "    database (output) - file with generated k-mer database," << endl
+		<< "    " << Params::OPTION_FILTER << " <filter> - number from [0, 1] interval determining a fraction of all k-mers to be accepted by the minhash filter," << endl
 		<< "    " << Params::OPTION_LENGTH << " <kmer_length> - length of k-mers (default: 18)." << endl << endl
 
 		<< "Minhashing k-mers:" << endl
 		<< "  kmer_db " << Params::MODE_MINHASH << " <sample_list> <fraction>" << endl
-		<< "    sample_list (input) - file containing list of KMC k-mer files (raw)" << endl
-		<< "    fraction (input) - fraction of kmers passing the filter" << endl << endl
+		<< "    sample_list (input) - file containing list of KMC k-mer files (raw)," << endl
+		<< "    fraction (input) - fraction of kmers passing the filter." << endl << endl
 
 		<< "Counting common k-mers for all the samples in the database:" << endl
-		<< "  kmer_db " << Params::MODE_ALL_2_ALL << " <database> <common_matrix>" << endl
-		<< "    database (input) - k-mer database file" << endl
-		<< "    commony_matrix (output) - file containing matrix with numbers of common k-mers" << endl << endl
+		<< "  kmer_db " << Params::MODE_ALL_2_ALL << " [" << Params::OPTION_BUFFER << " <size_mb>] <database> <common_table>" << endl
+		<< "    " << Params::OPTION_BUFFER << " <size_mb> - size of cache buffer in megabytes, applies to all2all mode" << endl
+		<< "                      (use L3 size for Intel CPUs and L2 for AMD to maximize performance; default: 8)," << endl
+		<< "    database (input) - k-mer database file," << endl
+		<< "    common_table (output) - comma-separated table with number of common k-mers." << endl << endl
 
-		<< "Calculating number of common kmers between single sample and all the samples in the database:" << endl
-		<< "  kmer_db " << Params::MODE_NEW_2_ALL << " [" << Params::SWITCH_KMC_SAMPLES << "|" << Params::SWITCH_MINHASH_SAMPLES << "] <database> <sample_list> <common_vector>" << endl
+		<< "Counting common kmers between set of new samples and all the samples in the database:" << endl
+		<< "  kmer_db " << Params::MODE_NEW_2_ALL << " [" << Params::SWITCH_KMC_SAMPLES << "|" << Params::SWITCH_MINHASH_SAMPLES << "] <database> <sample_list> <common_table>" << endl
 		<< "    database (input) - k-mer database file" << endl
-		<< "    sample_list (input) - file containing list of query samples in one of the following formats: fasta genomes, KMC k-mers (-from-kmers), or minhashed k-mers (-from-minhash)" << endl
-		<< "    common_vector (output) - file containing matrix with numbers of common k-mers" << endl << endl
+		<< "    sample_list (input) - file containing list of query samples in one of the following formats:" << endl
+		<< "                          fasta genomes, KMC k-mers (" << Params::SWITCH_KMC_SAMPLES << "), or minhashed k-mers (" << Params::SWITCH_MINHASH_SAMPLES << ")," << endl
+		<< "    common_table (output) - comma-separated table with number of common k-mers." << endl << endl
 
-		<< "Calculating number of common kmers between single sample and all the samples in the database:" << endl
-		<< "  kmer_db " << Params::MODE_ONE_2_ALL << " [" << Params::SWITCH_KMC_SAMPLES << "|" << Params::SWITCH_MINHASH_SAMPLES << "] <database> <sample> <common_vector>" << endl
+		<< "Counting common kmers between single sample and all the samples in the database:" << endl
+		<< "  kmer_db " << Params::MODE_ONE_2_ALL << " [" << Params::SWITCH_KMC_SAMPLES << "|" << Params::SWITCH_MINHASH_SAMPLES << "] <database> <sample> <common_table>" << endl
 		<< "    database (input) - k-mer database file" << endl
-		<< "    sample (input) - query sample in one of following formats: fasta genomes, KMC files (-from-kmers) or minhashed kmers (-from-minhash)" << endl
-		<< "    common_vector (output) - file containing vector with numbers of common k-mers" << endl << endl
+		<< "    sample (input) - query sample in one of following formats:" << endl
+		<< "                     fasta genomes, KMC k-mers (" << Params::SWITCH_KMC_SAMPLES << "), or minhashed k-mers (" << Params::SWITCH_MINHASH_SAMPLES << ")," << endl
+		<< "    common_table (output) - comma-separated table with number of common k-mers." << endl << endl
 
-		<< "Calculating similarity/distance metrices (vectors) on the basis of common k-mers:" << endl
-		<< "  kmer_db " << Params::MODE_DISTANCE << " <common_file>" << endl
-		<< "    common_file (input) - file containing matrix/vector with numbers of common k-mers" << endl
+		<< "Calculating similarities/distances on the basis of common k-mers:" << endl
+		<< "  kmer_db " << Params::MODE_DISTANCE << " <commony_table>" << endl
+		<< "    common_table (input) - file containing table with numbers of common k-mers" << endl
 		<< "This mode generates set of files:" << endl
-		<< "  <common_file>.jaccard" << endl
-		<< "  <common_file>.min" << endl
-		<< "  <common_file>.max" << endl
-		<< "  <common_file>.cosine" << endl
-		<< "  <common_file>.mash" << endl;
+		<< "  <common_table>.jaccard" << endl
+		<< "  <common_table>.min" << endl
+		<< "  <common_table>.max" << endl
+		<< "  <common_table>.cosine" << endl
+		<< "  <common_table>.mash" << endl;
 }
 
