@@ -452,8 +452,7 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 	std::copy(db.getSampleNames().cbegin(), db.getSampleNames().cend(), ostream_iterator<string>(ofs, ","));
 	ofs << endl << "query-samples,total-kmers,";
 	std::copy(db.getSampleKmersCount().cbegin(), db.getSampleKmersCount().cend(), ostream_iterator<size_t>(ofs, ","));
-	ofs << endl;
-
+	
 	cout << "Loading queries...";
 	start = std::chrono::high_resolution_clock::now();
 
