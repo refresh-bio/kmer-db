@@ -28,11 +28,11 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 
 	FILE * in;
 	
-	if ((in = fopen((filename + ".gz").c_str(), "rb")) || (in = fopen((filename + ".fna.gz").c_str(), "rb"))) {
+	if ((in = fopen((filename + ".gz").c_str(), "rb")) || (in = fopen((filename + ".fna.gz").c_str(), "rb")) || (in = fopen((filename + ".fasta.gz").c_str(), "rb"))) {
 		isGzipped = true;
 	}
 	else {
-		in = fopen((filename + ".fna").c_str(), "rb");
+		(in = fopen((filename + ".fna").c_str(), "rb")) || (in = fopen((filename + ".fasta").c_str(), "rb"));
 	}
 	
 	if (in) {

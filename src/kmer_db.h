@@ -162,7 +162,7 @@ public:
 			<< "\tHashtable searching (parallel): " << hashtableFindTime.count() << endl
 			<< "\tHashatable insertion (serial): " << hashtableAddTime.count() << endl
 			<< "\tSort time (parallel): " << sortTime.count() << endl
-			<< "\tPattern extension time (serial): " << extensionTime.count() << endl;
+			<< "\tPattern extension time (parallel): " << extensionTime.count() << endl;
 		return oss.str();
 	}
 

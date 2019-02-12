@@ -311,7 +311,7 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 	LOG_VERBOSE << "sort time: " << sortTime.count() << "  " << samplePatterns.size() << endl;
 
 
-	LOG_DEBUG << "Extending kmers (parallel)..." << endl;
+	LOG_DEBUG << "Extending patterns (parallel)..." << endl;
 	start = std::chrono::high_resolution_clock::now();
 	std::atomic<size_t> new_pid(patterns.size());
 
@@ -359,14 +359,13 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 		
 	// wait for the task to complete
 	semaphore.waitForZero();
+	extensionTime += std::chrono::high_resolution_clock::now() - start;
 
 	LOG_DEBUG << "Inserting kmers (serial)..." << endl;
 	for (int tid = 0; tid < threads.size(); ++tid) {
 		patternBytes += threadBytes[tid];
 	}
 
-	extensionTime += std::chrono::high_resolution_clock::now() - start;
-	
 	// extend by 1.5 on reallocation
 	if (patterns.capacity() < new_pid) {
 		patterns.reserve(new_pid * 3 / 2);
@@ -996,7 +995,7 @@ void  FastKmerDb::calculateSimilarity(const std::vector<kmer_t>& kmers, std::vec
 
 
 	dt = std::chrono::high_resolution_clock::now() - start;
-	cout << "Pattern listing time: " << dt.count() << endl;
+	LOG_VERBOSE << "Pattern listing time: " << dt.count() << endl;
 
 	start = std::chrono::high_resolution_clock::now();
 	std::vector<std::thread> workers(num_threads);
@@ -1062,5 +1061,5 @@ void  FastKmerDb::calculateSimilarity(const std::vector<kmer_t>& kmers, std::vec
 	}
 
 	dt = std::chrono::high_resolution_clock::now() - start;
-	cout << "Pattern unpacking time: " << dt.count() << endl;
+	LOG_VERBOSE << "Pattern unpacking time: " << dt.count() << endl;
 }
