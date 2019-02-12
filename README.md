@@ -165,7 +165,7 @@ kmer-db all2all pathogens.db matrix.csv
 kmer-db distance matrix.csv
 ```
 
-Calculating similarities/distances between samples listed in *pathogens.list* and *salmonella* using all 20-mers: 
+Calculating similarities/distances between samples listed in *pathogens.list* and *salmonella* (*salmonella.kmc_pre* and *salomnella.kmc_suf* must exist) using all 20-mers: 
 ```
 kmer-db build -k 20 pathogens.list pathogens.db
 kmer-db one2all pathogens.db salmonella vector.csv
