@@ -248,7 +248,6 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 	// find for kmers in parallel
 	LOG_DEBUG << "Finding kmers (parallel)..." << endl;
 	start = std::chrono::high_resolution_clock::now();
-	std::vector<std::thread> threads(num_threads);
 	// prepare tasks
 	for (int tid = 0; tid < num_threads; ++tid) {
 		semaphore.inc();
@@ -362,7 +361,7 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 	extensionTime += std::chrono::high_resolution_clock::now() - start;
 
 	LOG_DEBUG << "Inserting kmers (serial)..." << endl;
-	for (int tid = 0; tid < threads.size(); ++tid) {
+	for (int tid = 0; tid < num_threads; ++tid) {
 		patternBytes += threadBytes[tid];
 	}
 
@@ -373,7 +372,7 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 
 	patterns.resize(new_pid);
 
-	for (int tid = 0; tid < threads.size(); ++tid) {
+	for (int tid = 0; tid < num_threads; ++tid) {
 		for (auto& tp : threadPatterns[tid]) {
 			patterns[tp.first] = std::move(tp.second);
 		}
@@ -1062,4 +1061,89 @@ void  FastKmerDb::calculateSimilarity(const std::vector<kmer_t>& kmers, std::vec
 
 	dt = std::chrono::high_resolution_clock::now() - start;
 	LOG_VERBOSE << "Pattern unpacking time: " << dt.count() << endl;
+}
+
+// *****************************************************************************************
+//
+PrefixKmerDb::PrefixKmerDb(int _num_threads, size_t cacheBufferMb) : FastKmerDb(_num_threads, cacheBufferMb), prefixHistogramQueue(1)
+{
+	prefixHistogtamWorkers.resize(num_threads);
+
+	for (auto& t : prefixHistogtamWorkers) {
+		t = std::thread([this]() {
+			while (!this->dictionarySearchQueue.IsCompleted()) {
+				DictionarySearchTask task;
+
+				if (this->dictionarySearchQueue.Pop(task)) {
+
+			//		this->prefixHistogram_workers[task.block_id].clear(); // clear the histogram
+
+					const std::vector<kmer_t>& kmers = *(task.kmers);
+
+					size_t n_kmers = kmers.size();
+					size_t block_size = n_kmers / task.num_blocks;
+					size_t lo = task.block_id * block_size;
+					size_t hi = (task.block_id == task.num_blocks - 1) ? n_kmers : lo + block_size;
+
+					for (size_t i = lo; i < hi; ++i) {
+						uint64_t prefix = kmers[i] & this->prefixMask;
+				//		++this->prefixHistogram_workers[task.block_id][prefix];
+					}
+
+					if (this->dictionarySearchQueue.Pop(task)) {
+						this->semaphore.dec();
+					}
+				}
+			}
+		});
+	}
+
+}
+
+// *****************************************************************************************
+//
+PrefixKmerDb::~PrefixKmerDb() {
+	prefixHistogramQueue.MarkCompleted();
+	for (auto& t : prefixHistogtamWorkers) {
+		t.join();
+	}
+}
+
+
+// *****************************************************************************************
+//
+void PrefixKmerDb::initialize(uint32_t kmerLength, double fraction) {
+	FastKmerDb::initialize(kmerLength, fraction);
+
+	size_t prefixBits = (kmerLength - SUFFIX_LEN) * 2;
+	size_t binsCount = 1 << prefixBits;
+	this->prefixMask = (1ULL << prefixBits) - 1;
+
+	prefixHistogram.resize(binsCount);
+}
+
+// *****************************************************************************************
+//
+sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction)
+{
+	// get prefix histogram (parallel)
+	LOG_DEBUG << "Prefix histogram (parallel)..." << endl;
+	auto start = std::chrono::high_resolution_clock::now();
+	// prepare tasks
+	for (int tid = 0; tid < num_threads; ++tid) {
+		semaphore.inc();
+		LOG_DEBUG << "Block " << tid << " scheduled" << endl;
+		prefixHistogramQueue.Push(DictionarySearchTask{ tid, num_threads, &kmers, nullptr });
+	}
+
+	semaphore.waitForZero();
+
+	prefixHistogram.clear();
+	for (int tid = 0; tid < num_threads; ++tid) {
+//		std::transform(prefixHistogram.begin(), prefixHistogram.end(), prefixHistogram.begin(), prefixHistogram_workers[tid].begin(), std::plus<uint32_t>());
+	}
+
+	hashtableFindTime += std::chrono::high_resolution_clock::now() - start;
+	
+	return 0;
 }

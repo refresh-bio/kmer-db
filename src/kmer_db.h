@@ -26,12 +26,15 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 
 
 #define KMER_MSB (1ULL << 63)
+#define SUFFIX_LEN 16
 
 typedef uint64_t kmer_t;
 
 
 class AbstractKmerDb {
 protected:
+
+	bool isInitialized;
 
 	uint32_t kmerLength;
 
@@ -41,9 +44,15 @@ protected:
 
 	std::vector<size_t> sampleKmersCount;
 
+	virtual void initialize(uint32_t kmerLength, double fraction) {
+		this->kmerLength = kmerLength;
+		this->fraction = fraction;
+		this->isInitialized = true;
+	}
+
 public:
 
-	AbstractKmerDb() : kmerLength(0) {}
+	AbstractKmerDb() : kmerLength(0), isInitialized(false) {}
 
 	const uint32_t getKmerLength() const { return kmerLength; }
 
@@ -55,29 +64,30 @@ public:
 
 	const std::vector<size_t>& getSampleKmersCount() const { return sampleKmersCount; }
 
+	
 	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction) {
 		LOG_VERBOSE << "Adding sample: " << sampleName << " (" << kmers.size() << " kmers)" << endl;
+		
+		if (!isInitialized) {
+			initialize(kmerLength, fraction);
+		}
+
+		if (this->kmerLength != kmerLength) {
+			throw std::runtime_error("Error in AbstractKmerDb::addKmers(): adding kmers of different length");
+		}
+		if (this->fraction != fraction) {
+			throw std::runtime_error("Error in AbstractKmerDb::addKmers(): adding kmers of different minhash fraction");
+		}
+
 		sample_id_t newId = (sample_id_t) sampleNames.size();
 		sampleNames.push_back(sampleName);
 		sampleKmersCount.push_back(kmers.size());
 
-		if (this->kmerLength == 0) {
-			this->kmerLength = kmerLength;
-			this->fraction = fraction;
-		}
-		else {
-			if (this->kmerLength != kmerLength) {
-				throw std::runtime_error("ERROR in FastKmerDb::addKmers(): adding kmers of different length");
-			}
-			if (this->fraction != fraction) {
-				throw std::runtime_error("ERROR in FastKmerDb::addKmers(): adding kmers of different minhash fraction");
-			}
-		}
-		
 		return newId;
 	}
 
 	virtual void mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const = 0;
+
 };
 
 
@@ -119,9 +129,9 @@ public:
 
 	const std::vector<pattern_t>& getPatterns() const { return patterns; }
 
-	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction);
+	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction) override;
 
-	virtual void mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const;
+	virtual void mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const override;
 
 	virtual void calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix);// const;
 
@@ -166,6 +176,8 @@ public:
 		return oss.str();
 	}
 
+
+
 protected:
 	
 	std::chrono::duration<double> hashtableResizeTime;
@@ -177,10 +189,11 @@ protected:
 	bool avx2_present;
 
 	static const size_t ioBufferBytes;
-	
+
 	// memory needed for all templates
 	size_t patternBytes;
-								
+
+
 	hash_map_lp<kmer_t, pattern_id_t> kmers2patternIds;
 
 	//hash_set_lp<kmer_t> repeatedKmers;
@@ -192,7 +205,7 @@ protected:
 
 	std::vector<std::vector<std::pair<pattern_id_t, pattern_t>>> threadPatterns;
 
-	// first element - pattern id, second element 
+	// first element - pattern id, second element - ht table entry
 	aligned_vector<std::pair<pattern_id_t, pattern_id_t*>> samplePatterns;
 
 	CRegisteringQueue<DictionarySearchTask> dictionarySearchQueue;
@@ -210,4 +223,27 @@ protected:
 	int num_threads;
 
 	size_t cacheBufferMb;
+
+};
+
+
+class PrefixKmerDb : public FastKmerDb {
+public:
+	PrefixKmerDb(int _num_threads, size_t cacheBufferMb);
+
+	~PrefixKmerDb();
+
+	sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction);
+
+protected:
+
+	uint64_t prefixMask;
+
+	std::vector<uint32_t> prefixHistogram;
+
+	std::vector<std::thread> prefixHistogtamWorkers;
+
+	CRegisteringQueue<DictionarySearchTask> prefixHistogramQueue;
+
+	void initialize(uint32_t kmerLength, double fraction) override;
 };
