@@ -23,6 +23,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include "loader.h"
 #include "version.h"
 #include "analyzer.h"
+#include "similarity_calculator.h"
 
 
 using namespace std;
@@ -225,7 +226,7 @@ int Console::runBuildDatabase(
 	cout << "Processing samples..." << endl;
 	
 	LOG_DEBUG << "Creating FastKmerDb object" << endl;
-	FastKmerDb* db = new FastKmerDb(numThreads, cacheBufferMb);
+	FastKmerDb* db = new FastKmerDb(numThreads);
 
 	std::chrono::duration<double> loadingTime, processingTime;
 	
@@ -301,8 +302,9 @@ int Console::runBuildDatabase(
 int Console::runAllVsAll(const std::string& dbFilename, const std::string& similarityFile) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
 	std::ofstream ofs(similarityFile);
-	FastKmerDb* db = new FastKmerDb(numThreads, cacheBufferMb);;
-
+	FastKmerDb* db = new FastKmerDb(numThreads);
+	SimilarityCalculator calculator(numThreads, cacheBufferMb);
+	
 	std::chrono::duration<double> dt;
 	cout << "Loading k-mer database " << dbFilename << "...";
 	auto start = std::chrono::high_resolution_clock::now();
@@ -317,7 +319,7 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 	cout << "Calculating matrix of common k-mers...";
 	start = std::chrono::high_resolution_clock::now();
 	LowerTriangularMatrix<uint32_t> matrix;
-	db->calculateSimilarity(matrix);
+	calculator(*db, matrix);
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "OK (" << dt.count() << " seconds)" << endl;
 
@@ -351,7 +353,8 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 //
 int Console::runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFile, InputFile::Format inputFormat) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
-	FastKmerDb db(numThreads, cacheBufferMb);
+	FastKmerDb db(numThreads);
+	SimilarityCalculator calculator(numThreads, cacheBufferMb);
 
 	std::chrono::duration<double> dt;
 
@@ -404,7 +407,7 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 	cout << "Calculating similarity vector...";
 	start = std::chrono::high_resolution_clock::now();
 	std::vector<uint32_t> sims;
-	db.calculateSimilarity(queryKmers, sims);
+	calculator(db, queryKmers, sims);
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "OK (" << dt.count() << " seconds)" << endl;
 
@@ -430,8 +433,9 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 //
 int Console::runNewVsAll(const std::string& dbFilename, const std::string& multipleSamples, const std::string& similarityFile, InputFile::Format inputFormat) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
-	FastKmerDb db(numThreads, cacheBufferMb);
-	
+	FastKmerDb db(numThreads);
+	SimilarityCalculator calculator(numThreads, cacheBufferMb);
+
 	std::chrono::duration<double> loadingTime, processingTime, dt;
 
 	cout << "Loading k-mer database " << dbFilename << "...";
@@ -492,7 +496,7 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 
 			// use position vector for storing common kmer counts
 			sims.clear();
-			db.calculateSimilarity(*task->kmers, sims);
+			calculator(db, *task->kmers, sims);
 			ofs << endl << task->sampleName << "," << task->kmers->size() << ",";
 			std::copy(sims.begin(), sims.end(), ostream_iterator<uint32_t>(ofs, ","));
 		}
@@ -602,7 +606,7 @@ int Console::runAnalyzeDatabase(const std::string & multipleKmcSamples, const st
 	std::chrono::duration<double> loadingTime, processingTime;
 
 	std::ifstream dbFile(dbFilename, std::ios::binary);
-	FastKmerDb db(numThreads, cacheBufferMb);
+	FastKmerDb db(numThreads);
 
 	cout << "Loading k-mer database " << dbFilename << "...";
 	if (!dbFile || !db.deserialize(dbFile)) {
@@ -658,7 +662,7 @@ int Console::runAnalyzeDatabase(const std::string & multipleKmcSamples, const st
 //
 int Console::runListPatterns(const std::string& dbFilename, const std::string& patternFile) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
-	FastKmerDb db(numThreads, cacheBufferMb);
+	FastKmerDb db(numThreads);
 
 	cout << "Loading k-mer database " << dbFilename << "...";
 	if (!dbFile || !db.deserialize(dbFile)) {

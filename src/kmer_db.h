@@ -109,7 +109,7 @@ struct PatternExtensionTask {
 
 class FastKmerDb : public AbstractKmerDb {
 public:
-	FastKmerDb(int _num_threads, size_t cacheBufferMb);
+	FastKmerDb(int _num_threads);
 
 	~FastKmerDb();
 
@@ -129,14 +129,12 @@ public:
 
 	const std::vector<pattern_t>& getPatterns() const { return patterns; }
 
+	std::vector<pattern_t>& getPatterns() { return patterns; }
+
 	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction) override;
 
 	virtual void mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const override;
 
-	virtual void calculateSimilarity(LowerTriangularMatrix<uint32_t>& matrix);// const;
-
-	virtual void calculateSimilarity(const std::vector<kmer_t>& kmers, std::vector<uint32_t>& vector) const;
-	
 	virtual void serialize(std::ofstream& file) const;
 
 	virtual bool deserialize(std::ifstream& file);
@@ -186,13 +184,10 @@ protected:
 	std::chrono::duration<double> sortTime;
 	std::chrono::duration<double> extensionTime;
 
-	bool avx2_present;
-
 	static const size_t ioBufferBytes;
 
 	// memory needed for all templates
 	size_t patternBytes;
-
 
 	hash_map_lp<kmer_t, pattern_id_t> kmers2patternIds;
 
@@ -221,15 +216,12 @@ protected:
 	Semaphore semaphore;
 
 	int num_threads;
-
-	size_t cacheBufferMb;
-
 };
 
 
 class PrefixKmerDb : public FastKmerDb {
 public:
-	PrefixKmerDb(int _num_threads, size_t cacheBufferMb);
+	PrefixKmerDb(int _num_threads);
 
 	~PrefixKmerDb();
 
