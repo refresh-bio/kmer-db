@@ -7,6 +7,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 
 */
 
+#include "types.h"
 #include "elias_gamma.h"
 
 #include <cstdint>
@@ -14,8 +15,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include <cstring>
 #include <utility>
 
-typedef int64_t pattern_id_t;
-typedef uint32_t sample_id_t;
+
 
 // *****************************************************************************************
 //

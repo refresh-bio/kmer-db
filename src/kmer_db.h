@@ -7,9 +7,9 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 
 */
 
+#include "types.h"
 #include "pattern.h"
 #include "hashmap_lp.h"
-//#include "hashset_lp.h"
 #include "array.h"
 #include "queue.h"
 #include "aligned_vector.h"
@@ -22,12 +22,6 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include <vector>
 #include <map>
 #include <sstream>
-
-
-
-#define KMER_MSB (1ULL << 63)
-
-typedef uint64_t kmer_t;
 
 
 class AbstractKmerDb {

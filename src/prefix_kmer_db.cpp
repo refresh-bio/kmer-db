@@ -17,9 +17,6 @@
 
 using namespace std;
 
-const size_t PrefixKmerDb::ioBufferBytes = (2 << 29); //512MB buffer 
-
-
 // *****************************************************************************************
 //
 PrefixKmerDb::PrefixKmerDb(int _num_threads) : 
@@ -77,7 +74,6 @@ void PrefixKmerDb::initialize(uint32_t kmerLength, double fraction) {
 
 	size_t prefixBits = (kmerLength - SUFFIX_LEN) * 2;
 	size_t binsCount = 1 << prefixBits;
-	this->prefixMask = ((1ULL << prefixBits) - 1) << SUFFIX_BITS;
 
 	prefixHistogram.resize(binsCount);
 	hashtables.resize(binsCount);
@@ -99,18 +95,18 @@ void PrefixKmerDb::histogramJob() {
 			size_t lo = task.block_id * block_size;
 			size_t hi = (task.block_id == task.num_blocks - 1) ? n_kmers : lo + block_size;
 
-			kmer_t boundaryPrefix = kmers[hi - 1] & this->prefixMask;
+			kmer_t boundaryPrefix = GET_PREFIX_SHIFTED(kmers[hi - 1]);
 			uint32_t boundaryCount = 0;
 			uint32_t begin = lo;
 
-			kmer_t prevPrefix = kmers[lo] & this->prefixMask;
+			kmer_t prevPrefix = GET_PREFIX_SHIFTED(kmers[lo]);
 			
 			for (size_t i = lo + 1; i < hi; ++i) {
-				kmer_t prefix = kmers[i] & this->prefixMask;
+				kmer_t prefix = GET_PREFIX_SHIFTED(kmers[i]);
 
 				if (prefix != prevPrefix) {
 					
-					prefixHistogram[prevPrefix >> SUFFIX_BITS] = i - begin;
+					prefixHistogram[prevPrefix] = i - begin;
 					begin = i;
 					prevPrefix = prefix;
 					
@@ -123,7 +119,7 @@ void PrefixKmerDb::histogramJob() {
 			}
 
 			this->prefixHistogramMutex.lock();
-			prefixHistogram[boundaryPrefix >> SUFFIX_BITS] += boundaryCount;
+			prefixHistogram[boundaryPrefix] += boundaryCount;
 			this->prefixHistogramMutex.unlock();
 
 			// resize hastables
@@ -167,32 +163,31 @@ void PrefixKmerDb::hashtableSearchJob() {
 			const size_t prefetch_dist = 48;
 #endif
 
-			for (size_t i = lo; i < hi; ++i)
-			{
+			for (size_t i = lo; i < hi; ++i) {
 				u_kmer = kmers[i];
+				kmer_t prefix = GET_PREFIX_SHIFTED(u_kmer);
+				suffix_t suffix = GET_SUFFIX(u_kmer);
 				
-
 #ifdef USE_PREFETCH
-				if (i + prefetch_dist < hi)
-				{
+				if (i + prefetch_dist < hi) {
 					prefetch_kmer = kmers[i + prefetch_dist];
-			//		kmers2patternIds.prefetch(prefetch_kmer);
+					kmer_t prefetch_prefix = GET_PREFIX_SHIFTED(prefetch_kmer);
+					suffix_t suffix = GET_SUFFIX(prefetch_kmer);
+					hashtables[prefetch_prefix].prefetch(suffix);
 				}
 #endif
 				// Check whether k-mer exists in a dictionary
-				pattern_id_t* i_kmer;// = kmers2patternIds.find(u_kmer);
+				pattern_id_t* i_kmer = hashtables[prefix].find(suffix);
 				pattern_id_t p_id;
 
-				if (i_kmer == nullptr)
-				{
+				if (i_kmer == nullptr) {
 					// do not add kmer to hashtable - just mark as to be added
-					samplePatterns[to_add_id].first = u_kmer;
+					samplePatterns[to_add_id].first.kmer = u_kmer;
 					--to_add_id;
-				}
-				else {
+				} else {
 					p_id = *i_kmer;
 
-					samplePatterns[existing_id].first = p_id;
+					samplePatterns[existing_id].first.pattern_id = p_id;
 					samplePatterns[existing_id].second = i_kmer;
 					existing_id++;
 				}
@@ -224,11 +219,11 @@ void PrefixKmerDb::patternJob() {
 
 			for (size_t i = lo; i < hi;) {
 				size_t j;
-				auto p_id = samplePatterns[i].first;
+				auto p_id = samplePatterns[i].first.pattern_id;
 
 				// count k-mers from current sample with considered template 
 				for (j = i + 1; j < hi; ++j) {
-					if (p_id != samplePatterns[j].first) {
+					if (p_id != samplePatterns[j].first.pattern_id) {
 						break;
 					}
 				}
@@ -275,6 +270,7 @@ void PrefixKmerDb::patternJob() {
 sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction)
 {
 	sample_id_t sampleId = AbstractKmerDb::addKmers(sampleName, kmers, kmerLength, fraction);
+	size_t n_kmers = kmers.size();
 
 	// get prefix histogram (parallel)
 	LOG_DEBUG << "Restructurizing hashtable (parallel)..." << endl;
@@ -297,6 +293,145 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 #endif
 
 
+	// find for kmers in parallel
+	std::vector<size_t> num_existing_kmers(num_threads);
+	samplePatterns.resize(n_kmers);
+
+	LOG_DEBUG << "Finding kmers (parallel)..." << endl;
+	start = std::chrono::high_resolution_clock::now();
+	// prepare tasks
+	for (int tid = 0; tid < num_threads; ++tid) {
+		semaphore.inc();
+		LOG_DEBUG << "Block " << tid << " scheduled" << endl;
+		queues.hashtableSearch.Push(DictionarySearchTask{ tid, num_threads, &kmers, &num_existing_kmers[tid] });
+	}
+	// wait for the task to complete
+	semaphore.waitForZero();
+	times.hashtableFind += std::chrono::high_resolution_clock::now() - start;
+
+	// add kmers to hashtable sequentially
+	LOG_DEBUG << "Adding kmers (serial)..." << endl;
+	start = std::chrono::high_resolution_clock::now();
+
+	kmers_to_add_to_HT.clear();
+	for (int tid = 0; tid < num_threads; ++tid) {
+		size_t n_kmers = kmers.size();
+		size_t block = n_kmers / num_threads;
+		size_t lo = tid * block;
+		size_t hi = (tid == num_threads - 1) ? n_kmers : lo + block;
+
+		for (size_t i = num_existing_kmers[tid]; i < hi; ++i)
+			kmers_to_add_to_HT.push_back(i);
+	}
+
+	size_t n_kmers_to_add = kmers_to_add_to_HT.size();
+#ifdef USE_PREFETCH
+	uint64_t prefetch_kmer;
+#endif
+	for (int j = 0; j < n_kmers_to_add; ++j)
+	{
+#ifdef USE_PREFETCH
+		if (j + prefetch_dist < n_kmers_to_add) {
+			prefetch_kmer = samplePatterns[kmers_to_add_to_HT[j + prefetch_dist]].first.kmer;
+
+			kmer_t prefix = GET_PREFIX_SHIFTED(prefetch_kmer);
+			suffix_t suffix = GET_SUFFIX(prefetch_kmer);
+			hashtables[prefix].prefetch(suffix);
+		}
+#endif
+		int i = kmers_to_add_to_HT[j];
+		kmer_t kmer = samplePatterns[i].first.kmer;
+
+		kmer_t prefix = GET_PREFIX_SHIFTED(kmer);
+		suffix_t suffix = GET_SUFFIX(kmer);
+
+		auto i_kmer = hashtables[prefix].insert(suffix, 0); // First k-mer occurence - assign with temporary pattern 0
+		samplePatterns[i].first.pattern_id = 0;
+		samplePatterns[i].second = i_kmer;
+	}
+
+	times.hashtableAdd += std::chrono::high_resolution_clock::now() - start;
+
+	LOG_DEBUG << "Sorting (parallel)..." << endl;
+	start = std::chrono::high_resolution_clock::now();
+
+	ParallelSort(samplePatterns.data(), samplePatterns.size(), nullptr, 0, 0, num_threads);
+
+
+	times.sort += std::chrono::high_resolution_clock::now() - start;
+	LOG_VERBOSE << "sort time: " << times.sort.count() << "  " << samplePatterns.size() << endl;
+
+
+	LOG_DEBUG << "Extending patterns (parallel)..." << endl;
+	start = std::chrono::high_resolution_clock::now();
+	std::atomic<size_t> new_pid(patterns.size());
+
+	// calculate ranges
+	std::vector<size_t> ranges(num_threads + 1, n_kmers);
+	ranges[0] = 0;
+	size_t block = n_kmers / num_threads;
+
+	auto currentIndex = block;
+
+	std::vector<size_t> threadBytes(num_threads, 0);
+	auto pid_comparer = [](const std::pair<kmer_or_pattern_t, pattern_id_t*>& a, const std::pair<kmer_or_pattern_t, pattern_id_t*>& b)->bool {
+		return a.first.pattern_id < b.first.pattern_id;
+	};
+
+	for (int tid = 0; tid < num_threads - 1; ++tid) {
+		auto it = std::upper_bound(
+			samplePatterns.begin() + currentIndex,
+			samplePatterns.end(),
+			*(samplePatterns.begin() + currentIndex - 1),
+			pid_comparer);
+
+		size_t range = it - samplePatterns.begin();
+
+
+		ranges[tid + 1] = range;
+		currentIndex = range + block;
+
+		if (currentIndex >= samplePatterns.size()) {
+			break;
+		}
+	}
+
+	// this should never happen
+	if (ranges[num_threads] != n_kmers) {
+		throw std::runtime_error("ERROR in FastKmerDb::addKmers(): Invalid ranges");
+	}
+
+
+	for (int tid = 0; tid < num_threads; ++tid) {
+		semaphore.inc();
+		LOG_DEBUG << "Block " << tid << " scheduled" << endl;
+		queues.patternExtension.Push(PatternExtensionTask{ tid, sampleId, &ranges, &new_pid, &threadBytes });
+	}
+
+	// wait for the task to complete
+	semaphore.waitForZero();
+	times.extension += std::chrono::high_resolution_clock::now() - start;
+
+	LOG_DEBUG << "Inserting kmers (serial)..." << endl;
+	for (int tid = 0; tid < num_threads; ++tid) {
+		mem.pattern += threadBytes[tid];
+	}
+
+	// extend by 1.5 on reallocation
+	if (patterns.capacity() < new_pid) {
+		patterns.reserve(new_pid * 3 / 2);
+	}
+
+	patterns.resize(new_pid);
+
+	for (int tid = 0; tid < num_threads; ++tid) {
+		for (auto& tp : threadPatterns[tid]) {
+			patterns[tp.first] = std::move(tp.second);
+		}
+	}
+
+	return sampleId;
+
 	return 0;
 }
 
@@ -306,8 +441,8 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 //
 void PrefixKmerDb::serialize(std::ofstream& file) const {
 
-	size_t numHastableElements = ioBufferBytes / sizeof(hash_map_lp<kmer_t, pattern_id_t>::item_t);
-	std::vector <hash_map_lp<kmer_t, pattern_id_t>::item_t> hashtableBuffer(numHastableElements);
+	size_t numHastableElements = ioBufferBytes / sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t);
+	std::vector <hash_map_lp<suffix_t, pattern_id_t>::item_t> hashtableBuffer(numHastableElements);
 	char* buffer = reinterpret_cast<char*>(hashtableBuffer.data());
 
 	// store number of samples
@@ -346,13 +481,13 @@ void PrefixKmerDb::serialize(std::ofstream& file) const {
 			hashtableBuffer[bufpos++] = *it;
 			if (bufpos == numHastableElements) {
 				file.write(reinterpret_cast<const char*>(&bufpos), sizeof(size_t));
-				file.write(buffer, bufpos * sizeof(hash_map_lp<kmer_t, pattern_id_t>::item_t));
+				file.write(buffer, bufpos * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
 				bufpos = 0;
 			}
 		}
 		// write remaining ht elements
 		file.write(reinterpret_cast<const char*>(&bufpos), sizeof(size_t));
-		file.write(buffer, bufpos * sizeof(hash_map_lp<kmer_t, pattern_id_t>::item_t));
+		file.write(buffer, bufpos * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
 	}
 
 	// write patterns in portions

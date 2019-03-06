@@ -1,10 +1,6 @@
 #pragma once
 #include "kmer_db.h"
 
-#define SUFFIX_LEN 16
-#define SUFFIX_BITS (SUFFIX_LEN * 2)
-
-
 
 
 class PrefixKmerDb : public AbstractKmerDb {
@@ -18,7 +14,7 @@ public:
 
 	const size_t getHashtableBytes() const override { return mem.hashtable; };
 	
-	const std::vector<hash_map_lp<kmer_t, pattern_id_t>>& getHashtables() const { return hashtables; }
+	const std::vector<hash_map_lp<suffix_t, pattern_id_t>>& getHashtables() const { return hashtables; }
 
 	const std::vector<pattern_t>& getPatterns() const { return patterns; }
 
@@ -56,24 +52,23 @@ public:
 
 protected:
 
-	static const size_t ioBufferBytes;
+	static const size_t ioBufferBytes = (2 << 29); //512MB buffer 
+	static const int prefetch_dist = 48;
 
 	int num_threads;
 	
 	size_t kmersCount;
 
-	uint64_t prefixMask;
-
 	std::vector<uint32_t> prefixHistogram;
 
-	std::vector<hash_map_lp<kmer_t, pattern_id_t>> hashtables;
+	std::vector<hash_map_lp<suffix_t, pattern_id_t>> hashtables;
 
 	std::vector<pattern_t> patterns;
 
 	std::vector<std::vector<std::pair<pattern_id_t, pattern_t>>> threadPatterns;
 
 	// first element - pattern id, second element - ht table entry
-	aligned_vector<std::pair<pattern_id_t, pattern_id_t*>> samplePatterns;
+	aligned_vector<std::pair<kmer_or_pattern_t, pattern_id_t*>> samplePatterns;
 
 	// struct for storing queues
 	struct {

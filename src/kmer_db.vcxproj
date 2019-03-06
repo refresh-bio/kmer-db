@@ -178,6 +178,7 @@
     <ClInclude Include="queue.h" />
     <ClInclude Include="row_add.h" />
     <ClInclude Include="similarity_calculator.h" />
+    <ClInclude Include="types.h" />
     <ClInclude Include="version.h" />
   </ItemGroup>
   <ItemGroup>

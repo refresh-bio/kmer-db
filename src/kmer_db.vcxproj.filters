@@ -44,5 +44,6 @@
     <ClInclude Include="analyzer.h" />
     <ClInclude Include="similarity_calculator.h" />
     <ClInclude Include="prefix_kmer_db.h" />
+    <ClInclude Include="types.h" />
   </ItemGroup>
 </Project>
