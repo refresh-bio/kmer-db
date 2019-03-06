@@ -174,6 +174,7 @@
     <ClInclude Include="log.h" />
     <ClInclude Include="parallel_sorter.h" />
     <ClInclude Include="pattern.h" />
+    <ClInclude Include="prefix_kmer_db.h" />
     <ClInclude Include="queue.h" />
     <ClInclude Include="row_add.h" />
     <ClInclude Include="similarity_calculator.h" />
@@ -193,6 +194,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="parallel_sorter.cpp" />
     <ClCompile Include="pattern.cpp" />
+    <ClCompile Include="prefix_kmer_db.cpp" />
     <ClCompile Include="row_add_avx.cpp" />
     <ClCompile Include="row_add_avx2.cpp">
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>

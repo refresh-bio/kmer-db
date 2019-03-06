@@ -20,7 +20,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include <atomic>
 #include <iterator>
 #include <numeric>
-
+#include <cassert>
 
 #include "kmc_api/kmc_file.h"
 #include "kmer_db.h"
@@ -47,7 +47,6 @@ const size_t FastKmerDb::ioBufferBytes = (2 << 29); //512MB buffer
 // *****************************************************************************************
 //
 FastKmerDb::FastKmerDb(int _num_threads) :
-	kmers2patternIds(), 
 //	repeatedKmers(),
 	dictionarySearchQueue(1), 
 	patternExtensionQueue(1),
@@ -378,7 +377,7 @@ sample_id_t FastKmerDb::addKmers(std::string sampleName, const std::vector<kmer_
 
 // *****************************************************************************************
 //
-void FastKmerDb::mapKmers2Samples(uint64_t kmer, std::vector<sample_id_t>& samples) const {
+void FastKmerDb::mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const {
 	
 	// find corresponding pattern id
 	auto p_id = kmers2patternIds.find(kmer);
@@ -494,7 +493,6 @@ bool FastKmerDb::deserialize(std::ifstream& file) {
 	}
 
 	// load hashtable
-	temp = kmers2patternIds.get_size();
 	file.read(reinterpret_cast<char*>(&temp), sizeof(temp));
 
 	kmers2patternIds.clear();
@@ -562,88 +560,3 @@ void FastKmerDb::savePatterns(std::ofstream& file) const {
 
 }
 
-
-// *****************************************************************************************
-//
-PrefixKmerDb::PrefixKmerDb(int _num_threads) : FastKmerDb(_num_threads), prefixHistogramQueue(1)
-{
-	prefixHistogtamWorkers.resize(num_threads);
-
-	for (auto& t : prefixHistogtamWorkers) {
-		t = std::thread([this]() {
-			while (!this->dictionarySearchQueue.IsCompleted()) {
-				DictionarySearchTask task;
-
-				if (this->dictionarySearchQueue.Pop(task)) {
-
-			//		this->prefixHistogram_workers[task.block_id].clear(); // clear the histogram
-
-					const std::vector<kmer_t>& kmers = *(task.kmers);
-
-					size_t n_kmers = kmers.size();
-					size_t block_size = n_kmers / task.num_blocks;
-					size_t lo = task.block_id * block_size;
-					size_t hi = (task.block_id == task.num_blocks - 1) ? n_kmers : lo + block_size;
-
-					for (size_t i = lo; i < hi; ++i) {
-						uint64_t prefix = kmers[i] & this->prefixMask;
-				//		++this->prefixHistogram_workers[task.block_id][prefix];
-					}
-
-					if (this->dictionarySearchQueue.Pop(task)) {
-						this->semaphore.dec();
-					}
-				}
-			}
-		});
-	}
-
-}
-
-// *****************************************************************************************
-//
-PrefixKmerDb::~PrefixKmerDb() {
-	prefixHistogramQueue.MarkCompleted();
-	for (auto& t : prefixHistogtamWorkers) {
-		t.join();
-	}
-}
-
-
-// *****************************************************************************************
-//
-void PrefixKmerDb::initialize(uint32_t kmerLength, double fraction) {
-	FastKmerDb::initialize(kmerLength, fraction);
-
-	size_t prefixBits = (kmerLength - SUFFIX_LEN) * 2;
-	size_t binsCount = 1 << prefixBits;
-	this->prefixMask = (1ULL << prefixBits) - 1;
-
-	prefixHistogram.resize(binsCount);
-}
-
-// *****************************************************************************************
-//
-sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction)
-{
-	// get prefix histogram (parallel)
-	LOG_DEBUG << "Prefix histogram (parallel)..." << endl;
-	auto start = std::chrono::high_resolution_clock::now();
-	// prepare tasks
-	for (int tid = 0; tid < num_threads; ++tid) {
-		semaphore.inc();
-		LOG_DEBUG << "Block " << tid << " scheduled" << endl;
-		prefixHistogramQueue.Push(DictionarySearchTask{ tid, num_threads, &kmers, nullptr });
-	}
-
-	semaphore.waitForZero();
-
-	prefixHistogram.clear();
-	for (int tid = 0; tid < num_threads; ++tid) {
-//		std::transform(prefixHistogram.begin(), prefixHistogram.end(), prefixHistogram.begin(), prefixHistogram_workers[tid].begin(), std::plus<uint32_t>());
-	}
-
-	hashtableFindTime += std::chrono::high_resolution_clock::now() - start;
-	
-	return 0;
-}

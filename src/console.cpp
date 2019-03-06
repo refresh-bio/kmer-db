@@ -24,6 +24,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include "version.h"
 #include "analyzer.h"
 #include "similarity_calculator.h"
+#include "prefix_kmer_db.h"
 
 
 using namespace std;
@@ -49,7 +50,7 @@ const string Params::OPTION_BUFFER = "-buffer";
 
 // *****************************************************************************************
 //
-void show_progress(const FastKmerDb &db)
+void show_progress(const AbstractKmerDb &db)
 {
 	size_t tot_pat_size = 0;
 	size_t num_calc = 0;			
@@ -226,7 +227,8 @@ int Console::runBuildDatabase(
 	cout << "Processing samples..." << endl;
 	
 	LOG_DEBUG << "Creating FastKmerDb object" << endl;
-	FastKmerDb* db = new FastKmerDb(numThreads);
+	//FastKmerDb* db = new FastKmerDb(numThreads);
+	AbstractKmerDb* db = new PrefixKmerDb(numThreads);
 
 	std::chrono::duration<double> loadingTime, processingTime;
 	

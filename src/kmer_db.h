@@ -26,7 +26,6 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 
 
 #define KMER_MSB (1ULL << 63)
-#define SUFFIX_LEN 16
 
 typedef uint64_t kmer_t;
 
@@ -64,6 +63,22 @@ public:
 
 	const std::vector<size_t>& getSampleKmersCount() const { return sampleKmersCount; }
 
+	virtual const size_t getKmersCount() const = 0;
+
+	virtual const size_t getPatternsCount() const = 0;
+
+	virtual const size_t getPatternBytes() const = 0;
+
+	virtual const size_t getHashtableBytes() const = 0;
+
+	virtual void serialize(std::ofstream& file) const = 0;
+
+	virtual bool deserialize(std::ifstream& file) = 0;
+
+	virtual std::string printStats() const = 0;
+
+	virtual std::string printDetailedTimes() const = 0;
+
 	
 	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction) {
 		LOG_VERBOSE << "Adding sample: " << sampleName << " (" << kmers.size() << " kmers)" << endl;
@@ -85,9 +100,6 @@ public:
 
 		return newId;
 	}
-
-	virtual void mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const = 0;
-
 };
 
 
@@ -113,13 +125,13 @@ public:
 
 	~FastKmerDb();
 
-	const size_t getKmersCount() const { return kmers2patternIds.get_size(); }
+	const size_t getKmersCount() const override { return kmers2patternIds.get_size(); }
 
-	const size_t getPatternsCount() const { return patterns.size(); }
+	const size_t getPatternsCount() const override { return patterns.size(); }
 
-	const size_t getPatternBytes() const { return patternBytes; }
+	const size_t getPatternBytes() const override { return patternBytes; }
 
-	const size_t getHashtableBytes() const { return kmers2patternIds.get_bytes(); };
+	const size_t getHashtableBytes() const override { return kmers2patternIds.get_bytes(); };
 
 	const size_t getRepeatedKmersCount() const { return 0; }
 
@@ -131,13 +143,13 @@ public:
 
 	std::vector<pattern_t>& getPatterns() { return patterns; }
 
-	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction) override;
+	sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction) override;
 
-	virtual void mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const override;
+	void mapKmers2Samples(kmer_t kmer, std::vector<sample_id_t>& samples) const;
 
-	virtual void serialize(std::ofstream& file) const;
+	void serialize(std::ofstream& file) const override;
 
-	virtual bool deserialize(std::ifstream& file);
+	bool deserialize(std::ifstream& file) override;
 
 	virtual void savePatterns(std::ofstream& file) const;
 
@@ -153,7 +165,7 @@ public:
 		return kmers;
 	}
 
-	std::string printStats() const {
+	std::string printStats() const override {
 		std::ostringstream oss;
 		oss << "Number of samples: " << Log::formatLargeNumber(getSamplesCount()) << endl
 			<< "Number of patterns: " << Log::formatLargeNumber(getPatternsCount()) << endl
@@ -164,7 +176,7 @@ public:
 		return oss.str();
 	}
 
-	std::string printDetailedTimes() const {
+	std::string printDetailedTimes() const override {
 		std::ostringstream oss;
 		oss << "\tHashatable resizing (serial): " << hashtableResizeTime.count() << endl
 			<< "\tHashtable searching (parallel): " << hashtableFindTime.count() << endl
@@ -218,24 +230,3 @@ protected:
 	int num_threads;
 };
 
-
-class PrefixKmerDb : public FastKmerDb {
-public:
-	PrefixKmerDb(int _num_threads);
-
-	~PrefixKmerDb();
-
-	sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction);
-
-protected:
-
-	uint64_t prefixMask;
-
-	std::vector<uint32_t> prefixHistogram;
-
-	std::vector<std::thread> prefixHistogtamWorkers;
-
-	CRegisteringQueue<DictionarySearchTask> prefixHistogramQueue;
-
-	void initialize(uint32_t kmerLength, double fraction) override;
-};
