@@ -18,7 +18,7 @@ SimilarityCalculator::SimilarityCalculator(int _num_threads, size_t cacheBufferM
 
 // *****************************************************************************************
 //
-void SimilarityCalculator::operator()(FastKmerDb& db, LowerTriangularMatrix<uint32_t>& matrix) const 
+void SimilarityCalculator::operator()(PrefixKmerDb& db, LowerTriangularMatrix<uint32_t>& matrix) const 
 {
 	// get stuff from database
 	auto& patterns = db.getPatterns();
@@ -398,12 +398,12 @@ void SimilarityCalculator::operator()(FastKmerDb& db, LowerTriangularMatrix<uint
 
 // *****************************************************************************************
 //
-void  SimilarityCalculator::operator()(const FastKmerDb& db, const std::vector<kmer_t>& kmers, std::vector<uint32_t>& similarities) const {
+void  SimilarityCalculator::operator()(const PrefixKmerDb& db, const std::vector<kmer_t>& kmers, std::vector<uint32_t>& similarities) const {
 	
 	// get stuff from database
 	const auto& patterns = db.getPatterns();
 	int samples_count = db.getSamplesCount();
-	const auto& kmers2patternIds = db.getKmers2patternIds();
+	const auto& hashtables = db.getHashtables();
 	
 	similarities.resize(samples_count, 0);
 
@@ -415,9 +415,23 @@ void  SimilarityCalculator::operator()(const FastKmerDb& db, const std::vector<k
 	auto start = std::chrono::high_resolution_clock::now();
 
 	// iterate over kmers in analyzed sample
-	for (const auto& kmer : kmers) {
+	for (int i = 0; i < kmers.size(); ++i) {
+
+		if (i + prefetch_dist < kmers.size()) {
+			kmer_t prefetch_kmer = kmers[i + prefetch_dist];
+
+			kmer_t prefix = GET_PREFIX_SHIFTED(prefetch_kmer);
+			suffix_t suffix = GET_SUFFIX(prefetch_kmer);
+
+			hashtables[prefix].prefetch(suffix);
+		}
+
 		// check if kmer exists in a database
-		auto entry = kmers2patternIds.find(kmer);
+		kmer_t kmer = kmers[i];
+		kmer_t prefix = GET_PREFIX_SHIFTED(kmer);
+		suffix_t suffix = GET_SUFFIX(kmer);
+
+		auto entry = hashtables[prefix].find(suffix);
 
 		if (entry != nullptr) {
 			auto pid = *entry;

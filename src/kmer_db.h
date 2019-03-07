@@ -65,6 +65,8 @@ public:
 
 	virtual const size_t getHashtableBytes() const = 0;
 
+	virtual const size_t getHashtableEntrySize() const = 0;
+
 	virtual void serialize(std::ofstream& file) const = 0;
 
 	virtual bool deserialize(std::ifstream& file) = 0;
@@ -75,7 +77,7 @@ public:
 
 	
 	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction) {
-		LOG_VERBOSE << "Adding sample: " << sampleName << " (" << kmers.size() << " kmers)" << endl;
+		LOG_VERBOSE << "Adding sample " << sampleNames.size() << ": " << sampleName << " (" << kmers.size() << " kmers)" << endl;
 		
 		if (!isInitialized) {
 			initialize(kmerLength, fraction);
@@ -126,6 +128,8 @@ public:
 	const size_t getPatternBytes() const override { return patternBytes; }
 
 	const size_t getHashtableBytes() const override { return kmers2patternIds.get_bytes(); };
+
+	const size_t getHashtableEntrySize() const override { return sizeof(hash_map_lp<kmer_t, pattern_id_t>::item_t);  };
 
 	const size_t getRepeatedKmersCount() const { return 0; }
 

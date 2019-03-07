@@ -19,6 +19,8 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 
 using namespace std;
 
+
+
 // *****************************************************************************************
 //
 class Semaphore {

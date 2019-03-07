@@ -55,11 +55,12 @@ void show_progress(const AbstractKmerDb &db)
 	size_t tot_pat_size = 0;
 	size_t num_calc = 0;			
 
-	LOG_VERBOSE << "dict= " << Log::formatLargeNumber(db.getKmersCount())
-		<< " (" << db.getKmersCount() * 2 * sizeof(uint64_t) / (1ull << 20) << " MB)   "
-		<< "\t patterns= " << Log::formatLargeNumber(db.getPatternsCount())
-		<< "\t patterns mem= " << Log::formatLargeNumber(db.getPatternBytes())
-		<< "\t ht mem= " << Log::formatLargeNumber(db.getHashtableBytes())
+	size_t mega = (1ull << 20);
+
+	LOG_VERBOSE << "HT entries: " << Log::formatLargeNumber(db.getKmersCount())
+		<< " (" << (db.getKmersCount() * db.getHashtableEntrySize() / mega) << " MB, " << (db.getHashtableBytes() / mega) << " MB res),"
+		<< "\t patterns: " << Log::formatLargeNumber(db.getPatternsCount()) 
+		<< " (" << Log::formatLargeNumber(db.getPatternBytes()) << " B)"
 		<< endl;
 }
 
@@ -304,7 +305,7 @@ int Console::runBuildDatabase(
 int Console::runAllVsAll(const std::string& dbFilename, const std::string& similarityFile) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
 	std::ofstream ofs(similarityFile);
-	FastKmerDb* db = new FastKmerDb(numThreads);
+	PrefixKmerDb* db = new PrefixKmerDb(numThreads);
 	SimilarityCalculator calculator(numThreads, cacheBufferMb);
 	
 	std::chrono::duration<double> dt;
@@ -355,7 +356,7 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 //
 int Console::runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFile, InputFile::Format inputFormat) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
-	FastKmerDb db(numThreads);
+	PrefixKmerDb db(numThreads);
 	SimilarityCalculator calculator(numThreads, cacheBufferMb);
 
 	std::chrono::duration<double> dt;
@@ -435,7 +436,7 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 //
 int Console::runNewVsAll(const std::string& dbFilename, const std::string& multipleSamples, const std::string& similarityFile, InputFile::Format inputFormat) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
-	FastKmerDb db(numThreads);
+	PrefixKmerDb db(numThreads);
 	SimilarityCalculator calculator(numThreads, cacheBufferMb);
 
 	std::chrono::duration<double> loadingTime, processingTime, dt;

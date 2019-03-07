@@ -10,6 +10,7 @@
 #include <omp.h>
 
 #include <numeric>
+#include <cassert>
 
 
 #define USE_PREFETCH
@@ -87,7 +88,7 @@ void PrefixKmerDb::histogramJob() {
 
 		if (this->queues.prefixHistogram.Pop(task)) {
 
-			// generate histogram
+			// determine ranges
 			const std::vector<kmer_t>& kmers = *(task.kmers);
 
 			size_t n_kmers = kmers.size();
@@ -95,44 +96,62 @@ void PrefixKmerDb::histogramJob() {
 			size_t lo = task.block_id * block_size;
 			size_t hi = (task.block_id == task.num_blocks - 1) ? n_kmers : lo + block_size;
 
+			// generate histogram
 			kmer_t boundaryPrefix = GET_PREFIX_SHIFTED(kmers[hi - 1]);
 			uint32_t boundaryCount = 0;
 			uint32_t begin = lo;
 
 			kmer_t prevPrefix = GET_PREFIX_SHIFTED(kmers[lo]);
-			
-			for (size_t i = lo + 1; i < hi; ++i) {
-				kmer_t prefix = GET_PREFIX_SHIFTED(kmers[i]);
 
-				if (prefix != prevPrefix) {
-					
-					prefixHistogram[prevPrefix] = i - begin;
-					begin = i;
-					prevPrefix = prefix;
-					
-					if (prefix == boundaryPrefix) { // check if we are at the histogram bound 
-						// all kmers starting from here have same prefix as the last one in the block
-						boundaryCount = hi - i;
-						break;
+			// only one prefix in a block
+			if (prevPrefix == boundaryPrefix) {
+				boundaryCount = hi - lo;
+			}
+			else {
+				for (size_t i = lo + 1; i < hi; ++i) {
+					kmer_t prefix = GET_PREFIX_SHIFTED(kmers[i]);
+
+					if (prefix != prevPrefix) {
+
+						prefixHistogram[prevPrefix] = i - begin;
+						begin = i;
+						prevPrefix = prefix;
+
+						if (prefix == boundaryPrefix) { // check if we are at the histogram bound 
+							// all kmers starting from here have same prefix as the last one in the block
+							boundaryCount = hi - i;
+							break;
+						}
 					}
 				}
 			}
 
+			internalSempahores[0].dec_notify_all();
+			internalSempahores[0].waitForZero();
+
 			this->prefixHistogramMutex.lock();
 			prefixHistogram[boundaryPrefix] += boundaryCount;
 			this->prefixHistogramMutex.unlock();
+
+			internalSempahores[1].dec_notify_all();
+			internalSempahores[1].waitForZero();
 
 			// resize hastables
 			size_t tablesPerWorker = hashtables.size() / task.num_blocks;
 			lo = task.block_id * tablesPerWorker;
 			hi = (task.block_id == task.num_blocks - 1) ? hashtables.size() : lo + tablesPerWorker;
 
-			this->mem.hashtable = 0;
+			size_t htBytes = 0;
 
 			for (int i = lo; i < hi; ++i) {
 				hashtables[i].reserve_for_additional(prefixHistogram[i]);
-				this->mem.hashtable += hashtables[i].get_bytes();
+				htBytes += hashtables[i].get_bytes();
 			}
+
+			// update memory statistics
+			this->prefixHistogramMutex.lock();
+			mem.hashtable += htBytes;
+			this->prefixHistogramMutex.unlock();
 			
 			this->semaphore.dec();
 		}
@@ -177,18 +196,18 @@ void PrefixKmerDb::hashtableSearchJob() {
 				}
 #endif
 				// Check whether k-mer exists in a dictionary
-				pattern_id_t* i_kmer = hashtables[prefix].find(suffix);
+				pattern_id_t* entry = hashtables[prefix].find(suffix);
 				pattern_id_t p_id;
 
-				if (i_kmer == nullptr) {
+				if (entry == nullptr) {
 					// do not add kmer to hashtable - just mark as to be added
 					samplePatterns[to_add_id].first.kmer = u_kmer;
 					--to_add_id;
 				} else {
-					p_id = *i_kmer;
+					p_id = *entry;
 
 					samplePatterns[existing_id].first.pattern_id = p_id;
-					samplePatterns[existing_id].second = i_kmer;
+					samplePatterns[existing_id].second = entry;
 					existing_id++;
 				}
 			}
@@ -271,13 +290,17 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 {
 	sample_id_t sampleId = AbstractKmerDb::addKmers(sampleName, kmers, kmerLength, fraction);
 	size_t n_kmers = kmers.size();
-
+	
 	// get prefix histogram (parallel)
 	LOG_DEBUG << "Restructurizing hashtable (parallel)..." << endl;
 	auto start = std::chrono::high_resolution_clock::now();
+	std::fill(prefixHistogram.begin(), prefixHistogram.end(), 0);
+	mem.hashtable = 0;
 	// prepare tasks
+	semaphore.inc(num_threads);
+	internalSempahores[0].inc(num_threads);
+	internalSempahores[1].inc(num_threads);
 	for (int tid = 0; tid < num_threads; ++tid) {
-		semaphore.inc();
 		LOG_DEBUG << "Block " << tid << " scheduled" << endl;
 		queues.prefixHistogram.Push(DictionarySearchTask{ tid, num_threads, &kmers, nullptr });
 	}
@@ -300,8 +323,8 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	LOG_DEBUG << "Finding kmers (parallel)..." << endl;
 	start = std::chrono::high_resolution_clock::now();
 	// prepare tasks
+	semaphore.inc(num_threads);
 	for (int tid = 0; tid < num_threads; ++tid) {
-		semaphore.inc();
 		LOG_DEBUG << "Block " << tid << " scheduled" << endl;
 		queues.hashtableSearch.Push(DictionarySearchTask{ tid, num_threads, &kmers, &num_existing_kmers[tid] });
 	}
@@ -325,6 +348,8 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	}
 
 	size_t n_kmers_to_add = kmers_to_add_to_HT.size();
+	kmersCount += n_kmers_to_add;
+
 #ifdef USE_PREFETCH
 	uint64_t prefetch_kmer;
 #endif
@@ -336,6 +361,9 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 
 			kmer_t prefix = GET_PREFIX_SHIFTED(prefetch_kmer);
 			suffix_t suffix = GET_SUFFIX(prefetch_kmer);
+
+			assert(prefix < hashtables.size());
+		
 			hashtables[prefix].prefetch(suffix);
 		}
 #endif
@@ -431,8 +459,6 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	}
 
 	return sampleId;
-
-	return 0;
 }
 
 
@@ -525,9 +551,11 @@ void PrefixKmerDb::serialize(std::ofstream& file) const {
 //
 bool PrefixKmerDb::deserialize(std::ifstream& file) {
 
-	size_t numHastableElements = ioBufferBytes / sizeof(hash_map_lp<kmer_t, pattern_id_t>::item_t);
-	std::vector <hash_map_lp<kmer_t, pattern_id_t>::item_t> hashtableBuffer(numHastableElements);
+	size_t numHastableElements = ioBufferBytes / sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t);
+	std::vector <hash_map_lp<suffix_t, pattern_id_t>::item_t> hashtableBuffer(numHastableElements);
 	char* buffer = reinterpret_cast<char*>(hashtableBuffer.data());
+
+	LOG_VERBOSE << "Loading general info..." << endl;
 
 	// load sample info
 	size_t temp;
@@ -549,13 +577,16 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 		return false;
 	}
 
+	LOG_VERBOSE << "Loading kmer hashtables..." << endl;
+
 	// load number of hashmaps
 	file.read(reinterpret_cast<char*>(&temp), sizeof(temp));
 	hashtables.resize(temp);
 
 	// load all hashtables
-	for (auto& ht : hashtables) {
-
+	for (int i = 0; i < hashtables.size(); ++i) {
+		cout << i << ",";
+		auto& ht = hashtables[i];
 		// loal ht size
 		file.read(reinterpret_cast<char*>(&temp), sizeof(temp));
 
@@ -567,7 +598,7 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 		while (readCount < temp) {
 			size_t portion = 0;
 			file.read(reinterpret_cast<char*>(&portion), sizeof(size_t));
-			file.read(buffer, portion * sizeof(hash_map_lp<kmer_t, pattern_id_t>::item_t));
+			file.read(buffer, portion * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
 
 			for (size_t j = 0; j < portion; ++j) {
 				ht.insert(hashtableBuffer[j].key, hashtableBuffer[j].val);
@@ -576,9 +607,13 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 		}
 	}
 
+	cout << endl;
+
 	if (!file) {
 		return false;
 	}
+
+	cout << "Loading patterns..." << endl;
 
 	// load patterns
 	file.read(reinterpret_cast<char*>(&temp), sizeof(temp));

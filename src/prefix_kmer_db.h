@@ -13,6 +13,8 @@ public:
 	const size_t getPatternBytes() const override { return mem.pattern; }
 
 	const size_t getHashtableBytes() const override { return mem.hashtable; };
+
+	const size_t getHashtableEntrySize() const override { return sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t); };
 	
 	const std::vector<hash_map_lp<suffix_t, pattern_id_t>>& getHashtables() const { return hashtables; }
 
@@ -57,7 +59,7 @@ protected:
 
 	int num_threads;
 	
-	size_t kmersCount;
+	size_t kmersCount{ 0 };
 
 	std::vector<uint32_t> prefixHistogram;
 
@@ -93,6 +95,8 @@ protected:
 	std::mutex prefixHistogramMutex;
 
 	Semaphore semaphore;
+
+	Semaphore internalSempahores[2];
 
 	// structure for storing all the times
 	struct {

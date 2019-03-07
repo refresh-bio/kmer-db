@@ -262,7 +262,7 @@ public:
 
 	// *****************************************************************************************
 	//
-	void prefetch(Key k)
+	void prefetch(Key k) const
 	{
 		size_t h = my_hasher_lp<Key>(k) & allocated_mask;
 
