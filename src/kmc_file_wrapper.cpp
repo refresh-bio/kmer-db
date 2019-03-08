@@ -308,8 +308,6 @@ bool KmcInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& posit
 	size_t kmersCount = 0;
 	//filter->initialize(_total_kmers);
 
-	size_t passed = 0;
-
 	std::shared_ptr<MinHashFilter> minhashFilter = std::dynamic_pointer_cast<MinHashFilter>(filter);
 
 	while (!kmcfile->Eof())

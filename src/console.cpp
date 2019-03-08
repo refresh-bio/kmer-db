@@ -44,6 +44,7 @@ const string Params::SWITCH_MINHASH_SAMPLES = "-from-minhash";
 const string Params::OPTION_FILTER = "-f";
 const string Params::OPTION_LENGTH = "-k";
 const string Params::OPTION_VERBOSE = "-v";
+const string Params::OPTION_DEBUG = "-vv";
 const string Params::OPTION_THREADS = "-t";
 const string Params::OPTION_BUFFER = "-buffer";
 
@@ -82,6 +83,10 @@ int Console::parse(int argc, char** argv) {
 		// search for switches and options
 		if (findSwitch(params, Params::OPTION_VERBOSE)) { // verbose mode
 			Log::getInstance(Log::LEVEL_VERBOSE).enable();
+		}
+
+		if (findSwitch(params, Params::OPTION_DEBUG)) { // verbose mode
+			Log::getInstance(Log::LEVEL_DEBUG).enable();
 		}
 
 		findOption(params, Params::OPTION_THREADS, numThreads);		// number of threads

@@ -51,9 +51,10 @@ public:
 	
 	size_t getCurrentFileId() const { return currentFileId; }
 
+	std::map<size_t, std::shared_ptr<Task>>& getLoadedTasks() { return loadedTasks; }
+
 	Loader(std::shared_ptr<AbstractFilter> filter, InputFile::Format inputFormat, int _num_threads, bool storePositions = false);
-	// *****************************************************************************************
-	//
+	
 	~Loader() {
 		readerQueue.MarkCompleted();
 		prefetcherQueue.MarkCompleted();
@@ -72,19 +73,18 @@ public:
 	void initLoad();
 	void waitForLoad() { readerSemaphore.waitForZero();  }
 
-	std::map<size_t, std::shared_ptr<Task>>& getLoadedTasks() { return loadedTasks;  }
-
+	
 private:
 	
+	size_t currentFileId{ 0 };
+
 	InputFile::Format inputFormat;
+
+	int numThreads;
 
 	uint32_t kmerLength;
 
 	bool storePositions;
-
-	size_t currentFileId;
-
-	int numThreads;
 
 	std::vector<std::string> kmcFileList;
 
@@ -102,11 +102,11 @@ private:
 
 	std::mutex outputMutex;
 
-	CRegisteringQueue<std::shared_ptr<Task>> readerQueue;
+	CRegisteringQueue<std::shared_ptr<Task>> readerQueue{ 1 };
 	
-	CRegisteringQueue<std::shared_ptr<Task>> prefetcherQueue;
+	CRegisteringQueue<std::shared_ptr<Task>> prefetcherQueue{ 1 };
 
-	CRegisteringQueue<std::shared_ptr<Task>> intermediateQueue;
+	CRegisteringQueue<std::shared_ptr<Task>> intermediateQueue{ 1 };
 
 	std::map<size_t, std::shared_ptr<Task>> loadedTasks;
 };

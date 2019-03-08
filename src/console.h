@@ -30,6 +30,7 @@ public:
 	static const string OPTION_FILTER;
 	static const string OPTION_LENGTH;
 	static const string OPTION_VERBOSE;
+	static const string OPTION_DEBUG;
 	static const string OPTION_THREADS;
 	static const string OPTION_BUFFER;
 };

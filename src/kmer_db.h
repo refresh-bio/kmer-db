@@ -27,9 +27,9 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 class AbstractKmerDb {
 protected:
 
-	bool isInitialized;
-
 	uint32_t kmerLength;
+
+	bool isInitialized;
 
 	double fraction;
 
@@ -47,25 +47,25 @@ public:
 
 	AbstractKmerDb() : kmerLength(0), isInitialized(false) {}
 
-	const uint32_t getKmerLength() const { return kmerLength; }
+	uint32_t getKmerLength() const { return kmerLength; }
 
-	const double getFraction() const { return fraction; }
+	double getFraction() const { return fraction; }
 
-	const size_t getSamplesCount() const { return sampleNames.size(); }
+	size_t getSamplesCount() const { return sampleNames.size(); }
 
 	const std::vector<string>& getSampleNames() const { return sampleNames; }
 
 	const std::vector<size_t>& getSampleKmersCount() const { return sampleKmersCount; }
 
-	virtual const size_t getKmersCount() const = 0;
+	virtual size_t getKmersCount() const = 0;
 
-	virtual const size_t getPatternsCount() const = 0;
+	virtual size_t getPatternsCount() const = 0;
 
-	virtual const size_t getPatternBytes() const = 0;
+	virtual size_t getPatternBytes() const = 0;
 
-	virtual const size_t getHashtableBytes() const = 0;
+	virtual size_t getHashtableBytes() const = 0;
 
-	virtual const size_t getHashtableEntrySize() const = 0;
+	virtual size_t getHashtableEntrySize() const = 0;
 
 	virtual void serialize(std::ofstream& file) const = 0;
 
@@ -122,17 +122,17 @@ public:
 
 	~FastKmerDb();
 
-	const size_t getKmersCount() const override { return kmers2patternIds.get_size(); }
+	size_t getKmersCount() const override { return kmers2patternIds.get_size(); }
 
-	const size_t getPatternsCount() const override { return patterns.size(); }
+	size_t getPatternsCount() const override { return patterns.size(); }
 
-	const size_t getPatternBytes() const override { return patternBytes; }
+	size_t getPatternBytes() const override { return patternBytes; }
 
-	const size_t getHashtableBytes() const override { return kmers2patternIds.get_bytes(); };
+	size_t getHashtableBytes() const override { return kmers2patternIds.get_bytes(); };
 
-	const size_t getHashtableEntrySize() const override { return sizeof(hash_map_lp<kmer_t, pattern_id_t>::item_t);  };
+	size_t getHashtableEntrySize() const override { return sizeof(hash_map_lp<kmer_t, pattern_id_t>::item_t);  };
 
-	const size_t getRepeatedKmersCount() const { return 0; }
+	size_t getRepeatedKmersCount() const { return 0; }
 
 //	const hash_set_lp<kmer_t>& getRepeatedKmers() const { return repeatedKmers; }
 
