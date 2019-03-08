@@ -200,6 +200,7 @@ bool GenomeInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& po
 		}
 
 		std::sort(kmers.begin(), kmers.end());
+		auto it = std::unique(kmers.begin(), kmers.end());
 
 		// iterate over kmers to select repeated ones
 /*		size_t repeated = 0;
@@ -211,11 +212,11 @@ bool GenomeInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& po
 				++repeated;
 			}
 		}
-*/
+
 	//	cout << "Repeated kmers: " << repeated << endl;
 		auto it = std::unique(kmers.begin(), kmers.end(), 
 			[](kmer_t a, kmer_t b)->bool { return (a << 1) == (b << 1);  }); // ignore MSB during comparison
-		
+	*/	
 		kmers.erase(it, kmers.end());	
 	}
 	

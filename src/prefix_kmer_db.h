@@ -2,6 +2,11 @@
 #include "kmer_db.h"
 
 
+struct HashtableAdditionTask {
+	int block_id;
+	std::vector<size_t>* ranges;
+};
+
 
 class PrefixKmerDb : public AbstractKmerDb {
 public:
@@ -78,6 +83,8 @@ protected:
 
 		CRegisteringQueue<DictionarySearchTask> hashtableSearch{ 1 };
 
+		CRegisteringQueue<HashtableAdditionTask> hashtableAddition{ 1 };
+
 		CRegisteringQueue<PatternExtensionTask> patternExtension{ 1 };
 	} queues;
 
@@ -87,12 +94,14 @@ protected:
 
 		std::vector<std::thread> hashtableSearch;
 
+		std::vector<std::thread> hashtableAddition;
+
 		std::vector<std::thread> patternExtension;
 	} workers;
 
 	std::vector<int> kmers_to_add_to_HT;
 
-	std::mutex prefixHistogramMutex;
+	std::mutex internalMutex;
 
 	Semaphore semaphore;
 

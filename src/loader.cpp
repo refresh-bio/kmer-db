@@ -60,7 +60,7 @@ Loader::Loader(std::shared_ptr<AbstractFilter> filter, InputFile::Format inputFo
 				}
 
 				if (task->file->open(kmcFileList[task->fileId])) {
-					LOG_VERBOSE << "Adding to intermediate queue: " << task->fileId + 1 << endl;
+					LOG_DEBUG << "Adding to intermediate queue: " << task->fileId + 1 << endl;
 					intermediateQueue.Push(task);
 				}
 				else {
@@ -86,7 +86,7 @@ Loader::Loader(std::shared_ptr<AbstractFilter> filter, InputFile::Format inputFo
 						loadedTasks[task->fileId] = task;
 						lck.unlock();
 					} else {
-						LOG_VERBOSE << "Sample load failed: " << task->fileId + 1 << endl;
+						cout << "Sample load failed: " << task->fileId + 1 << endl;
 					}
 					readerSemaphore.dec();
 				}
@@ -113,7 +113,7 @@ void Loader::initPrefetch() {
 	for (int tid = 0; tid < numThreads; ++tid) {
 		size_t file_id = currentFileId + tid;
 		if (file_id < kmcFileList.size()) {
-			LOG_VERBOSE << "Adding to prefetcher queue (serial): " << file_id + 1 << endl;
+			LOG_DEBUG << "Adding to prefetcher queue (serial): " << file_id + 1 << endl;
 			std::shared_ptr<Task> task = std::make_shared<Task>(file_id, tid, kmcFileList[file_id]);
 			
 			prefetcherSemaphore.inc();
@@ -132,7 +132,7 @@ void Loader::initLoad() {
 
 	while (!intermediateQueue.IsEmpty()) {
 		intermediateQueue.Pop(task);
-		LOG_VERBOSE << "Moving from intermediate to reader queue: " << task->fileId + 1 << endl;
+		LOG_DEBUG << "Moving from intermediate to reader queue: " << task->fileId + 1 << endl;
 		readerSemaphore.inc();
 		readerQueue.Push(task);
 	}

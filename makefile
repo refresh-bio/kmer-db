@@ -30,6 +30,8 @@ OBJS := $(KMER_DB_MAIN_DIR)/kmer_db.o \
 	$(KMER_DB_MAIN_DIR)/parallel_sorter.o \
 	$(KMER_DB_MAIN_DIR)/pattern.o \
 	$(KMER_DB_MAIN_DIR)/kmc_file_wrapper.o \
+	$(KMER_DB_MAIN_DIR)/prefix_kmer_db.o \
+	$(KMER_DB_MAIN_DIR)/similarity_calculator.o \
 	$(KMER_DB_LIBS_DIR)/kmc_file.o \
 	$(KMER_DB_LIBS_DIR)/kmer_api.o \
 	$(KMER_DB_LIBS_DIR)/mmer.o 

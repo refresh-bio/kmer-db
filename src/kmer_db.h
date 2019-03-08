@@ -106,6 +106,7 @@ struct DictionarySearchTask {
 	size_t* num_existing_kmers;
 };
 
+
 struct PatternExtensionTask {
 	int block_id;
 	size_t sample_id;
