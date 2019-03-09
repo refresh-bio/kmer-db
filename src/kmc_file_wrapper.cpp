@@ -1,6 +1,3 @@
-#include "kmc_file_wrapper.h"
-
-#pragma once
 /*
 This file is a part of Kmer-db software distributed under GNU GPL 3 licence.
 The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
@@ -8,7 +5,7 @@ The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
 Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka Danek
 
 */
-
+#include "kmc_file_wrapper.h"
 #include "kmc_api/kmc_file.h"
 #include "kmer_db.h"
 #include "filter.h"
@@ -28,11 +25,14 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 
 	FILE * in;
 	
-	if ((in = fopen((filename + ".gz").c_str(), "rb")) || (in = fopen((filename + ".fna.gz").c_str(), "rb")) || (in = fopen((filename + ".fasta.gz").c_str(), "rb"))) {
+	if ((in = fopen((filename + ".gz").c_str(), "rb")) || 
+		(in = fopen((filename + ".fna.gz").c_str(), "rb")) || 
+		(in = fopen((filename + ".fasta.gz").c_str(), "rb"))) {
 		isGzipped = true;
 	}
 	else {
-		(in = fopen((filename + ".fna").c_str(), "rb")) || (in = fopen((filename + ".fasta").c_str(), "rb"));
+		(in = fopen((filename + ".fna").c_str(), "rb")) || 
+		(in = fopen((filename + ".fasta").c_str(), "rb"));
 	}
 	
 	if (in) {

@@ -419,7 +419,7 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	auto currentIndex = block;
 
 	auto prefix_comparer = [this](int a, int b)->bool {
-		return this->samplePatterns[a].first.kmer < this->samplePatterns[b].first.kmer;
+		return GET_PREFIX_SHIFTED(this->samplePatterns[a].first.kmer) < GET_PREFIX_SHIFTED(this->samplePatterns[b].first.kmer);
 	};
 
 	for (int tid = 0; tid < num_threads - 1; ++tid) {

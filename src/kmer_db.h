@@ -47,6 +47,8 @@ public:
 
 	AbstractKmerDb() : kmerLength(0), isInitialized(false) {}
 
+	virtual ~AbstractKmerDb() {}
+
 	uint32_t getKmerLength() const { return kmerLength; }
 
 	double getFraction() const { return fraction; }
