@@ -270,9 +270,9 @@ void PrefixKmerDb::hashtableAdditionJob() {
 				samplePatterns[i].second = i_kmer;
 			}
 
-		}
+			semaphore.dec();
 
-		semaphore.dec();
+		}	
 	}
 }
 
@@ -446,9 +446,8 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	}
 
 	semaphore.waitForZero();
-	
 
-	/*
+/*
 #ifdef USE_PREFETCH
 	uint64_t prefetch_kmer;
 #endif
@@ -476,8 +475,8 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 		samplePatterns[i].first.pattern_id = 0;
 		samplePatterns[i].second = i_kmer;
 	}
-*/
 
+*/
 	times.hashtableAdd += std::chrono::high_resolution_clock::now() - start;
 
 	//--------------------------------------------------------------------------

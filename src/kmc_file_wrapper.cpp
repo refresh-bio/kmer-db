@@ -221,7 +221,7 @@ bool GenomeInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& po
 	*/	
 		kmers.erase(it, kmers.end());	
 
-		LOG_VERBOSE << "Extraction: " << kmers.size() << " kmers, " << chromosomes.size() << " chromosomes, " << totalLen << " bases" << endl;
+		LOG_DEBUG << "Extraction: " << kmers.size() << " kmers, " << chromosomes.size() << " chromosomes, " << totalLen << " bases" << endl;
 	}
 	
 	// free memory
