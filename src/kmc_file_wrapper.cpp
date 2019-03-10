@@ -131,6 +131,7 @@ bool GenomeInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& po
 		// extract contigs
 		char * header = nullptr;
 		char * ptr = data;
+		size_t totalLen = 0;
 
 		while (header = strchr(ptr, '>')) { // find begining of header
 			*header = 0; // put 0 as separator (end of previous chromosome)
@@ -153,6 +154,7 @@ bool GenomeInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& po
 			char* newend = std::remove_if(chromosomes[i], chromosomes[i] + lengths[i], [](char c) -> bool { return c == '\n' || c == '\r';  });
 			*newend = 0;
 			lengths[i] = newend - chromosomes[i];
+			totalLen += lengths[i];
 			assert(lengths[i] == strlen(chromosomes[i]));
 		}
 
@@ -218,6 +220,8 @@ bool GenomeInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& po
 			[](kmer_t a, kmer_t b)->bool { return (a << 1) == (b << 1);  }); // ignore MSB during comparison
 	*/	
 		kmers.erase(it, kmers.end());	
+
+		LOG_VERBOSE << "Extraction: " << kmers.size() << " kmers, " << chromosomes.size() << " chromosomes, " << totalLen << " bases" << endl;
 	}
 	
 	// free memory

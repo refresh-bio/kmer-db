@@ -438,17 +438,17 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 		}
 	}
 
-	/*
+	
 	semaphore.inc(num_threads);
 	for (int tid = 0; tid < num_threads; ++tid) {
 		LOG_DEBUG << "Block " << tid << " scheduled" << endl;
 		queues.hashtableAddition.Push(HashtableAdditionTask{ tid, &ranges });
 	}
 
-	semaphore.waitForZero();\
-	*/
+	semaphore.waitForZero();
+	
 
-
+	/*
 #ifdef USE_PREFETCH
 	uint64_t prefetch_kmer;
 #endif
@@ -476,7 +476,7 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 		samplePatterns[i].first.pattern_id = 0;
 		samplePatterns[i].second = i_kmer;
 	}
-
+*/
 
 	times.hashtableAdd += std::chrono::high_resolution_clock::now() - start;
 
