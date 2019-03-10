@@ -411,7 +411,6 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	size_t n_kmers_to_add = kmers_to_add_to_HT.size();
 	kmersCount += n_kmers_to_add;
 
-
 	// calculate ranges
 	std::vector<size_t> ranges(num_threads + 1, n_kmers_to_add);
 	ranges[0] = 0;
@@ -439,13 +438,46 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 		}
 	}
 
+	/*
 	semaphore.inc(num_threads);
 	for (int tid = 0; tid < num_threads; ++tid) {
 		LOG_DEBUG << "Block " << tid << " scheduled" << endl;
 		queues.hashtableAddition.Push(HashtableAdditionTask{ tid, &ranges });
 	}
 
-	semaphore.waitForZero();
+	semaphore.waitForZero();\
+	*/
+
+
+#ifdef USE_PREFETCH
+	uint64_t prefetch_kmer;
+#endif
+	for (int j = 0; j < n_kmers_to_add; ++j)
+	{
+#ifdef USE_PREFETCH
+		if (j + prefetch_dist < n_kmers_to_add) {
+			prefetch_kmer = samplePatterns[kmers_to_add_to_HT[j + prefetch_dist]].first.kmer;
+
+			kmer_t prefix = GET_PREFIX_SHIFTED(prefetch_kmer);
+			suffix_t suffix = GET_SUFFIX(prefetch_kmer);
+
+			assert(prefix < hashtables.size());
+
+			hashtables[prefix].prefetch(suffix);
+		}
+#endif
+		int i = kmers_to_add_to_HT[j];
+		kmer_t kmer = samplePatterns[i].first.kmer;
+
+		kmer_t prefix = GET_PREFIX_SHIFTED(kmer);
+		suffix_t suffix = GET_SUFFIX(kmer);
+
+		auto i_kmer = hashtables[prefix].insert(suffix, 0); // First k-mer occurence - assign with temporary pattern 0
+		samplePatterns[i].first.pattern_id = 0;
+		samplePatterns[i].second = i_kmer;
+	}
+
+
 	times.hashtableAdd += std::chrono::high_resolution_clock::now() - start;
 
 	//--------------------------------------------------------------------------
