@@ -1,6 +1,7 @@
 #pragma once
 #include "kmer_db.h"
 
+#include <atomic>
 
 struct HashtableAdditionTask {
 	int block_id;
@@ -118,8 +119,8 @@ protected:
 
 	// structure for storing bytes 
 	struct {
-		size_t hashtable { 0 };
-		size_t pattern { 0 };
+		std::atomic<size_t> hashtable { 0 };
+		std::atomic<size_t> pattern { 0 };
 	} mem;
 
 

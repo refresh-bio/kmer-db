@@ -158,10 +158,8 @@ void PrefixKmerDb::histogramJob() {
 				htBytes += hashtables[i].get_bytes();
 			}
 
-			// update memory statistics
-			this->internalMutex.lock();
+			// update memory statistics (atomic - no sync needed)
 			mem.hashtable += htBytes;
-			this->internalMutex.unlock();
 			
 			this->semaphore.dec();
 		}
@@ -198,6 +196,20 @@ void PrefixKmerDb::hashtableSearchJob() {
 				suffix_t suffix = GET_SUFFIX(u_kmer);
 				
 #ifdef USE_PREFETCH
+				/*
+				if (i + 2 * prefetch_dist < hi) {
+					prefetch_kmer = kmers[i + 2 * prefetch_dist];
+					kmer_t prefetch_prefix = GET_PREFIX_SHIFTED(prefetch_kmer);
+					
+					const char* addr = static_cast<const char*>(&hashtables[prefetch_prefix]);
+#ifdef WIN32
+					_mm_prefetch(addr, _MM_HINT_T0);
+#else
+					__builtin_prefetch(data);
+#endif
+				}
+				*/
+
 				if (i + prefetch_dist < hi) {
 					prefetch_kmer = kmers[i + prefetch_dist];
 					kmer_t prefetch_prefix = GET_PREFIX_SHIFTED(prefetch_kmer);
@@ -290,7 +302,7 @@ void PrefixKmerDb::patternJob() {
 
 			size_t lo = (*task.ranges)[task.block_id];
 			size_t hi = (*task.ranges)[task.block_id + 1];
-			size_t size = 0;
+			size_t size = mem.pattern; // get current pattern memory size (atomic)
 
 			for (size_t i = lo; i < hi;) {
 				size_t j;
@@ -331,10 +343,8 @@ void PrefixKmerDb::patternJob() {
 				i = j;
 			}
 
-			// update memory statistics
-			this->internalMutex.lock();
+			// update memory statistics (atomic - no sync needed)
 			mem.pattern += size;
-			this->internalMutex.unlock();
 
 			LOG_DEBUG << "Block " << task.block_id << " finished" << endl;
 			this->semaphore.dec();
