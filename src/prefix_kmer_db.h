@@ -5,14 +5,13 @@
 
 struct HashtableAdditionTask {
 	int block_id;
-	std::vector<size_t>* ranges;
+	const std::vector<kmer_t>* kmers;
+	const std::vector<size_t>* ranges;
 };
 
 
 class PrefixKmerDb : public AbstractKmerDb {
 public:
-
-	using hashmap_t = hash_map_lp<suffix_t, pattern_id_t>;
 
 	size_t getKmersCount() const override { return kmersCount; }
 
@@ -24,7 +23,7 @@ public:
 
 	size_t getHashtableEntrySize() const override { return sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t); };
 	
-	const std::vector<hashmap_t*>& getHashtables() const { return hashtables; }
+	const std::vector<hash_map_lp<suffix_t, pattern_id_t>>& getHashtables() const { return hashtables; }
 
 	const std::vector<pattern_t>& getPatterns() const { return patterns; }
 
@@ -67,11 +66,11 @@ protected:
 
 	int num_threads;
 	
-	size_t kmersCount{ 0 };
+	std::atomic<size_t> kmersCount{ 0 };
 
 	std::vector<uint32_t> prefixHistogram;
 
-	std::vector<hash_map_lp<suffix_t, pattern_id_t>*> hashtables;
+	std::vector<hash_map_lp<suffix_t, pattern_id_t>> hashtables;
 
 	std::vector<pattern_t> patterns;
 
@@ -131,5 +130,7 @@ protected:
 	void histogramJob();
 	void hashtableSearchJob();
 	void hashtableAdditionJob();
+
+	void hashtableJob();
 	void patternJob();
 };
