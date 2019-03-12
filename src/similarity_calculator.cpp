@@ -423,7 +423,7 @@ void  SimilarityCalculator::operator()(const PrefixKmerDb& db, const std::vector
 			kmer_t prefix = GET_PREFIX_SHIFTED(prefetch_kmer);
 			suffix_t suffix = GET_SUFFIX(prefetch_kmer);
 
-			hashtables[prefix].prefetch(suffix);
+			hashtables[prefix]->prefetch(suffix);
 		}
 
 		// check if kmer exists in a database
@@ -431,7 +431,7 @@ void  SimilarityCalculator::operator()(const PrefixKmerDb& db, const std::vector
 		kmer_t prefix = GET_PREFIX_SHIFTED(kmer);
 		suffix_t suffix = GET_SUFFIX(kmer);
 
-		auto entry = hashtables[prefix].find(suffix);
+		auto entry = hashtables[prefix]->find(suffix);
 
 		if (entry != nullptr) {
 			auto pid = *entry;

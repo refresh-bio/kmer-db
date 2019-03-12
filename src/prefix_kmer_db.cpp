@@ -76,6 +76,10 @@ PrefixKmerDb::~PrefixKmerDb() {
 	for (auto& t : workers.patternExtension) {
 		t.join();
 	}
+
+	for (auto ht : hashtables) {
+		delete ht;
+	}
 }
 
 
@@ -89,6 +93,9 @@ void PrefixKmerDb::initialize(uint32_t kmerLength, double fraction) {
 
 	prefixHistogram.resize(binsCount);
 	hashtables.resize(binsCount);
+	for (auto& ht : hashtables) {
+		ht = new hashmap_t();
+	}
 }
 
 // *****************************************************************************************
@@ -154,8 +161,8 @@ void PrefixKmerDb::histogramJob() {
 			size_t htBytes = 0;
 
 			for (int i = lo; i < hi; ++i) {
-				hashtables[i].reserve_for_additional(prefixHistogram[i]);
-				htBytes += hashtables[i].get_bytes();
+				hashtables[i]->reserve_for_additional(prefixHistogram[i]);
+				htBytes += hashtables[i]->get_bytes();
 			}
 
 			// update memory statistics (atomic - no sync needed)
@@ -189,36 +196,35 @@ void PrefixKmerDb::hashtableSearchJob() {
 			kmer_t prefetch_kmer;
 			const size_t prefetch_dist = 48;
 #endif
-
 			for (size_t i = lo; i < hi; ++i) {
 				u_kmer = kmers[i];
 				kmer_t prefix = GET_PREFIX_SHIFTED(u_kmer);
 				suffix_t suffix = GET_SUFFIX(u_kmer);
 				
 #ifdef USE_PREFETCH
-				/*
+				
 				if (i + 2 * prefetch_dist < hi) {
 					prefetch_kmer = kmers[i + 2 * prefetch_dist];
 					kmer_t prefetch_prefix = GET_PREFIX_SHIFTED(prefetch_kmer);
 					
-					const char* addr = static_cast<const char*>(&hashtables[prefetch_prefix]);
+					const char* addr = reinterpret_cast<const char*>(hashtables.data() + prefetch_prefix);
 #ifdef WIN32
 					_mm_prefetch(addr, _MM_HINT_T0);
 #else
-					__builtin_prefetch(data);
+					__builtin_prefetch(addr);
 #endif
 				}
-				*/
+				
 
 				if (i + prefetch_dist < hi) {
 					prefetch_kmer = kmers[i + prefetch_dist];
 					kmer_t prefetch_prefix = GET_PREFIX_SHIFTED(prefetch_kmer);
 					suffix_t suffix = GET_SUFFIX(prefetch_kmer);
-					hashtables[prefetch_prefix].prefetch(suffix);
+					hashtables[prefetch_prefix]->prefetch(suffix);
 				}
 #endif
 				// Check whether k-mer exists in a dictionary
-				pattern_id_t* entry = hashtables[prefix].find(suffix);
+				pattern_id_t* entry = hashtables[prefix]->find(suffix);
 				pattern_id_t p_id;
 
 				if (entry == nullptr) {
@@ -268,7 +274,7 @@ void PrefixKmerDb::hashtableAdditionJob() {
 
 					assert(prefix < hashtables.size());
 
-					hashtables[prefix].prefetch(suffix);
+					hashtables[prefix]->prefetch(suffix);
 				}
 #endif
 				int i = kmers_to_add_to_HT[j];
@@ -277,7 +283,7 @@ void PrefixKmerDb::hashtableAdditionJob() {
 				kmer_t prefix = GET_PREFIX_SHIFTED(kmer);
 				suffix_t suffix = GET_SUFFIX(kmer);
 
-				auto i_kmer = hashtables[prefix].insert(suffix, 0); // First k-mer occurence - assign with temporary pattern 0
+				auto i_kmer = hashtables[prefix]->insert(suffix, 0); // First k-mer occurence - assign with temporary pattern 0
 				samplePatterns[i].first.pattern_id = 0;
 				samplePatterns[i].second = i_kmer;
 			}
@@ -302,7 +308,7 @@ void PrefixKmerDb::patternJob() {
 
 			size_t lo = (*task.ranges)[task.block_id];
 			size_t hi = (*task.ranges)[task.block_id + 1];
-			size_t size = mem.pattern; // get current pattern memory size (atomic)
+			int64_t deltaSize = 0; // get current pattern memory size (atomic)
 
 			for (size_t i = lo; i < hi;) {
 				size_t j;
@@ -318,9 +324,9 @@ void PrefixKmerDb::patternJob() {
 
 				if (patterns[p_id].get_num_kmers() == pid_count && !patterns[p_id].get_is_parrent()) {
 					// Extend pattern - all k-mers with considered template exist in the analyzed sample
-					size -= patterns[p_id].get_bytes();
+					deltaSize -= patterns[p_id].get_bytes();
 					patterns[p_id].expand((sample_id_t)(task.sample_id));
-					size += patterns[p_id].get_bytes();
+					deltaSize += patterns[p_id].get_bytes();
 				}
 				else
 				{
@@ -328,7 +334,7 @@ void PrefixKmerDb::patternJob() {
 					pattern_id_t local_pid = task.new_pid->fetch_add(1);
 
 					threadPatterns[task.block_id].emplace_back(local_pid, pattern_t(patterns[p_id], p_id, task.sample_id, (uint32_t)pid_count));
-					size += threadPatterns[task.block_id].back().second.get_bytes();
+					deltaSize += threadPatterns[task.block_id].back().second.get_bytes();
 
 					if (p_id) {
 						patterns[p_id].set_num_kmers(patterns[p_id].get_num_kmers() - pid_count);
@@ -344,7 +350,7 @@ void PrefixKmerDb::patternJob() {
 			}
 
 			// update memory statistics (atomic - no sync needed)
-			mem.pattern += size;
+			mem.pattern += deltaSize;
 
 			LOG_DEBUG << "Block " << task.block_id << " finished" << endl;
 			this->semaphore.dec();
@@ -570,8 +576,8 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 //
 void PrefixKmerDb::serialize(std::ofstream& file) const {
 
-	size_t numHastableElements = ioBufferBytes / sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t);
-	std::vector <hash_map_lp<suffix_t, pattern_id_t>::item_t> hashtableBuffer(numHastableElements);
+	size_t numHastableElements = ioBufferBytes / sizeof(hashmap_t::item_t);
+	std::vector <hashmap_t::item_t> hashtableBuffer(numHastableElements);
 	char* buffer = reinterpret_cast<char*>(hashtableBuffer.data());
 
 	// store number of samples
@@ -597,26 +603,26 @@ void PrefixKmerDb::serialize(std::ofstream& file) const {
 	for (const auto& ht : hashtables) {
 
 		// store ht size
-		temp = ht.get_size();
+		temp = ht->get_size();
 		file.write(reinterpret_cast<const char*>(&temp), sizeof(temp));
 
 		// write ht elements in portions
 		size_t bufpos = 0;
-		for (auto it = ht.cbegin(); it < ht.cend(); ++it) {
-			if (ht.is_free(*it)) {
+		for (auto it = ht->cbegin(); it < ht->cend(); ++it) {
+			if (ht->is_free(*it)) {
 				continue;
 			}
 
 			hashtableBuffer[bufpos++] = *it;
 			if (bufpos == numHastableElements) {
 				file.write(reinterpret_cast<const char*>(&bufpos), sizeof(size_t));
-				file.write(buffer, bufpos * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
+				file.write(buffer, bufpos * sizeof(hashmap_t::item_t));
 				bufpos = 0;
 			}
 		}
 		// write remaining ht elements
 		file.write(reinterpret_cast<const char*>(&bufpos), sizeof(size_t));
-		file.write(buffer, bufpos * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
+		file.write(buffer, bufpos * sizeof(hashmap_t::item_t));
 	}
 
 	// write patterns in portions
@@ -654,8 +660,8 @@ void PrefixKmerDb::serialize(std::ofstream& file) const {
 //
 bool PrefixKmerDb::deserialize(std::ifstream& file) {
 
-	size_t numHastableElements = ioBufferBytes / sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t);
-	std::vector <hash_map_lp<suffix_t, pattern_id_t>::item_t> hashtableBuffer(numHastableElements);
+	size_t numHastableElements = ioBufferBytes / sizeof(hashmap_t::item_t);
+	std::vector <hashmap_t::item_t> hashtableBuffer(numHastableElements);
 	char* buffer = reinterpret_cast<char*>(hashtableBuffer.data());
 
 	LOG_VERBOSE << "Loading general info..." << endl;
@@ -689,7 +695,7 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 	// load all hashtables
 	for (int i = 0; i < hashtables.size(); ++i) {
 		cout << i << ",";
-		auto& ht = hashtables[i];
+		auto& ht = *hashtables[i];
 		// loal ht size
 		file.read(reinterpret_cast<char*>(&temp), sizeof(temp));
 
@@ -701,7 +707,7 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 		while (readCount < temp) {
 			size_t portion = 0;
 			file.read(reinterpret_cast<char*>(&portion), sizeof(size_t));
-			file.read(buffer, portion * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
+			file.read(buffer, portion * sizeof(hashmap_t::item_t));
 
 			for (size_t j = 0; j < portion; ++j) {
 				ht.insert(hashtableBuffer[j].key, hashtableBuffer[j].val);
