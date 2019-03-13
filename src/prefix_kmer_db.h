@@ -51,9 +51,7 @@ public:
 
 	std::string printDetailedTimes() const override {
 		std::ostringstream oss;
-		oss << "\tHashatable resizing (parallel): " << times.hashtableResize.count() << endl
-			<< "\tHashtable searching (parallel): " << times.hashtableFind.count() << endl
-			<< "\tHashatable insertion (parallel): " << times.hashtableAdd.count() << endl
+		oss << "\tHashatable processing (parallel): " << times.hashtableProcess.count() << endl
 			<< "\tSort time (parallel): " << times.sort.count() << endl
 			<< "\tPattern extension time (parallel): " << times.extension.count() << endl;
 		return oss.str();
@@ -81,10 +79,6 @@ protected:
 
 	// struct for storing queues
 	struct {
-		CRegisteringQueue<DictionarySearchTask> prefixHistogram{ 1 };
-
-		CRegisteringQueue<DictionarySearchTask> hashtableSearch{ 1 };
-
 		CRegisteringQueue<HashtableAdditionTask> hashtableAddition{ 1 };
 
 		CRegisteringQueue<PatternExtensionTask> patternExtension{ 1 };
@@ -92,28 +86,16 @@ protected:
 
 	// struct for storing workers
 	struct {
-		std::vector<std::thread> prefixHistogram;
-
-		std::vector<std::thread> hashtableSearch;
-
 		std::vector<std::thread> hashtableAddition;
 
 		std::vector<std::thread> patternExtension;
 	} workers;
 
-	std::vector<int> kmers_to_add_to_HT;
-
-	std::mutex internalMutex;
-
 	Semaphore semaphore;
-
-	Semaphore internalSempahores[2];
 
 	// structure for storing all the times
 	struct {
-		std::chrono::duration<double> hashtableResize { 0 };
-		std::chrono::duration<double> hashtableFind { 0 };
-		std::chrono::duration<double> hashtableAdd { 0 };
+		std::chrono::duration<double> hashtableProcess { 0 };
 		std::chrono::duration<double> sort { 0 };
 		std::chrono::duration<double> extension{ 0 };
 	} times;

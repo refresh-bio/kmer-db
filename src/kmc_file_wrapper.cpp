@@ -10,6 +10,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include "kmer_db.h"
 #include "filter.h"
 #include "kmer_extract.h"
+#include "parallel_sorter.h"
 
 #include <zlib.h>
 
@@ -172,15 +173,6 @@ bool GenomeInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& po
 			throw std::runtime_error("unsupported filter type!");
 		}
 
-		// MAREK
-		// Ekstrakcja k-merów z chromosomów. Wa¿ne zmienne:
-		// - chromosomes - wektor ³añcuchów zakoñczonych zerem przechowuj¹cych sekwencje chromosomów
-		// - lengths - wektor d³ugoœci chromosomów
-		// - kmers - wektor wyjœciowy z kmerami
-		// - filter - obiekt filtruj¹cy k-mery, operator () zwraca true jeœli k-mer spe³nia warunek
-		// - kmerLength - d³ugoœæ k-mera
-
-		
 		//przewidywana liczba k-merow, zeby tylko raz byla alokacja pamieci w wektorze
 		//przez 'N'ki i filtrowanie moze byc mniej faktycznie k-merow
 		size_t sum_sizes = 0;
@@ -202,6 +194,7 @@ bool GenomeInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& po
 		}
 
 		std::sort(kmers.begin(), kmers.end());
+		//ParallelSort(kmers.data(), kmers.size());
 		auto it = std::unique(kmers.begin(), kmers.end());
 
 		// iterate over kmers to select repeated ones

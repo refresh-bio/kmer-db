@@ -16,6 +16,19 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #endif
 
 
+
+// *****************************************************************************************
+//
+void ParallelSort(kmer_t *arr, size_t arr_size)
+{
+#ifdef WIN32
+	concurrency::parallel_sort(arr, arr + arr_size);
+	//std::stable_sort(samplePatterns.begin(), samplePatterns.end(), pid_comparer);
+#else
+	__gnu_parallel::sort(arr, arr + arr_size);
+#endif
+}
+
 // *****************************************************************************************
 //
 void ParallelSort(pair<pattern_id_t, pattern_id_t*> *arr, size_t arr_size, pair<pattern_id_t, pattern_id_t*> *tmp, int rec_size, int key_size, int n_threads)

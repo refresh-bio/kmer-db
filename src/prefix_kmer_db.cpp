@@ -31,23 +31,8 @@ PrefixKmerDb::PrefixKmerDb(int _num_threads) :
 		tp.reserve(2 << 20); 
 	}
 	
-//	workers.prefixHistogram.resize(num_threads);
-//	workers.hashtableSearch.resize(num_threads);
 	workers.hashtableAddition.resize(num_threads);
 	workers.patternExtension.resize(num_threads);
-/*
-	for (auto& t : workers.prefixHistogram) {
-		t = std::thread(&PrefixKmerDb::histogramJob, this);
-	}
-
-	for (auto& t : workers.hashtableSearch) {
-		t = std::thread(&PrefixKmerDb::hashtableSearchJob, this);
-	}
-
-	for (auto& t : workers.hashtableAddition) {
-		t = std::thread(&PrefixKmerDb::hashtableAdditionJob, this);
-	}
-	*/
 
 	for (auto& t : workers.hashtableAddition) {
 		t = std::thread(&PrefixKmerDb::hashtableJob, this);
@@ -61,17 +46,6 @@ PrefixKmerDb::PrefixKmerDb(int _num_threads) :
 // *****************************************************************************************
 //
 PrefixKmerDb::~PrefixKmerDb() {
-/*
-	queues.prefixHistogram.MarkCompleted();
-	for (auto& t : workers.prefixHistogram) {
-		t.join();
-	}
-
-	queues.hashtableSearch.MarkCompleted();
-	for (auto& t : workers.hashtableSearch) {
-		t.join();
-	}
-*/
 	queues.hashtableAddition.MarkCompleted();
 	for (auto& t : workers.hashtableAddition) {
 		t.join();
@@ -94,203 +68,6 @@ void PrefixKmerDb::initialize(uint32_t kmerLength, double fraction) {
 
 	prefixHistogram.resize(binsCount);
 	hashtables.resize(binsCount);
-}
-
-// *****************************************************************************************
-//
-void PrefixKmerDb::histogramJob() {
-	while (!this->queues.prefixHistogram.IsCompleted()) {
-		DictionarySearchTask task;
-
-		if (this->queues.prefixHistogram.Pop(task)) {
-
-			// determine ranges
-			const std::vector<kmer_t>& kmers = *(task.kmers);
-
-			size_t block_size = kmers.size() / task.num_blocks;
-			size_t lo = task.block_id * block_size;
-			size_t hi = (task.block_id == task.num_blocks - 1) ? kmers.size() : lo + block_size;
-
-			// generate histogram
-			kmer_t boundaryPrefix = GET_PREFIX_SHIFTED(kmers[hi - 1]);
-			uint32_t boundaryCount = 0;
-			uint32_t begin = lo;
-
-			kmer_t prevPrefix = GET_PREFIX_SHIFTED(kmers[lo]);
-
-			// only one prefix in a block
-			if (prevPrefix == boundaryPrefix) {
-				boundaryCount = hi - lo;
-			}
-			else {
-				for (size_t i = lo + 1; i < hi; ++i) {
-					kmer_t prefix = GET_PREFIX_SHIFTED(kmers[i]);
-
-					if (prefix != prevPrefix) {
-
-						prefixHistogram[prevPrefix] = i - begin;
-						begin = i;
-						prevPrefix = prefix;
-
-						if (prefix == boundaryPrefix) { // check if we are at the histogram bound 
-							// all kmers starting from here have same prefix as the last one in the block
-							boundaryCount = hi - i;
-							break;
-						}
-					}
-				}
-			}
-
-			internalSempahores[0].dec_notify_all();
-			internalSempahores[0].waitForZero();
-
-			this->internalMutex.lock();
-			prefixHistogram[boundaryPrefix] += boundaryCount;
-			this->internalMutex.unlock();
-
-			internalSempahores[1].dec_notify_all();
-			internalSempahores[1].waitForZero();
-
-			// resize hastables
-			size_t tablesPerWorker = hashtables.size() / task.num_blocks;
-			lo = task.block_id * tablesPerWorker;
-			hi = (task.block_id == task.num_blocks - 1) ? hashtables.size() : lo + tablesPerWorker;
-
-			size_t htBytes = 0;
-
-			for (int i = lo; i < hi; ++i) {
-				hashtables[i].reserve_for_additional(prefixHistogram[i]);
-				htBytes += hashtables[i].get_bytes();
-			}
-
-			// update memory statistics (atomic - no sync needed)
-			mem.hashtable += htBytes;
-			
-			this->semaphore.dec();
-		}
-	}
-}
-
-// *****************************************************************************************
-//
-void PrefixKmerDb::hashtableSearchJob() {
-	while (!this->queues.hashtableSearch.IsCompleted()) {
-		DictionarySearchTask task;
-
-		if (this->queues.hashtableSearch.Pop(task)) {
-			LOG_DEBUG << "Block " << task.block_id << " started" << endl;
-			const std::vector<kmer_t>& kmers = *(task.kmers);
-
-			size_t n_kmers = kmers.size();
-			size_t block_size = n_kmers / task.num_blocks;
-			size_t lo = task.block_id * block_size;
-			size_t hi = (task.block_id == task.num_blocks - 1) ? n_kmers : lo + block_size;
-
-			size_t existing_id = lo;
-			size_t to_add_id = hi - 1;
-
-			kmer_t u_kmer;
-#ifdef USE_PREFETCH
-			kmer_t prefetch_kmer;
-			const size_t prefetch_dist = 48;
-#endif
-
-			for (size_t i = lo; i < hi; ++i) {
-				u_kmer = kmers[i];
-				kmer_t prefix = GET_PREFIX_SHIFTED(u_kmer);
-				suffix_t suffix = GET_SUFFIX(u_kmer);
-				
-#ifdef USE_PREFETCH
-				/*
-				if (i + 2 * prefetch_dist < hi) {
-					prefetch_kmer = kmers[i + 2 * prefetch_dist];
-					kmer_t prefetch_prefix = GET_PREFIX_SHIFTED(prefetch_kmer);
-					
-					const char* addr = static_cast<const char*>(&hashtables[prefetch_prefix]);
-#ifdef WIN32
-					_mm_prefetch(addr, _MM_HINT_T0);
-#else
-					__builtin_prefetch(data);
-#endif
-				}
-				*/
-
-				if (i + prefetch_dist < hi) {
-					prefetch_kmer = kmers[i + prefetch_dist];
-					kmer_t prefetch_prefix = GET_PREFIX_SHIFTED(prefetch_kmer);
-					suffix_t suffix = GET_SUFFIX(prefetch_kmer);
-					hashtables[prefetch_prefix].prefetch(suffix);
-				}
-#endif
-				// Check whether k-mer exists in a dictionary
-				pattern_id_t* entry = hashtables[prefix].find(suffix);
-				pattern_id_t p_id;
-
-				if (entry == nullptr) {
-					// do not add kmer to hashtable - just mark as to be added
-					samplePatterns[to_add_id].first.kmer = u_kmer;
-					--to_add_id;
-				} else {
-					p_id = *entry;
-
-					samplePatterns[existing_id].first.pattern_id = p_id;
-					samplePatterns[existing_id].second = entry;
-					existing_id++;
-				}
-			}
-
-			*(task.num_existing_kmers) = existing_id;
-			//cout << "Thread " << tid << ", existing: " << existing_id - lo << ", to add: " << hi - existing_id << endl;
-
-			LOG_DEBUG << "Block " << task.block_id << " finished" << endl;
-			this->semaphore.dec();
-		}
-	}
-}
-
-// *****************************************************************************************
-//
-void PrefixKmerDb::hashtableAdditionJob() {
-	while (!this->queues.hashtableAddition.IsCompleted()) {
-		HashtableAdditionTask task;
-
-		if (this->queues.hashtableAddition.Pop(task)) {
-			size_t lo = (*task.ranges)[task.block_id];
-			size_t hi = (*task.ranges)[task.block_id + 1];
-
-		
-#ifdef USE_PREFETCH
-			uint64_t prefetch_kmer;
-#endif
-			for (int j = lo; j < hi; ++j)
-			{
-#ifdef USE_PREFETCH
-				if (j + prefetch_dist < hi) {
-					prefetch_kmer = samplePatterns[kmers_to_add_to_HT[j + prefetch_dist]].first.kmer;
-
-					kmer_t prefix = GET_PREFIX_SHIFTED(prefetch_kmer);
-					suffix_t suffix = GET_SUFFIX(prefetch_kmer);
-
-					assert(prefix < hashtables.size());
-
-					hashtables[prefix].prefetch(suffix);
-				}
-#endif
-				int i = kmers_to_add_to_HT[j];
-				kmer_t kmer = samplePatterns[i].first.kmer;
-
-				kmer_t prefix = GET_PREFIX_SHIFTED(kmer);
-				suffix_t suffix = GET_SUFFIX(kmer);
-
-				auto i_kmer = hashtables[prefix].insert(suffix, 0); // First k-mer occurence - assign with temporary pattern 0
-				samplePatterns[i].first.pattern_id = 0;
-				samplePatterns[i].second = i_kmer;
-			}
-
-			semaphore.dec();
-
-		}	
-	}
 }
 
 // *****************************************************************************************
@@ -364,7 +141,8 @@ void PrefixKmerDb::hashtableJob() {
 					}
 #endif
 					// Check whether k-mer exists in a dictionary
-					pattern_id_t* entry = hashtables[prefix].find(suffix);
+					const auto& ht = hashtables[prefix];
+					pattern_id_t* entry = ht.find(suffix);
 
 					if (entry == nullptr) {
 						entry = hashtables[prefix].insert(suffix, 0);
@@ -501,7 +279,7 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	}
 
 	semaphore.waitForZero();
-	times.hashtableResize += std::chrono::high_resolution_clock::now() - start;
+	times.hashtableProcess += std::chrono::high_resolution_clock::now() - start;
 
 #ifdef _DEBUG
 	uint32_t histoSum = std::accumulate(prefixHistogram.begin(), prefixHistogram.end(), 0);

@@ -13,6 +13,8 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 using namespace std;
 
 
+void ParallelSort(kmer_t *arr, size_t arr_size);
+
 void ParallelSort(pair<pattern_id_t, pattern_id_t*> *arr, size_t arr_size, pair<pattern_id_t, pattern_id_t*> *tmp, int rec_size, int key_size, int n_threads);
 
 void ParallelSort(pair<kmer_or_pattern_t, pattern_id_t*> *arr, size_t arr_size, pair<kmer_or_pattern_t, pattern_id_t*> *tmp, int rec_size, int key_size, int n_threads);
