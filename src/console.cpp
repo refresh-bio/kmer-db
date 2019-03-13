@@ -230,6 +230,13 @@ int Console::runBuildDatabase(
 	double filterValue,
 	uint32_t kmerLength){
 
+	time_t rawtime;
+	struct tm * timeinfo;
+
+	time(&rawtime);
+	timeinfo = localtime(&rawtime);
+	
+	cout << "Analysis started at " << asctime(timeinfo) << endl;
 	cout << "Processing samples..." << endl;
 	
 	LOG_DEBUG << "Creating FastKmerDb object" << endl;
@@ -275,6 +282,11 @@ int Console::runBuildDatabase(
 	loader.waitForPrefetch();
 
 	auto totalTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
+
+	time(&rawtime);
+	timeinfo = localtime(&rawtime);
+
+	cout << "Analysis finished at " << asctime(timeinfo) << endl;
 
 	cout << endl << endl << "EXECUTION TIMES" << endl
 		<< "Total: " << totalTime.count() << endl
