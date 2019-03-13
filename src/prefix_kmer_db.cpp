@@ -307,75 +307,77 @@ void PrefixKmerDb::hashtableJob() {
 			size_t lo = (*task.ranges)[task.block_id];
 			size_t hi = (*task.ranges)[task.block_id + 1];
 
-			kmer_t lo_prefix = GET_PREFIX_SHIFTED(kmers[lo]);
-			kmer_t hi_prefix = GET_PREFIX_SHIFTED(kmers[hi - 1]);
+			if (lo != hi) {
 
-			// generate histogram
-			size_t begin = lo;
-			kmer_t prevPrefix = lo_prefix;
-			
-			for (size_t i = lo + 1; i < hi; ++i) {
-				kmer_t prefix = GET_PREFIX_SHIFTED(kmers[i]);
-				if (prefix != prevPrefix) {
-					prefixHistogram[prevPrefix] = i - begin;
-					begin = i;
-					prevPrefix = prefix;
+				kmer_t lo_prefix = GET_PREFIX_SHIFTED(kmers[lo]);
+				kmer_t hi_prefix = GET_PREFIX_SHIFTED(kmers[hi - 1]);
+
+				// generate histogram
+				size_t begin = lo;
+				kmer_t prevPrefix = lo_prefix;
+
+				for (size_t i = lo + 1; i < hi; ++i) {
+					kmer_t prefix = GET_PREFIX_SHIFTED(kmers[i]);
+					if (prefix != prevPrefix) {
+						prefixHistogram[prevPrefix] = i - begin;
+						begin = i;
+						prevPrefix = prefix;
+					}
 				}
-			}
 
-			// add remanining
-			prefixHistogram[hi_prefix] = hi - begin;
-			
-			// resize hastables
-			size_t htBytes = 0;
-			
-			for (auto i = lo_prefix; i <= hi_prefix; ++i) {
-				hashtables[i].reserve_for_additional(prefixHistogram[i]);
-				htBytes += hashtables[i].get_bytes();
-			}
+				// add remanining
+				prefixHistogram[hi_prefix] = hi - begin;
 
-		//	cout << "Block: " << task.block_id << ", lo_prefix: " << lo_prefix << ", hi_prefix: " << hi_prefix << endl << flush;
+				// resize hastables
+				size_t htBytes = 0;
 
+				for (auto i = lo_prefix; i <= hi_prefix; ++i) {
+					hashtables[i].reserve_for_additional(prefixHistogram[i]);
+					htBytes += hashtables[i].get_bytes();
+				}
 
-			// update memory statistics (atomic - no sync needed)
-			mem.hashtable += htBytes;
-			 
-			size_t existing_id = lo;
-			size_t to_add = 0;
-			kmer_t u_kmer;
+				LOG_DEBUG << "Block: " << task.block_id << ", lo_prefix: " << lo_prefix << ", hi_prefix: " << hi_prefix << endl << flush;
+
+				// update memory statistics (atomic - no sync needed)
+				mem.hashtable += htBytes;
+
+				size_t existing_id = lo;
+				size_t to_add = 0;
+				kmer_t u_kmer;
 #ifdef USE_PREFETCH
-			kmer_t prefetch_kmer;
-			const size_t prefetch_dist = 48;
+				kmer_t prefetch_kmer;
+				const size_t prefetch_dist = 48;
 #endif
 
-			for (size_t i = lo; i < hi; ++i) {
-				u_kmer = kmers[i];
-				kmer_t prefix = GET_PREFIX_SHIFTED(u_kmer);
-				suffix_t suffix = GET_SUFFIX(u_kmer);
+				for (size_t i = lo; i < hi; ++i) {
+					u_kmer = kmers[i];
+					kmer_t prefix = GET_PREFIX_SHIFTED(u_kmer);
+					suffix_t suffix = GET_SUFFIX(u_kmer);
 
 #ifdef USE_PREFETCH
-				
-				if (i + prefetch_dist < hi) {
-					prefetch_kmer = kmers[i + prefetch_dist];
-					kmer_t prefetch_prefix = GET_PREFIX_SHIFTED(prefetch_kmer);
-					suffix_t suffix = GET_SUFFIX(prefetch_kmer);
-					hashtables[prefetch_prefix].prefetch(suffix);
-				}
-#endif
-				// Check whether k-mer exists in a dictionary
-				pattern_id_t* entry = hashtables[prefix].find(suffix);
-				
-				if (entry == nullptr) {
-					entry = hashtables[prefix].insert(suffix, 0);
-					++to_add;
-				}
-				
-				samplePatterns[existing_id].first.pattern_id = *entry;
-				samplePatterns[existing_id].second = entry;
-				existing_id++;
-			}
 
-			kmersCount += to_add;
+					if (i + prefetch_dist < hi) {
+						prefetch_kmer = kmers[i + prefetch_dist];
+						kmer_t prefetch_prefix = GET_PREFIX_SHIFTED(prefetch_kmer);
+						suffix_t suffix = GET_SUFFIX(prefetch_kmer);
+						hashtables[prefetch_prefix].prefetch(suffix);
+					}
+#endif
+					// Check whether k-mer exists in a dictionary
+					pattern_id_t* entry = hashtables[prefix].find(suffix);
+
+					if (entry == nullptr) {
+						entry = hashtables[prefix].insert(suffix, 0);
+						++to_add;
+					}
+
+					samplePatterns[existing_id].first.pattern_id = *entry;
+					samplePatterns[existing_id].second = entry;
+					existing_id++;
+				}
+
+				kmersCount += to_add;
+			}
 
 			this->semaphore.dec();
 		}
@@ -456,7 +458,7 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	
 	//--------------------------------------------------------------------------
 	// get prefix histogram (parallel)
-	LOG_DEBUG << "Restructurizing hashtable (parallel)..." << endl;
+	LOG_DEBUG << "Hashtable resizing, searching, and adding (parallel)..." << endl;
 	auto start = std::chrono::high_resolution_clock::now();
 	std::fill(prefixHistogram.begin(), prefixHistogram.end(), 0);
 	samplePatterns.resize(n_kmers);
