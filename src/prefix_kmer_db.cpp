@@ -41,6 +41,9 @@ PrefixKmerDb::PrefixKmerDb(int _num_threads) :
 	for (auto& t : workers.patternExtension) {
 		t = std::thread(&PrefixKmerDb::patternJob, this);
 	}
+
+	//stats.workerAdditions.resize(num_threads);
+	//stats.workerReallocs.resize(num_threads);
 }
 
 // *****************************************************************************************
@@ -89,6 +92,7 @@ void PrefixKmerDb::hashtableJob() {
 				kmer_t lo_prefix = GET_PREFIX_SHIFTED(kmers[lo]);
 				kmer_t hi_prefix = GET_PREFIX_SHIFTED(kmers[hi - 1]);
 
+				auto start = std::chrono::high_resolution_clock::now();
 				// generate histogram
 				size_t begin = lo;
 				kmer_t prevPrefix = lo_prefix;
@@ -107,16 +111,21 @@ void PrefixKmerDb::hashtableJob() {
 
 				// resize hastables
 				size_t htBytes = 0;
-
+				int reallocsCount = 0;
 				for (auto i = lo_prefix; i <= hi_prefix; ++i) {
-					hashtables[i].reserve_for_additional(prefixHistogram[i]);
+					reallocsCount += hashtables[i].reserve_for_additional(prefixHistogram[i]);
 					htBytes += hashtables[i].get_bytes();
 				}
 
+				// update memory statistics (atomic - no sync needed)
+				stats.hashtableBytes += htBytes;
+			//	stats.workerReallocs[task.block_id] += reallocsCount;
+
+				times.hashtableResize_worker += std::chrono::high_resolution_clock::now() - start;
+
 				LOG_DEBUG << "Block: " << task.block_id << ", lo_prefix: " << lo_prefix << ", hi_prefix: " << hi_prefix << endl << flush;
 
-				// update memory statistics (atomic - no sync needed)
-				mem.hashtable += htBytes;
+				start = std::chrono::high_resolution_clock::now();
 
 				size_t existing_id = lo;
 				size_t to_add = 0;
@@ -155,6 +164,8 @@ void PrefixKmerDb::hashtableJob() {
 				}
 
 				kmersCount += to_add;
+				
+				times.hashtableFind_worker += std::chrono::high_resolution_clock::now() - start;
 			}
 
 			this->semaphore.dec();
@@ -171,54 +182,60 @@ void PrefixKmerDb::patternJob() {
 
 		if (this->queues.patternExtension.Pop(task)) {
 			LOG_DEBUG << "Block " << task.block_id << " started" << endl;
-			threadPatterns[task.block_id].clear();
-			threadPatterns[task.block_id].reserve(task.ranges->back());
-
+			
 			size_t lo = (*task.ranges)[task.block_id];
 			size_t hi = (*task.ranges)[task.block_id + 1];
-			int64_t deltaSize = 0; // get current pattern memory size (atomic)
 
-			for (size_t i = lo; i < hi;) {
-				size_t j;
-				auto p_id = samplePatterns[i].first.pattern_id;
+			if (lo != hi) {
 
-				// count k-mers from current sample with considered template 
-				for (j = i + 1; j < hi; ++j) {
-					if (p_id != samplePatterns[j].first.pattern_id) {
-						break;
+				threadPatterns[task.block_id].clear();
+				threadPatterns[task.block_id].reserve(task.ranges->back());
+
+
+				int64_t deltaSize = 0; // get current pattern memory size (atomic)
+
+				for (size_t i = lo; i < hi;) {
+					size_t j;
+					auto p_id = samplePatterns[i].first.pattern_id;
+
+					// count k-mers from current sample with considered template 
+					for (j = i + 1; j < hi; ++j) {
+						if (p_id != samplePatterns[j].first.pattern_id) {
+							break;
+						}
 					}
-				}
-				size_t pid_count = j - i;
+					size_t pid_count = j - i;
 
-				if (patterns[p_id].get_num_kmers() == pid_count && !patterns[p_id].get_is_parrent()) {
-					// Extend pattern - all k-mers with considered template exist in the analyzed sample
-					deltaSize -= patterns[p_id].get_bytes();
-					patterns[p_id].expand((sample_id_t)(task.sample_id));
-					deltaSize += patterns[p_id].get_bytes();
-				}
-				else
-				{
-					// Generate new template 
-					pattern_id_t local_pid = task.new_pid->fetch_add(1);
+					if (patterns[p_id].get_num_kmers() == pid_count && !patterns[p_id].get_is_parrent()) {
+						// Extend pattern - all k-mers with considered template exist in the analyzed sample
+						deltaSize -= patterns[p_id].get_bytes();
+						patterns[p_id].expand((sample_id_t)(task.sample_id));
+						deltaSize += patterns[p_id].get_bytes();
+					}
+					else
+					{
+						// Generate new template 
+						pattern_id_t local_pid = task.new_pid->fetch_add(1);
 
-					threadPatterns[task.block_id].emplace_back(local_pid, pattern_t(patterns[p_id], p_id, task.sample_id, (uint32_t)pid_count));
-					deltaSize += threadPatterns[task.block_id].back().second.get_bytes();
+						threadPatterns[task.block_id].emplace_back(local_pid, pattern_t(patterns[p_id], p_id, task.sample_id, (uint32_t)pid_count));
+						deltaSize += threadPatterns[task.block_id].back().second.get_bytes();
 
-					if (p_id) {
-						patterns[p_id].set_num_kmers(patterns[p_id].get_num_kmers() - pid_count);
+						if (p_id) {
+							patterns[p_id].set_num_kmers(patterns[p_id].get_num_kmers() - pid_count);
+						}
+
+						for (size_t k = i; k < j; ++k) {
+							*(samplePatterns[k].second) = local_pid;
+						}
+
 					}
 
-					for (size_t k = i; k < j; ++k) {
-						*(samplePatterns[k].second) = local_pid;
-					}
-
+					i = j;
 				}
 
-				i = j;
+				// update memory statistics (atomic - no sync needed)
+				stats.patternBytes += deltaSize;
 			}
-
-			// update memory statistics (atomic - no sync needed)
-			mem.pattern += deltaSize;
 
 			LOG_DEBUG << "Block " << task.block_id << " finished" << endl;
 			this->semaphore.dec();
@@ -234,6 +251,9 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	sample_id_t sampleId = AbstractKmerDb::addKmers(sampleName, kmers, kmerLength, fraction);
 	size_t n_kmers = kmers.size();
 	
+//	std::fill(stats.workerReallocs.begin(), stats.workerReallocs.end(), 0);
+//	std::fill(stats.workerAdditions.begin(), stats.workerAdditions.end(), 0);
+
 	//--------------------------------------------------------------------------
 	// get prefix histogram (parallel)
 	LOG_DEBUG << "Hashtable resizing, searching, and adding (parallel)..." << endl;
@@ -241,7 +261,7 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	std::fill(prefixHistogram.begin(), prefixHistogram.end(), 0);
 	samplePatterns.resize(n_kmers);
 
-	mem.hashtable = 0;
+	stats.hashtableBytes = 0;
 	
 	// prepare tasks
 	size_t num_blocks = num_threads;
@@ -254,6 +274,8 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 		return GET_PREFIX_SHIFTED(a) < GET_PREFIX_SHIFTED(b);
 	};
 
+	size_t largestRange = 0;
+
 	for (int tid = 0; tid < num_blocks - 1; ++tid) {
 		auto it = std::upper_bound(
 			kmers.begin() + currentIndex,
@@ -262,14 +284,20 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 			prefix_comparer);
 
 		size_t range = it - kmers.begin();
-
 		ranges[tid + 1] = range;
+
+		if (range - ranges[tid] > largestRange) {
+			largestRange = range;
+		}
+
 		currentIndex = range + block;
 
 		if (currentIndex >= kmers.size()) {
 			break;
 		}
 	}
+
+	stats.hashtableJobsImbalance += (double)largestRange * num_blocks / n_kmers;
 
 	semaphore.inc(num_blocks);
 
@@ -358,7 +386,17 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 		for (auto& tp : threadPatterns[tid]) {
 			patterns[tp.first] = std::move(tp.second);
 		}
+
+		// update stats
+/*		int avg = std::accumulate(stats.workerReallocs.begin(), stats.workerReallocs.end(), 0) / num_threads;
+		int avg_diff = *std::max_element(stats.workerReallocs.begin(), stats.workerReallocs.end(), [avg](int a, int b)->bool {
+			return abs(avg - a) < abs(avg - b);
+		});
+		
+		stats.reallocsImbalance += ((double)avg_diff / avg);*/
 	}
+
+
 
 	return sampleId;
 }

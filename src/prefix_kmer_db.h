@@ -17,9 +17,9 @@ public:
 
 	size_t getPatternsCount() const override { return patterns.size(); }
 
-	size_t getPatternBytes() const override { return mem.pattern; }
+	size_t getPatternBytes() const override { return stats.patternBytes; }
 
-	size_t getHashtableBytes() const override { return mem.hashtable; };
+	size_t getHashtableBytes() const override { return stats.hashtableBytes; };
 
 	size_t getHashtableEntrySize() const override { return sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t); };
 	
@@ -51,7 +51,10 @@ public:
 
 	std::string printDetailedTimes() const override {
 		std::ostringstream oss;
-		oss << "\tHashatable processing (parallel): " << times.hashtableProcess.count() << endl
+		oss << "\tHashatable processing (parallel): " << times.hashtableProcess.count() <<  endl 
+			<< "\timbalance: " << stats.hashtableJobsImbalance / getSamplesCount() <<  endl
+			<< "\t\tResize: " << (times.hashtableResize_worker.count() / num_threads) << endl
+			<< "\t\tFind'n'add: " << (times.hashtableFind_worker.count() / num_threads) << endl
 			<< "\tSort time (parallel): " << times.sort.count() << endl
 			<< "\tPattern extension time (parallel): " << times.extension.count() << endl;
 		return oss.str();
@@ -96,22 +99,33 @@ protected:
 	// structure for storing all the times
 	struct {
 		std::chrono::duration<double> hashtableProcess { 0 };
+		
+		std::chrono::duration<double> hashtableResize_worker;
+		std::chrono::duration<double> hashtableFind_worker;
+		std::chrono::duration<double> hashtableAdd_worker;
+
+
 		std::chrono::duration<double> sort { 0 };
 		std::chrono::duration<double> extension{ 0 };
 	} times;
 
 	// structure for storing bytes 
 	struct {
-		std::atomic<size_t> hashtable { 0 };
-		std::atomic<size_t> pattern { 0 };
-	} mem;
+		std::atomic<size_t> hashtableBytes { 0 };
+		std::atomic<size_t> patternBytes { 0 };
+
+		double hashtableJobsImbalance{ 0 };
+		
+		//std::vector<int> workerReallocs;
+
+	} stats;
 
 
 	void initialize(uint32_t kmerLength, double fraction) override;
 
-	void histogramJob();
-	void hashtableSearchJob();
-	void hashtableAdditionJob();
+	//void histogramJob();
+	//void hashtableSearchJob();
+	//void hashtableAdditionJob();
 
 	void hashtableJob();
 	void patternJob();

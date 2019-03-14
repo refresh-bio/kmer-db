@@ -319,10 +319,10 @@ bool KmcInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& posit
 		}
 	}
 	kmers.resize(kmersCount);
-	//kmers = std::move(filter->finalize());
+	std::sort(kmers.begin(), kmers.end());
 
 	filterValue = ((double)kmers.size() / _total_kmers); // this may differ from theoretical
-	LOG_VERBOSE << "Filter passed: " << kmers.size() << "/" << _total_kmers << "(" << filterValue << ")" << endl;
+	LOG_DEBUG << "Filter passed: " << kmers.size() << "/" << _total_kmers << "(" << filterValue << ")" << endl;
 	filterValue = minhashFilter->getFilterValue(); // use proper value
 	return kmcfile->Close();
 }

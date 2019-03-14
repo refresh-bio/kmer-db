@@ -282,10 +282,10 @@ public:
 
 	// *****************************************************************************************
 	//
-	void reserve_for_additional(size_t n_elems)
+	bool reserve_for_additional(size_t n_elems)
 	{
 		if (filled + n_elems <= allocated * max_fill_factor)
-			return;
+			return false;
 
 		item_t *old_data = data;
 		size_t old_allocated = allocated;
@@ -323,5 +323,7 @@ public:
 
 		delete[] old_data;
 		ht_memory -= old_allocated * sizeof(item_t);
+
+		return true;
 	}
 };
