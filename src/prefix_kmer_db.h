@@ -5,8 +5,10 @@
 
 struct HashtableAdditionTask {
 	int block_id;
+	size_t lo;
+	size_t hi;
 	const std::vector<kmer_t>* kmers;
-	const std::vector<size_t>* ranges;
+	//const std::vector<size_t>* ranges;
 };
 
 

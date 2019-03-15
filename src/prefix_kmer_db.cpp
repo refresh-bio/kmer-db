@@ -84,8 +84,8 @@ void PrefixKmerDb::hashtableJob() {
 			// determine ranges
 			const std::vector<kmer_t>& kmers = *(task.kmers);
 
-			size_t lo = (*task.ranges)[task.block_id];
-			size_t hi = (*task.ranges)[task.block_id + 1];
+			size_t lo = task.lo;
+			size_t hi = task.hi;
 
 			if (lo != hi) {
 
@@ -181,60 +181,54 @@ void PrefixKmerDb::patternJob() {
 
 		if (this->queues.patternExtension.Pop(task)) {
 			LOG_DEBUG << "Block " << task.block_id << " started" << endl;
-			
+			threadPatterns[task.block_id].clear();
+			threadPatterns[task.block_id].reserve(task.ranges->back());
+
 			size_t lo = (*task.ranges)[task.block_id];
 			size_t hi = (*task.ranges)[task.block_id + 1];
+			int64_t deltaSize = 0; // get current pattern memory size (atomic)
 
-			if (lo != hi) {
+			for (size_t i = lo; i < hi;) {
+				size_t j;
+				auto p_id = samplePatterns[i].first.pattern_id;
 
-				threadPatterns[task.block_id].clear();
-				threadPatterns[task.block_id].reserve(task.ranges->back());
-
-
-				int64_t deltaSize = 0; // get current pattern memory size (atomic)
-
-				for (size_t i = lo; i < hi;) {
-					size_t j;
-					auto p_id = samplePatterns[i].first.pattern_id;
-
-					// count k-mers from current sample with considered template 
-					for (j = i + 1; j < hi; ++j) {
-						if (p_id != samplePatterns[j].first.pattern_id) {
-							break;
-						}
+				// count k-mers from current sample with considered template 
+				for (j = i + 1; j < hi; ++j) {
+					if (p_id != samplePatterns[j].first.pattern_id) {
+						break;
 					}
-					size_t pid_count = j - i;
+				}
+				size_t pid_count = j - i;
 
-					if (patterns[p_id].get_num_kmers() == pid_count && !patterns[p_id].get_is_parrent()) {
-						// Extend pattern - all k-mers with considered template exist in the analyzed sample
-						deltaSize -= patterns[p_id].get_bytes();
-						patterns[p_id].expand((sample_id_t)(task.sample_id));
-						deltaSize += patterns[p_id].get_bytes();
-					}
-					else
-					{
-						// Generate new template 
-						pattern_id_t local_pid = task.new_pid->fetch_add(1);
+				if (patterns[p_id].get_num_kmers() == pid_count && !patterns[p_id].get_is_parrent()) {
+					// Extend pattern - all k-mers with considered template exist in the analyzed sample
+					deltaSize -= patterns[p_id].get_bytes();
+					patterns[p_id].expand((sample_id_t)(task.sample_id));
+					deltaSize += patterns[p_id].get_bytes();
+				}
+				else
+				{
+					// Generate new template 
+					pattern_id_t local_pid = task.new_pid->fetch_add(1);
 
-						threadPatterns[task.block_id].emplace_back(local_pid, pattern_t(patterns[p_id], p_id, task.sample_id, (uint32_t)pid_count));
-						deltaSize += threadPatterns[task.block_id].back().second.get_bytes();
+					threadPatterns[task.block_id].emplace_back(local_pid, pattern_t(patterns[p_id], p_id, task.sample_id, (uint32_t)pid_count));
+					deltaSize += threadPatterns[task.block_id].back().second.get_bytes();
 
-						if (p_id) {
-							patterns[p_id].set_num_kmers(patterns[p_id].get_num_kmers() - pid_count);
-						}
-
-						for (size_t k = i; k < j; ++k) {
-							*(samplePatterns[k].second) = local_pid;
-						}
-
+					if (p_id) {
+						patterns[p_id].set_num_kmers(patterns[p_id].get_num_kmers() - pid_count);
 					}
 
-					i = j;
+					for (size_t k = i; k < j; ++k) {
+						*(samplePatterns[k].second) = local_pid;
+					}
+
 				}
 
-				// update memory statistics (atomic - no sync needed)
-				stats.patternBytes += deltaSize;
+				i = j;
 			}
+
+			// update memory statistics (atomic - no sync needed)
+			stats.patternBytes += deltaSize;
 
 			LOG_DEBUG << "Block " << task.block_id << " finished" << endl;
 			this->semaphore.dec();
@@ -263,46 +257,47 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	stats.hashtableBytes = 0;
 	
 	// prepare tasks
-	size_t num_blocks = num_threads;
+	size_t num_blocks = num_threads * 8;
 	size_t block = n_kmers / num_blocks;
-	std::vector<size_t> ranges(num_blocks + 1, n_kmers);
-	ranges[0] = 0;
-	auto currentIndex = block;
+
+	// prepare tasks
+	std::vector<HashtableAdditionTask> tasks(num_blocks, HashtableAdditionTask{0, 0, n_kmers, &kmers });
+	auto currentHi = 0;
 
 	auto prefix_comparer = [this](kmer_t a, kmer_t b)->bool {
 		return GET_PREFIX_SHIFTED(a) < GET_PREFIX_SHIFTED(b);
 	};
 
-	size_t largestRange = 0;
+	int tid = 0;
+	for (tid = 0; tid < num_blocks && currentHi < n_kmers; ++tid) {
+		// set block id and low bound
+		tasks[tid].block_id = tid;
+		tasks[tid].lo = (tid == 0) ? 0 : tasks[tid - 1].hi;
 
-	for (int tid = 0; tid < num_blocks - 1; ++tid) {
-		auto it = std::upper_bound(
-			kmers.begin() + currentIndex,
-			kmers.end(),
-			*(kmers.begin() + currentIndex - 1),
-			prefix_comparer);
+		currentHi = tasks[tid].lo + block;
 
-		size_t range = it - kmers.begin();
-		ranges[tid + 1] = range;
+		// check if it makes sense to search for upper bound
+		if (currentHi < n_kmers) {
 
-		if (range - ranges[tid] > largestRange) {
-			largestRange = range;
-		}
+			auto it = std::upper_bound(kmers.begin() + currentHi, kmers.end(),
+				*(kmers.begin() + currentHi - 1), prefix_comparer);
 
-		currentIndex = range + block;
-
-		if (currentIndex >= kmers.size()) {
-			break;
-		}
+			tasks[tid].hi = it - kmers.begin();
+		}	
 	}
 
-	stats.hashtableJobsImbalance += (double)largestRange * num_blocks / n_kmers;
+	tasks.resize(tid);
 
-	semaphore.inc(num_blocks);
+	std::stable_sort(tasks.begin(), tasks.end(), [](const HashtableAdditionTask& x, const HashtableAdditionTask& y)->bool {
+		return (x.hi - x.lo) > (y.hi - y.lo);
+	});
 
-	for (int tid = 0; tid < num_blocks; ++tid) {
+	stats.hashtableJobsImbalance += (double)(tasks.front().hi - tasks.front().lo) * num_blocks / n_kmers;
+
+	semaphore.inc(tasks.size());
+	for (int tid = 0; tid < tasks.size(); ++tid) {
 		LOG_DEBUG << "Block " << tid << " scheduled" << endl;
-		queues.hashtableAddition.Push(HashtableAdditionTask{tid, &kmers, &ranges });
+		queues.hashtableAddition.Push(tasks[tid]);
 	}
 
 	semaphore.waitForZero();
@@ -330,10 +325,10 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	std::atomic<size_t> new_pid(patterns.size());
 
 	// calculate ranges
-	std::fill(ranges.begin(), ranges.end(), n_kmers);
+	std::vector<size_t> ranges(num_threads + 1, n_kmers);
 	ranges[0] = 0;
 	block = n_kmers / num_threads;
-	currentIndex = block;
+	currentHi = block;
 
 	auto pid_comparer = [](const std::pair<kmer_or_pattern_t, pattern_id_t*>& a, const std::pair<kmer_or_pattern_t, pattern_id_t*>& b)->bool {
 		return a.first.pattern_id < b.first.pattern_id;
@@ -341,16 +336,16 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 
 	for (int tid = 0; tid < num_threads - 1; ++tid) {
 		auto it = std::upper_bound(
-			samplePatterns.begin() + currentIndex,
+			samplePatterns.begin() + currentHi,
 			samplePatterns.end(),
-			*(samplePatterns.begin() + currentIndex - 1),
+			*(samplePatterns.begin() + currentHi - 1),
 			pid_comparer);
 
 		size_t range = it - samplePatterns.begin();
 		ranges[tid + 1] = range;
-		currentIndex = range + block;
+		currentHi = range + block;
 
-		if (currentIndex >= samplePatterns.size()) {
+		if (currentHi >= samplePatterns.size()) {
 			break;
 		}
 	}
