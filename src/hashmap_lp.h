@@ -50,8 +50,9 @@ public:
 		Value val;
 	} item_t;
 
+	static const Key empty_key = static_cast<Key>(-1);
+
 private:
-	Key empty_key;
 	double max_fill_factor;
 
 	size_t size;
@@ -110,7 +111,7 @@ public:
 
 	// *****************************************************************************************
 	//
-	hash_map_lp() : empty_key((Key)-1)
+	hash_map_lp()
 	{
 		ht_memory = 0;
 		ht_total = 0;
@@ -228,6 +229,16 @@ public:
 
 	// *****************************************************************************************
 	//
+	void insert(Key k, Value v, item_t* place) 
+	{
+		place->key = k;
+		place->val = v;
+		++filled;
+		++size;
+	}
+
+	// *****************************************************************************************
+	//
 	const Value* cfind(Key k) const {
 		return find(k);
 	}
@@ -258,6 +269,19 @@ public:
 		}
 
 		return nullptr;
+	}
+
+
+	// *****************************************************************************************
+	//
+	item_t* find_item(Key k) const
+	{
+		size_t h = my_hasher_lp<Key>(k) & allocated_mask;
+		
+		while (data[h].key != k && data[h].key != empty_key) {
+			h = (h + 1) & allocated_mask;
+		} 
+		return &(data[h]);
 	}
 
 	// *****************************************************************************************

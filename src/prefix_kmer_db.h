@@ -100,9 +100,9 @@ protected:
 	struct {
 		std::chrono::duration<double> hashtableProcess { 0 };
 		
-		std::chrono::duration<double> hashtableResize_worker;
-		std::chrono::duration<double> hashtableFind_worker;
-		std::chrono::duration<double> hashtableAdd_worker;
+		std::chrono::duration<double> hashtableResize_worker{ 0 };
+		std::chrono::duration<double> hashtableFind_worker{ 0 };
+		std::chrono::duration<double> hashtableAdd_worker{ 0 };
 
 
 		std::chrono::duration<double> sort { 0 };
@@ -115,8 +115,6 @@ protected:
 		std::atomic<size_t> patternBytes { 0 };
 
 		double hashtableJobsImbalance{ 0 };
-		
-		//std::vector<int> workerReallocs;
 
 	} stats;
 

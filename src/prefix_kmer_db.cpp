@@ -150,21 +150,20 @@ void PrefixKmerDb::hashtableJob() {
 					}
 #endif
 					// Check whether k-mer exists in a dictionary
-					const auto& ht = hashtables[prefix];
-					pattern_id_t* entry = ht.find(suffix);
+					auto& ht = hashtables[prefix];
+					auto* entry = ht.find_item(suffix);
 
-					if (entry == nullptr) {
-						entry = hashtables[prefix].insert(suffix, 0);
+					if (entry->key == ht.empty_key) {
+						ht.insert(suffix, 0, entry);
 						++to_add;
 					}
 
-					samplePatterns[existing_id].first.pattern_id = *entry;
-					samplePatterns[existing_id].second = entry;
+					samplePatterns[existing_id].first.pattern_id = entry->val;
+					samplePatterns[existing_id].second = &(entry->val);
 					existing_id++;
 				}
 
 				kmersCount += to_add;
-				
 				times.hashtableFind_worker += std::chrono::high_resolution_clock::now() - start;
 			}
 
@@ -386,17 +385,7 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 		for (auto& tp : threadPatterns[tid]) {
 			patterns[tp.first] = std::move(tp.second);
 		}
-
-		// update stats
-/*		int avg = std::accumulate(stats.workerReallocs.begin(), stats.workerReallocs.end(), 0) / num_threads;
-		int avg_diff = *std::max_element(stats.workerReallocs.begin(), stats.workerReallocs.end(), [avg](int a, int b)->bool {
-			return abs(avg - a) < abs(avg - b);
-		});
-		
-		stats.reallocsImbalance += ((double)avg_diff / avg);*/
 	}
-
-
 
 	return sampleId;
 }
