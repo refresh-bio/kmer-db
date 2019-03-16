@@ -181,11 +181,13 @@ void PrefixKmerDb::patternJob() {
 
 		if (this->queues.patternExtension.Pop(task)) {
 			LOG_DEBUG << "Block " << task.block_id << " started" << endl;
-			threadPatterns[task.block_id].clear();
-			threadPatterns[task.block_id].reserve(task.ranges->back());
-
+			
 			size_t lo = (*task.ranges)[task.block_id];
 			size_t hi = (*task.ranges)[task.block_id + 1];
+			
+			threadPatterns[task.block_id].clear();
+			threadPatterns[task.block_id].reserve(hi - lo);
+
 			int64_t deltaSize = 0; // get current pattern memory size (atomic)
 
 			for (size_t i = lo; i < hi;) {
