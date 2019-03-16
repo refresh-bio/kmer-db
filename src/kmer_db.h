@@ -77,6 +77,8 @@ public:
 
 	virtual std::string printDetailedTimes() const = 0;
 
+	virtual std::string printProgress() const = 0;
+
 	
 	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction) {
 		LOG_VERBOSE << "Adding sample " << sampleNames.size() << ": " << sampleName << " (" << kmers.size() << " kmers)" << endl;
@@ -164,6 +166,17 @@ public:
 			kmers[i++] = it->key;
 		}
 		return kmers;
+	}
+
+	std::string printProgress() const override {
+		size_t mega = (1ull << 20);
+		std::ostringstream oss;
+		oss << "HT entries: " << Log::formatLargeNumber(getKmersCount())
+			<< " (" << (getKmersCount() * getHashtableEntrySize() / mega) << " MB, " << (getHashtableBytes() / mega) << " MB res),"
+			<< "\t patterns: " << Log::formatLargeNumber(getPatternsCount())
+			<< " (" << Log::formatLargeNumber(getPatternBytes()) << " B)"
+			<< endl;
+		return oss.str();
 	}
 
 	std::string printStats() const override {

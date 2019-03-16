@@ -2,6 +2,7 @@
 #include "kmer_db.h"
 
 #include <atomic>
+#include <numeric>
 
 struct HashtableAdditionTask {
 	int block_id;
@@ -23,6 +24,15 @@ public:
 
 	size_t getHashtableBytes() const override { return stats.hashtableBytes; };
 
+	size_t getWorkersPatternBytes() const {
+		size_t total;
+		for (const auto& t : threadPatterns) {
+			total += t.capacity() * sizeof(std::pair<pattern_id_t, pattern_t>);
+		}
+		return total;
+
+	}
+
 	size_t getHashtableEntrySize() const override { return sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t); };
 	
 	const std::vector<hash_map_lp<suffix_t, pattern_id_t>>& getHashtables() const { return hashtables; }
@@ -40,6 +50,17 @@ public:
 	void serialize(std::ofstream& file) const override;
 
 	bool deserialize(std::ifstream& file) override;
+
+	std::string printProgress() const override {
+		size_t mega = (1ull << 20);
+		std::ostringstream oss;
+		oss << "HT entries: " << Log::formatLargeNumber(getKmersCount())
+			<< " (" << (getKmersCount() * getHashtableEntrySize() / mega) << " MB, " << (getHashtableBytes() / mega) << " MB res),"
+			<< "\t patterns: " << Log::formatLargeNumber(getPatternsCount())
+			<< " (" << Log::formatLargeNumber(getPatternBytes()) << " B), worker_patterns: " << (getWorkersPatternBytes() / mega) << "MB res"
+			<< endl;
+		return oss.str();
+	}
 
 	std::string printStats() const override {
 		std::ostringstream oss;

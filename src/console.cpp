@@ -48,23 +48,6 @@ const string Params::OPTION_DEBUG = "-vv";
 const string Params::OPTION_THREADS = "-t";
 const string Params::OPTION_BUFFER = "-buffer";
 
-
-// *****************************************************************************************
-//
-void show_progress(const AbstractKmerDb &db)
-{
-	size_t tot_pat_size = 0;
-	size_t num_calc = 0;			
-
-	size_t mega = (1ull << 20);
-
-	LOG_VERBOSE << "HT entries: " << Log::formatLargeNumber(db.getKmersCount())
-		<< " (" << (db.getKmersCount() * db.getHashtableEntrySize() / mega) << " MB, " << (db.getHashtableBytes() / mega) << " MB res),"
-		<< "\t patterns: " << Log::formatLargeNumber(db.getPatternsCount()) 
-		<< " (" << Log::formatLargeNumber(db.getPatternBytes()) << " B)"
-		<< endl;
-}
-
 // *****************************************************************************************
 //
 int Console::parse(int argc, char** argv) {
@@ -272,7 +255,7 @@ int Console::runBuildDatabase(
 		for (const auto& entry : loader.getLoadedTasks()) {
 			auto task = entry.second;
 			db->addKmers(task->sampleName, *task->kmers, task->kmerLength, task->fraction);
-			show_progress(*db);
+			cout << db->printProgress();
 		}
 		
 		loader.getLoadedTasks().clear();
