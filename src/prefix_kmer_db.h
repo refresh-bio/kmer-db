@@ -9,7 +9,14 @@ struct HashtableAdditionTask {
 	size_t lo;
 	size_t hi;
 	const std::vector<kmer_t>* kmers;
-	//const std::vector<size_t>* ranges;
+};
+
+struct PatternTask {
+	int block_id;
+	size_t lo;
+	size_t hi;
+	size_t sample_id;
+	std::atomic<size_t>* new_pid;
 };
 
 
@@ -107,7 +114,7 @@ protected:
 	struct {
 		CRegisteringQueue<HashtableAdditionTask> hashtableAddition{ 1 };
 
-		CRegisteringQueue<PatternExtensionTask> patternExtension{ 1 };
+		CRegisteringQueue<PatternTask> patternExtension{ 1 };
 	} queues;
 
 	// struct for storing workers

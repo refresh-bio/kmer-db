@@ -177,13 +177,13 @@ void PrefixKmerDb::hashtableJob() {
 //
 void PrefixKmerDb::patternJob() {
 	while (!this->queues.patternExtension.IsCompleted()) {
-		PatternExtensionTask task;
+		PatternTask task;
 
 		if (this->queues.patternExtension.Pop(task)) {
 			LOG_DEBUG << "Block " << task.block_id << " started" << endl;
 			
-			size_t lo = (*task.ranges)[task.block_id];
-			size_t hi = (*task.ranges)[task.block_id + 1];
+			size_t lo = task.lo;
+			size_t hi = task.hi;
 			
 			threadPatterns[task.block_id].clear();
 			threadPatterns[task.block_id].reserve(hi - lo);
@@ -263,7 +263,7 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	size_t block = n_kmers / num_blocks;
 
 	// prepare tasks
-	std::vector<HashtableAdditionTask> tasks(num_blocks, HashtableAdditionTask{0, 0, n_kmers, &kmers });
+	std::vector<HashtableAdditionTask> hashtableTasks(num_blocks, HashtableAdditionTask{0, 0, n_kmers, &kmers });
 	auto currentHi = 0;
 
 	auto prefix_comparer = [this](kmer_t a, kmer_t b)->bool {
@@ -273,10 +273,10 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	int tid = 0;
 	for (tid = 0; tid < num_blocks && currentHi < n_kmers; ++tid) {
 		// set block id and low bound
-		tasks[tid].block_id = tid;
-		tasks[tid].lo = (tid == 0) ? 0 : tasks[tid - 1].hi;
+		hashtableTasks[tid].block_id = tid;
+		hashtableTasks[tid].lo = (tid == 0) ? 0 : hashtableTasks[tid - 1].hi;
 
-		currentHi = tasks[tid].lo + block;
+		currentHi = hashtableTasks[tid].lo + block;
 
 		// check if it makes sense to search for upper bound
 		if (currentHi < n_kmers) {
@@ -284,22 +284,22 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 			auto it = std::upper_bound(kmers.begin() + currentHi, kmers.end(),
 				*(kmers.begin() + currentHi - 1), prefix_comparer);
 
-			tasks[tid].hi = it - kmers.begin();
+			hashtableTasks[tid].hi = it - kmers.begin();
 		}	
 	}
 
-	tasks.resize(tid);
+	hashtableTasks.resize(tid);
 
-	std::stable_sort(tasks.begin(), tasks.end(), [](const HashtableAdditionTask& x, const HashtableAdditionTask& y)->bool {
+	std::stable_sort(hashtableTasks.begin(), hashtableTasks.end(), [](const HashtableAdditionTask& x, const HashtableAdditionTask& y)->bool {
 		return (x.hi - x.lo) > (y.hi - y.lo);
 	});
 
-	stats.hashtableJobsImbalance += (double)(tasks.front().hi - tasks.front().lo) * num_blocks / n_kmers;
+	stats.hashtableJobsImbalance += (double)(hashtableTasks.front().hi - hashtableTasks.front().lo) * num_blocks / n_kmers;
 
-	semaphore.inc(tasks.size());
-	for (int tid = 0; tid < tasks.size(); ++tid) {
+	semaphore.inc(hashtableTasks.size());
+	for (int tid = 0; tid < hashtableTasks.size(); ++tid) {
 		LOG_DEBUG << "Block " << tid << " scheduled" << endl;
-		queues.hashtableAddition.Push(tasks[tid]);
+		queues.hashtableAddition.Push(hashtableTasks[tid]);
 	}
 
 	semaphore.waitForZero();
@@ -326,41 +326,41 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	start = std::chrono::high_resolution_clock::now();
 	std::atomic<size_t> new_pid(patterns.size());
 
-	// calculate ranges
-	std::vector<size_t> ranges(num_threads + 1, n_kmers);
-	ranges[0] = 0;
-	block = n_kmers / num_threads;
-	currentHi = block;
+	
+	// prepare tasks
+	num_blocks = num_threads;
+	block = n_kmers / num_blocks;
+	std::vector<PatternTask> patternTasks(num_blocks, PatternTask{ 0, 0, n_kmers, sampleId,  &new_pid});
+	currentHi = 0;
 
 	auto pid_comparer = [](const std::pair<kmer_or_pattern_t, pattern_id_t*>& a, const std::pair<kmer_or_pattern_t, pattern_id_t*>& b)->bool {
 		return a.first.pattern_id < b.first.pattern_id;
 	};
 
-	for (int tid = 0; tid < num_threads - 1; ++tid) {
-		auto it = std::upper_bound(
-			samplePatterns.begin() + currentHi,
-			samplePatterns.end(),
-			*(samplePatterns.begin() + currentHi - 1),
-			pid_comparer);
+	tid = 0;
+	for (tid = 0; tid < num_blocks && currentHi < n_kmers; ++tid) {
+		// set block id and low bound
+		patternTasks[tid].block_id = tid;
+		patternTasks[tid].lo = (tid == 0) ? 0 : patternTasks[tid - 1].hi;
 
-		size_t range = it - samplePatterns.begin();
-		ranges[tid + 1] = range;
-		currentHi = range + block;
+		currentHi = patternTasks[tid].lo + block;
 
-		if (currentHi >= samplePatterns.size()) {
-			break;
+		// check if it makes sense to search for upper bound
+		if (currentHi < n_kmers) {
+
+			auto it = std::upper_bound(samplePatterns.begin() + currentHi, samplePatterns.end(),
+				*(samplePatterns.begin() + currentHi - 1), pid_comparer);
+
+			patternTasks[tid].hi = it - samplePatterns.begin();
 		}
 	}
 
-	// this should never happen
-	if (ranges[num_threads] != n_kmers) {
-		throw std::runtime_error("ERROR in FastKmerDb::addKmers(): Invalid ranges");
-	}
+	patternTasks.resize(tid);
 
-	semaphore.inc(num_threads);
-	for (int tid = 0; tid < num_threads; ++tid) {
+	semaphore.inc(patternTasks.size());
+	for (int tid = 0; tid < patternTasks.size(); ++tid) {
 		LOG_DEBUG << "Block " << tid << " scheduled" << endl;
-		queues.patternExtension.Push(PatternExtensionTask{ tid, sampleId, &ranges, &new_pid, nullptr });
+		queues.patternExtension.Push(patternTasks[tid]);
 	}
 
 	// wait for the task to complete
