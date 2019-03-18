@@ -26,6 +26,11 @@ PrefixKmerDb::PrefixKmerDb(int _num_threads) :
 	patterns.reserve(2 << 20);
 	patterns.push_back(pattern_t());
 
+	threadPatterns.resize(num_threads);
+	for (auto& tp : threadPatterns) { 
+		tp.reserve(2 << 10); 
+	}
+	
 	workers.hashtableAddition.resize(num_threads);
 	workers.patternExtension.resize(num_threads);
 
@@ -182,6 +187,7 @@ void PrefixKmerDb::patternJob() {
 			size_t addedId = lo;
 			sample_id_t sampleId = (sample_id_t)(task->sample_id);
 			
+			threadPatterns[task->block_id].clear();
 			int64_t deltaSize = 0; // get current pattern memory size (atomic)
 
 			for (size_t i = lo; i < hi;) {
@@ -207,8 +213,8 @@ void PrefixKmerDb::patternJob() {
 					// Generate new template 
 					pattern_id_t local_pid = task->new_pid->fetch_add(1);
 
-					threadPatterns[addedId] = { local_pid, pattern_t(patterns[p_id], p_id, sampleId, (uint32_t)pid_count) };
-					deltaSize += threadPatterns[addedId++].second.get_bytes();
+					threadPatterns[task->block_id].emplace_back( local_pid, pattern_t(patterns[p_id], p_id, sampleId, (uint32_t)pid_count) );
+					deltaSize += threadPatterns[task->block_id].back().second.get_bytes();
 
 					if (p_id) {
 						patterns[p_id].set_num_kmers(patterns[p_id].get_num_kmers() - pid_count);
@@ -225,7 +231,6 @@ void PrefixKmerDb::patternJob() {
 
 			// update memory statistics (atomic - no sync needed)
 			stats.patternBytes += deltaSize;
-			task->addedHi = addedId;
 
 			LOG_DEBUG << "Block " << task->block_id << " finished" << endl;
 			this->semaphore.dec();
@@ -324,7 +329,7 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	// prepare tasks
 	num_blocks = num_threads;
 	block = n_kmers / num_blocks;
-	std::vector<PatternTask> patternTasks(num_blocks, PatternTask{ 0, 0, n_kmers, 0, sampleId, &new_pid});
+	std::vector<PatternTask> patternTasks(num_blocks, PatternTask{ 0, 0, n_kmers, sampleId, &new_pid});
 	currentHi = 0;
 
 	auto pid_comparer = [](const std::pair<kmer_or_pattern_t, pattern_id_t*>& a, const std::pair<kmer_or_pattern_t, pattern_id_t*>& b)->bool {
@@ -350,10 +355,6 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	}
 
 	patternTasks.resize(tid);
-	
-	if (threadPatterns.size() < n_kmers) {
-		threadPatterns.resize(n_kmers);
-	}
 
 	semaphore.inc(patternTasks.size());
 	for (int tid = 0; tid < patternTasks.size(); ++tid) {
@@ -376,9 +377,8 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 
 	patterns.resize(new_pid);
 
-	for (auto& pt : patternTasks) {
-		for (size_t i = pt.lo; i < pt.addedHi; ++i) {
-			auto& tp = threadPatterns[i];
+	for (int tid = 0; tid < num_threads; ++tid) {
+		for (auto& tp : threadPatterns[tid]) {
 			patterns[tp.first] = std::move(tp.second);
 		}
 	}
