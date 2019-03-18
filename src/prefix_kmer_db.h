@@ -32,7 +32,7 @@ public:
 	size_t getHashtableBytes() const override { return stats.hashtableBytes; };
 
 	size_t getWorkersPatternBytes() const {
-		size_t total;
+		size_t total = 0;
 		for (const auto& t : threadPatterns) {
 			total += t.capacity() * sizeof(std::pair<pattern_id_t, pattern_t>);
 		}
@@ -112,9 +112,9 @@ protected:
 
 	// struct for storing queues
 	struct {
-		CRegisteringQueue<HashtableAdditionTask*> hashtableAddition{ 1 };
+		CRegisteringQueue<HashtableAdditionTask> hashtableAddition{ 1 };
 
-		CRegisteringQueue<PatternTask*> patternExtension{ 1 };
+		CRegisteringQueue<PatternTask> patternExtension{ 1 };
 	} queues;
 
 	// struct for storing workers
