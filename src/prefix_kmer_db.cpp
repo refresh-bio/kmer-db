@@ -26,11 +26,6 @@ PrefixKmerDb::PrefixKmerDb(int _num_threads) :
 	patterns.reserve(2 << 20);
 	patterns.push_back(pattern_t());
 
-	threadPatterns.resize(num_threads);
-	for (auto& tp : threadPatterns) { 
-		tp.reserve(2 << 20); 
-	}
-	
 	workers.hashtableAddition.resize(num_threads);
 	workers.patternExtension.resize(num_threads);
 
@@ -78,14 +73,14 @@ void PrefixKmerDb::initialize(uint32_t kmerLength, double fraction) {
 void PrefixKmerDb::hashtableJob() {
 
 	while (!this->queues.hashtableAddition.IsCompleted()) {
-		HashtableAdditionTask task;
+		HashtableAdditionTask* task;
 
 		if (this->queues.hashtableAddition.Pop(task)) {
 			// determine ranges
-			const std::vector<kmer_t>& kmers = *(task.kmers);
+			const std::vector<kmer_t>& kmers = *(task->kmers);
 
-			size_t lo = task.lo;
-			size_t hi = task.hi;
+			size_t lo = task->lo;
+			size_t hi = task->hi;
 
 			if (lo != hi) {
 
@@ -123,7 +118,7 @@ void PrefixKmerDb::hashtableJob() {
 
 				times.hashtableResize_worker += std::chrono::high_resolution_clock::now() - start;
 
-				LOG_DEBUG << "Block: " << task.block_id << ", lo_prefix: " << lo_prefix << ", hi_prefix: " << hi_prefix << endl << flush;
+				LOG_DEBUG << "Block: " << task->block_id << ", lo_prefix: " << lo_prefix << ", hi_prefix: " << hi_prefix << endl << flush;
 
 				start = std::chrono::high_resolution_clock::now();
 
@@ -177,17 +172,16 @@ void PrefixKmerDb::hashtableJob() {
 //
 void PrefixKmerDb::patternJob() {
 	while (!this->queues.patternExtension.IsCompleted()) {
-		PatternTask task;
+		PatternTask* task;
 
 		if (this->queues.patternExtension.Pop(task)) {
-			LOG_DEBUG << "Block " << task.block_id << " started" << endl;
+			LOG_DEBUG << "Block " << task->block_id << " started" << endl;
 			
-			size_t lo = task.lo;
-			size_t hi = task.hi;
+			size_t lo = task->lo;
+			size_t hi = task->hi;
+			size_t addedId = lo;
+			sample_id_t sampleId = (sample_id_t)(task->sample_id);
 			
-			threadPatterns[task.block_id].clear();
-			threadPatterns[task.block_id].reserve(hi - lo);
-
 			int64_t deltaSize = 0; // get current pattern memory size (atomic)
 
 			for (size_t i = lo; i < hi;) {
@@ -205,16 +199,16 @@ void PrefixKmerDb::patternJob() {
 				if (patterns[p_id].get_num_kmers() == pid_count && !patterns[p_id].get_is_parrent()) {
 					// Extend pattern - all k-mers with considered template exist in the analyzed sample
 					deltaSize -= patterns[p_id].get_bytes();
-					patterns[p_id].expand((sample_id_t)(task.sample_id));
+					patterns[p_id].expand(sampleId);
 					deltaSize += patterns[p_id].get_bytes();
 				}
 				else
 				{
 					// Generate new template 
-					pattern_id_t local_pid = task.new_pid->fetch_add(1);
+					pattern_id_t local_pid = task->new_pid->fetch_add(1);
 
-					threadPatterns[task.block_id].emplace_back(local_pid, pattern_t(patterns[p_id], p_id, task.sample_id, (uint32_t)pid_count));
-					deltaSize += threadPatterns[task.block_id].back().second.get_bytes();
+					threadPatterns[addedId] = { local_pid, pattern_t(patterns[p_id], p_id, sampleId, (uint32_t)pid_count) };
+					deltaSize += threadPatterns[addedId++].second.get_bytes();
 
 					if (p_id) {
 						patterns[p_id].set_num_kmers(patterns[p_id].get_num_kmers() - pid_count);
@@ -231,8 +225,9 @@ void PrefixKmerDb::patternJob() {
 
 			// update memory statistics (atomic - no sync needed)
 			stats.patternBytes += deltaSize;
+			task->addedHi = addedId;
 
-			LOG_DEBUG << "Block " << task.block_id << " finished" << endl;
+			LOG_DEBUG << "Block " << task->block_id << " finished" << endl;
 			this->semaphore.dec();
 		}
 	}
@@ -298,13 +293,13 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 
 	semaphore.inc(hashtableTasks.size());
 	for (int tid = 0; tid < hashtableTasks.size(); ++tid) {
-		LOG_DEBUG << "Block " << tid << " scheduled" << endl;
-		queues.hashtableAddition.Push(hashtableTasks[tid]);
+		LOG_DEBUG << "Hashtable job " << tid << " scheduled" << endl;
+		queues.hashtableAddition.Push(&hashtableTasks[tid]);
 	}
 
 	semaphore.waitForZero();
 	times.hashtableProcess += std::chrono::high_resolution_clock::now() - start;
-
+	
 #ifdef _DEBUG
 	uint32_t histoSum = std::accumulate(prefixHistogram.begin(), prefixHistogram.end(), 0);
 	if (histoSum != kmers.size()) {
@@ -326,11 +321,10 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	start = std::chrono::high_resolution_clock::now();
 	std::atomic<size_t> new_pid(patterns.size());
 
-	
 	// prepare tasks
 	num_blocks = num_threads;
 	block = n_kmers / num_blocks;
-	std::vector<PatternTask> patternTasks(num_blocks, PatternTask{ 0, 0, n_kmers, sampleId,  &new_pid});
+	std::vector<PatternTask> patternTasks(num_blocks, PatternTask{ 0, 0, n_kmers, 0, sampleId, &new_pid});
 	currentHi = 0;
 
 	auto pid_comparer = [](const std::pair<kmer_or_pattern_t, pattern_id_t*>& a, const std::pair<kmer_or_pattern_t, pattern_id_t*>& b)->bool {
@@ -356,11 +350,15 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	}
 
 	patternTasks.resize(tid);
+	
+	if (threadPatterns.size() < n_kmers) {
+		threadPatterns.resize(n_kmers);
+	}
 
 	semaphore.inc(patternTasks.size());
 	for (int tid = 0; tid < patternTasks.size(); ++tid) {
-		LOG_DEBUG << "Block " << tid << " scheduled" << endl;
-		queues.patternExtension.Push(patternTasks[tid]);
+		LOG_DEBUG << "Pattern job " << tid << " scheduled" << endl;
+		queues.patternExtension.Push(&patternTasks[tid]);
 	}
 
 	// wait for the task to complete
@@ -369,7 +367,7 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 
 	//--------------------------------------------------------------------------
 	// patterns insertion
-	LOG_DEBUG << "Inserting patterns (serial)..." << endl;
+	LOG_DEBUG << "Moving patterns to global collection (serial)..." << endl;
 	
 	// extend by 1.5 on reallocation
 	if (patterns.capacity() < new_pid) {
@@ -378,8 +376,9 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 
 	patterns.resize(new_pid);
 
-	for (int tid = 0; tid < num_threads; ++tid) {
-		for (auto& tp : threadPatterns[tid]) {
+	for (auto& pt : patternTasks) {
+		for (size_t i = pt.lo; i < pt.addedHi; ++i) {
+			auto& tp = threadPatterns[i];
 			patterns[tp.first] = std::move(tp.second);
 		}
 	}

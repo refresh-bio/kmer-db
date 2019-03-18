@@ -15,6 +15,7 @@ struct PatternTask {
 	int block_id;
 	size_t lo;
 	size_t hi;
+	size_t addedHi;
 	size_t sample_id;
 	std::atomic<size_t>* new_pid;
 };
@@ -31,14 +32,8 @@ public:
 
 	size_t getHashtableBytes() const override { return stats.hashtableBytes; };
 
-	size_t getWorkersPatternBytes() const {
-		size_t total;
-		for (const auto& t : threadPatterns) {
-			total += t.capacity() * sizeof(std::pair<pattern_id_t, pattern_t>);
-		}
-		return total;
-
-	}
+	size_t getWorkersPatternBytes() const { return threadPatterns.capacity() * sizeof(std::pair<pattern_id_t, pattern_t>); }
+		
 
 	size_t getHashtableEntrySize() const override { return sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t); };
 	
@@ -105,16 +100,16 @@ protected:
 
 	std::vector<pattern_t> patterns;
 
-	std::vector<std::vector<std::pair<pattern_id_t, pattern_t>>> threadPatterns;
+	std::vector<std::pair<pattern_id_t, pattern_t>> threadPatterns;
 
 	// first element - pattern id, second element - ht table entry
 	aligned_vector<std::pair<kmer_or_pattern_t, pattern_id_t*>> samplePatterns;
 
 	// struct for storing queues
 	struct {
-		CRegisteringQueue<HashtableAdditionTask> hashtableAddition{ 1 };
+		CRegisteringQueue<HashtableAdditionTask*> hashtableAddition{ 1 };
 
-		CRegisteringQueue<PatternTask> patternExtension{ 1 };
+		CRegisteringQueue<PatternTask*> patternExtension{ 1 };
 	} queues;
 
 	// struct for storing workers
