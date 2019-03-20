@@ -59,13 +59,18 @@ public:
 	bool deserialize(std::ifstream& file) override;
 
 	std::string printProgress() const override {
-		size_t mega = (1ull << 20);
 		std::ostringstream oss;
+
+		size_t otherBytes =
+			prefixHistogram.capacity() * sizeof(uint32_t) +
+			hashtables.capacity() * sizeof(hash_map_lp<suffix_t, pattern_id_t>) +
+			samplePatterns.get_bytes();
+	
 		oss << "HT entries: " << Log::formatLargeNumber(getKmersCount())
-			<< " (" << (getKmersCount() * getHashtableEntrySize() / mega) << " MB, " << (getHashtableBytes() / mega) << " MB res),"
+			<< " (" << ((getKmersCount() * getHashtableEntrySize()) >> 20) << " MB, " << (getHashtableBytes() >> 20) << " MB res),"
 			<< "\t patterns: " << Log::formatLargeNumber(getPatternsCount())
-			<< " (" << Log::formatLargeNumber(getPatternBytes()) << " B), worker_patterns: " << (getWorkersPatternBytes() / mega) << " MB res"
-			<< endl;
+			<< " (" << Log::formatLargeNumber(getPatternBytes()) << " B), worker_patterns: " << (getWorkersPatternBytes() >> 20) << " MB res, "
+			<< " other: " << (otherBytes >> 20) << " MB";
 		return oss.str();
 	}
 

@@ -15,6 +15,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include <memory>
 #include <map>
 #include <fstream>
+#include <sstream>
 
 // *****************************************************************************************
 //
@@ -83,6 +84,14 @@ public:
 	
 	}
 
+	size_t getBytes() {
+		size_t mem = 0;
+		for (const auto& col : kmersCollections) {
+			mem += col.capacity() * sizeof(kmer_t);
+		}
+		
+		return mem;
+	}
 	
 private:
 	

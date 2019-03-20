@@ -49,6 +49,10 @@ template<typename T, unsigned ALIGNMENT = 4096> class aligned_vector
 public:
 	typedef T value_type;
 
+	size_t get_bytes() const {
+		return data_allocated * sizeof(T) + ALIGNMENT;
+	}
+
 	// *****************************************************************************************
 	//
 	aligned_vector(size_t _data_size = 0) : data_size(_data_size), data_aligned(nullptr), data_raw(nullptr)

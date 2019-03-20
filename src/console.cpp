@@ -252,10 +252,12 @@ int Console::runBuildDatabase(
 			break;
 		}
 		
+		LOG_VERBOSE << "Loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl;
+
 		for (const auto& entry : loader.getLoadedTasks()) {
 			auto task = entry.second;
 			db->addKmers(task->sampleName, *task->kmers, task->kmerLength, task->fraction);
-			cout << db->printProgress();
+			cout << db->printProgress() << endl;
 		}
 		
 		loader.getLoadedTasks().clear();
