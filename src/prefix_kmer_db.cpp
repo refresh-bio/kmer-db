@@ -329,12 +329,15 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	// prepare tasks
 	num_blocks = num_threads;
 	block = n_kmers / num_blocks;
-	std::vector<PatternTask> patternTasks(num_blocks, PatternTask{ 0, 0, n_kmers, sampleId, &new_pid});
-	currentHi = 0;
+	std::vector<PatternTask> patternTasks(num_blocks, PatternTask{ 0, n_kmers, n_kmers, sampleId, &new_pid});
+	patternTasks[0].lo = 0;
 
 	auto pid_comparer = [](const std::pair<kmer_or_pattern_t, pattern_id_t*>& a, const std::pair<kmer_or_pattern_t, pattern_id_t*>& b)->bool {
 		return a.first.pattern_id < b.first.pattern_id;
 	};
+
+	/*
+	currentHi = 0;
 
 	tid = 0;
 	for (tid = 0; tid < num_blocks && currentHi < n_kmers; ++tid) {
@@ -355,6 +358,31 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	}
 
 	patternTasks.resize(tid);
+
+	*/
+
+	auto currentIndex = block;
+	for (int tid = 0; tid < num_blocks - 1; ++tid) {
+		auto it = std::upper_bound(
+			samplePatterns.begin() + currentIndex,
+			samplePatterns.end(),
+			*(samplePatterns.begin() + currentIndex - 1),
+			pid_comparer);
+
+		size_t range = it - samplePatterns.begin();
+
+		patternTasks[tid + 1].lo = patternTasks[tid].hi = range;
+		patternTasks[tid + 1].block_id = tid + 1;
+		currentIndex = range + block;
+
+		if (currentIndex >= samplePatterns.size()) {
+			break;
+		}
+	}
+
+	patternTasks.erase(
+		std::find_if(patternTasks.begin(), patternTasks.end(), [](const PatternTask& t)->bool { return t.hi == t.lo;  }),
+		patternTasks.end());
 
 	semaphore.inc(patternTasks.size());
 	for (int tid = 0; tid < patternTasks.size(); ++tid) {
