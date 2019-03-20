@@ -324,7 +324,7 @@ bool KmcInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& posit
 		return GET_PREFIX_SHIFTED(a) < GET_PREFIX_SHIFTED(b);
 	};
 
-	std::sort(kmers.begin(), kmers.end(), prefix_comparer);
+	std::sort(kmers.begin(), kmers.end());
 	
 	filterValue = ((double)kmers.size() / _total_kmers); // this may differ from theoretical
 	LOG_DEBUG << "Filter passed: " << kmers.size() << "/" << _total_kmers << "(" << filterValue << ")" << endl;

@@ -69,9 +69,19 @@ public:
 
 	void configure(const std::string& multipleKmcSamples);
 	void initPrefetch();
-	void waitForPrefetch() { prefetcherSemaphore.waitForZero();  }
+	void waitForPrefetch() { 
+		LOG_VERBOSE << "Waiting for prefetch" << std::endl;
+		prefetcherSemaphore.waitForZero();
+		LOG_VERBOSE << "Prefetch finished" << std::endl;
+	}
+	
 	void initLoad();
-	void waitForLoad() { readerSemaphore.waitForZero();  }
+	void waitForLoad() { 
+		LOG_VERBOSE << "Waiting for load" << std::endl;
+		readerSemaphore.waitForZero(); 
+		LOG_VERBOSE << "Load finished" << std::endl;
+	
+	}
 
 	
 private:

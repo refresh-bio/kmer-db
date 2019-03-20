@@ -290,7 +290,7 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 
 	hashtableTasks.resize(tid);
 
-	std::stable_sort(hashtableTasks.begin(), hashtableTasks.end(), [](const HashtableAdditionTask& x, const HashtableAdditionTask& y)->bool {
+	std::sort(hashtableTasks.begin(), hashtableTasks.end(), [](const HashtableAdditionTask& x, const HashtableAdditionTask& y)->bool {
 		return (x.hi - x.lo) > (y.hi - y.lo);
 	});
 

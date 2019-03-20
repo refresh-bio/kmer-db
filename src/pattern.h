@@ -17,6 +17,26 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 
 
 
+class pattern_minimal_t {
+private:
+	int64_t num_kmers;			// number of kmers with this pattern
+	int64_t parent_id;			// parrent pattern id
+
+	sample_id_t num_samples;	// number of samples in current node and its parents (cannot be larger than sample id)	
+/*
+	pattern_minimal_t(pattern_t &v, int64_t parent_id, uint64_t num_kmers) :
+		num_kmers(num_kmers), parent_id(-1), num_samples(v.num_samples + 1)
+	{
+		if (v.num_samples > 0) {
+			v.is_parent = true;
+			this->parent_id = parent_id;
+		}
+	}
+*/
+};
+
+
+
 // *****************************************************************************************
 //
 class pattern_t {
@@ -94,6 +114,17 @@ public:
 		}
 	}
 
+
+	// *****************************************************************************************
+	//
+/*	void from_minimal(const pattern_minimal_t& ref, sample_id_t sample_id) {
+		this->num_kmers = ref.num_kmers;
+		this->parent_id = ref.parent_id;
+		this->num_samples = ref.num_samples;
+		this->last_sample_id = sample_id;
+		this->num_local_samples = 1;
+	}
+*/
 	// *****************************************************************************************
 	//
 	pattern_t(const pattern_t &v) = delete;
