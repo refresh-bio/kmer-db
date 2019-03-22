@@ -90,19 +90,15 @@ public:
 
 private:
 
-	static const int READER_QUEUE_SIZE = 4;
+	int numThreads;
 
-	static const int BUFFERS_COUNT = 8;
+	bool storePositions;
 
 	InputFile::Format inputFormat;
-
-	int numThreads;
 
 	int numFiles;
 
 	uint32_t kmerLength;
-
-	bool storePositions;
 
 	std::thread prefetcher;
 
@@ -116,7 +112,7 @@ private:
 	struct {
 		RegisteringQueue<std::shared_ptr<TaskEx>> input{ 1 };
 
-		RegisteringQueue<std::shared_ptr<TaskEx>> readers{ 1, READER_QUEUE_SIZE };
+		RegisteringQueue<std::shared_ptr<TaskEx>> readers{ 1 };
 
 		RegisteringQueue<int> freeBuffers{ 1 };
 

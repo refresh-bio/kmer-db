@@ -232,7 +232,7 @@ int Console::runBuildDatabase(
 
 	auto filter = std::make_shared<MinHashFilter>(filterValue, kmerLength);
 
-	LoaderEx loader(filter, inputFormat, 4);
+	LoaderEx loader(filter, inputFormat, numThreads / 2);
 	int numSamples = loader.configure(multipleSamples);
 
 	LOG_DEBUG << "Starting loop..." << endl;

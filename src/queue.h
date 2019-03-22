@@ -91,11 +91,14 @@ template<typename T> class RegisteringQueue
 	condition_variable cv_queue_empty;
 
 public:
+
+
+
 	// *****************************************************************************************
 	//
-	RegisteringQueue(int _n_producers, int size = 0) : size(size)
+	RegisteringQueue(int _n_producers, int size = 0)
 	{
-		Restart(_n_producers);
+		Restart(_n_producers, size);
 	};
 
 	// *****************************************************************************************
@@ -105,13 +108,14 @@ public:
 
 	// *****************************************************************************************
 	//
-	void Restart(int _n_producers)
+	void Restart(int _n_producers, int size = 0)
 	{
 		unique_lock<mutex> lck(mtx);
 
 		is_completed = false;
 		n_producers  = _n_producers;
 		n_elements = 0;
+		this->size = size;
 	}
 
 	// *****************************************************************************************

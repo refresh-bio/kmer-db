@@ -25,13 +25,16 @@ LoaderEx::LoaderEx(
 	numThreads(_num_threads > 0 ? _num_threads : std::thread::hardware_concurrency()),
 	inputFormat(inputFormat),
 	storePositions(storePositions)
+
 {
 	readers.resize(numThreads);
+	int buffersCount = std::max(numThreads, 8);
+
+	queues.readers.Restart(1, buffersCount);
+	kmersCollections.resize(buffersCount);
+	positionsCollections.resize(buffersCount);
 	
-	kmersCollections.resize(BUFFERS_COUNT);
-	positionsCollections.resize(BUFFERS_COUNT);
-	
-	for (int id = 0; id < BUFFERS_COUNT; ++id) {
+	for (int id = 0; id < kmersCollections.size(); ++id) {
 		queues.freeBuffers.Push(id);
 		kmersCollections[id].reserve(10000000);
 		if (storePositions) {
