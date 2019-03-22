@@ -156,10 +156,10 @@ public:
 		filled = 0;
 		for (size_t i = 0; i < allocated; ++i)
 		{
-			if (i % (1 << 15) == 0)
+	/*		if (i % (1 << 15) == 0)
 			{
 				LOG_DEBUG << "Clear: " << i << " from " << allocated << std::endl;
-			}
+			} */
 			data[i].key = empty_key;
 		}
 	}
@@ -174,7 +174,7 @@ public:
 		int n_threads = std::thread::hardware_concurrency();
 		std::vector<std::thread> threads(n_threads);
 
-		LOG_DEBUG << "Clearing hashtable (parallel)...";
+		//LOG_DEBUG << "Clearing hashtable (parallel)...";
 
 		for (int tid = 0; tid < n_threads; ++tid) {
 			threads[tid] = std::thread([tid, n_threads, this] {
@@ -196,7 +196,6 @@ public:
 			t.join();
 		}
 
-		LOG_DEBUG << std::endl;
 	}
 
 	// *****************************************************************************************
@@ -314,23 +313,23 @@ public:
 		item_t *old_data = data;
 		size_t old_allocated = allocated;
 
-		LOG_DEBUG << "reserve_for_additional - in\n";
+	//	LOG_DEBUG << "reserve_for_additional - in\n";
 		while (filled + n_elems > allocated * max_fill_factor)
 			allocated *= 2;
 
-		LOG_DEBUG << "reserve_for_additional - new_size: " << allocated << std::endl;
+	//	LOG_DEBUG << "reserve_for_additional - new_size: " << allocated << std::endl;
 
 		allocated_mask = allocated - 1ull;
 		allocated_mask2 = allocated_mask >> 1;
 		size_when_restruct = (size_t)(allocated * max_fill_factor);
 
-		LOG_NORMAL << "\n--- Realloc to: " << allocated << "..." << std::endl;
+	//	LOG_NORMAL << "\n--- Realloc to: " << allocated << "..." << std::endl;
 
 		data = new item_t[allocated];
-		LOG_DEBUG << "reserve_for_additional - after new: " << allocated << std::endl;
+	//	LOG_DEBUG << "reserve_for_additional - after new: " << allocated << std::endl;
 
 		parallel_clear();
-		LOG_DEBUG << "reserve_for_additional - after clear: " << allocated << std::endl;
+	//	LOG_DEBUG << "reserve_for_additional - after clear: " << allocated << std::endl;
 
 		ht_memory += allocated * sizeof(item_t);
 
@@ -341,7 +340,7 @@ public:
 
 			if (i % (1 << 15) == 0)
 			{
-				LOG_DEBUG << "Inserted (restr.): " << i << std::endl;
+	//			LOG_DEBUG << "Inserted (restr.): " << i << std::endl;
 			}
 		}
 

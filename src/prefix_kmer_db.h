@@ -117,9 +117,9 @@ protected:
 
 	// struct for storing queues
 	struct {
-		CRegisteringQueue<HashtableAdditionTask> hashtableAddition{ 1 };
+		RegisteringQueue<HashtableAdditionTask> hashtableAddition{ 1 };
 
-		CRegisteringQueue<PatternTask> patternExtension{ 1 };
+		RegisteringQueue<PatternTask> patternExtension{ 1 };
 	} queues;
 
 	// struct for storing workers

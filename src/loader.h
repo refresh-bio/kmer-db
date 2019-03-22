@@ -121,11 +121,11 @@ private:
 
 	std::mutex outputMutex;
 
-	CRegisteringQueue<std::shared_ptr<Task>> readerQueue{ 1 };
+	RegisteringQueue<std::shared_ptr<Task>> readerQueue{ 1 };
 	
-	CRegisteringQueue<std::shared_ptr<Task>> prefetcherQueue{ 1 };
+	RegisteringQueue<std::shared_ptr<Task>> prefetcherQueue{ 1 };
 
-	CRegisteringQueue<std::shared_ptr<Task>> intermediateQueue{ 1 };
+	RegisteringQueue<std::shared_ptr<Task>> intermediateQueue{ 1 };
 
 	std::map<size_t, std::shared_ptr<Task>> loadedTasks;
 };

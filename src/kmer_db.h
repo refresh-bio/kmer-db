@@ -81,7 +81,7 @@ public:
 
 	
 	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction) {
-		LOG_VERBOSE << "Adding sample " << sampleNames.size() << ": " << sampleName << " (" << kmers.size() << " kmers)" << endl;
+		LOG_VERBOSE << "Adding sample " << sampleNames.size() + 1 << ": " << sampleName << " (" << kmers.size() << " kmers)" << endl;
 		
 		if (!isInitialized) {
 			initialize(kmerLength, fraction);
@@ -229,9 +229,9 @@ protected:
 	// first element - pattern id, second element - ht table entry
 	aligned_vector<std::pair<pattern_id_t, pattern_id_t*>> samplePatterns;
 
-	CRegisteringQueue<DictionarySearchTask> dictionarySearchQueue;
+	RegisteringQueue<DictionarySearchTask> dictionarySearchQueue;
 	
-	CRegisteringQueue<PatternExtensionTask> patternExtensionQueue;
+	RegisteringQueue<PatternExtensionTask> patternExtensionQueue;
 
 	std::vector<std::thread> dictionarySearchWorkers;
 

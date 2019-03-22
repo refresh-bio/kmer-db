@@ -18,6 +18,7 @@
     <ClCompile Include="analyzer.cpp" />
     <ClCompile Include="similarity_calculator.cpp" />
     <ClCompile Include="prefix_kmer_db.cpp" />
+    <ClCompile Include="loader_ex.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="aligned_vector.h" />
@@ -45,5 +46,6 @@
     <ClInclude Include="similarity_calculator.h" />
     <ClInclude Include="prefix_kmer_db.h" />
     <ClInclude Include="types.h" />
+    <ClInclude Include="loader_ex.h" />
   </ItemGroup>
 </Project>

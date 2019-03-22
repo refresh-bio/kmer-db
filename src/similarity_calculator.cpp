@@ -59,16 +59,16 @@ void SimilarityCalculator::operator()(PrefixKmerDb& db, LowerTriangularMatrix<ui
 	for (int i = no_ranges - 1; i >= 0; --i)
 		v_range_ids.push_back(i);
 
-	CRegisteringQueue<int> tasks_matrix_queue(1);
+	RegisteringQueue<int> tasks_matrix_queue(1);
 	Semaphore semaphore_matrix;
 	std::atomic<uint64_t> numAdditions(0);
 
 	// ranges of patterns to decompress
 	std::vector<int> v_range_patterns(no_ranges + 1);
-	CRegisteringQueue<pair<int, uint32_t>> tasks_decomp_queue(1);
+	RegisteringQueue<pair<int, uint32_t>> tasks_decomp_queue(1);
 	Semaphore semaphore_decomp;
 
-	CRegisteringQueue<int> tasks_sample2patterns_queue(1);
+	RegisteringQueue<int> tasks_sample2patterns_queue(1);
 	Semaphore semaphore_sample2patterns;
 
 	Semaphore semaphore_hist_first;		// semaphore for first stage in histogram calculation
@@ -76,7 +76,7 @@ void SimilarityCalculator::operator()(PrefixKmerDb& db, LowerTriangularMatrix<ui
 
 	int no_hist_parts = num_threads * 1;
 	std::vector<std::vector<int>> hist_sample_ids(no_hist_parts, std::vector<int>(samples_count, 0));
-	CRegisteringQueue<int> tasks_histogram_queue(1);
+	RegisteringQueue<int> tasks_histogram_queue(1);
 	std::vector<int> hist_boundary_values(num_threads, 0);
 	std::vector<pair<int, uint32_t>> v_tmp;
 	std::vector<int> v_tmp_int;

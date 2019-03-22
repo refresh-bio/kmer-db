@@ -171,6 +171,7 @@
     <ClInclude Include="kmc_api\mmer.h" />
     <ClInclude Include="kmer_extract.h" />
     <ClInclude Include="loader.h" />
+    <ClInclude Include="loader_ex.h" />
     <ClInclude Include="log.h" />
     <ClInclude Include="parallel_sorter.h" />
     <ClInclude Include="pattern.h" />
@@ -191,6 +192,7 @@
     <ClCompile Include="kmc_file_wrapper.cpp" />
     <ClCompile Include="kmer_db.cpp" />
     <ClCompile Include="loader.cpp" />
+    <ClCompile Include="loader_ex.cpp" />
     <ClCompile Include="log.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="parallel_sorter.cpp" />

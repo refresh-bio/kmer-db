@@ -25,6 +25,7 @@ OBJS := $(KMER_DB_MAIN_DIR)/kmer_db.o \
 	$(KMER_DB_MAIN_DIR)/console.o \
 	$(KMER_DB_MAIN_DIR)/instrset_detect.o \
 	$(KMER_DB_MAIN_DIR)/loader.o \
+	$(KMER_DB_MAIN_DIR)/loader_ex.o \
 	$(KMER_DB_MAIN_DIR)/log.o \
 	$(KMER_DB_MAIN_DIR)/main.o \
 	$(KMER_DB_MAIN_DIR)/parallel_sorter.o \

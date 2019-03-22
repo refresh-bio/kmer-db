@@ -20,7 +20,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 
 #include "console.h"
 #include "kmer_db.h"
-#include "loader.h"
+#include "loader_ex.h"
 #include "version.h"
 #include "analyzer.h"
 #include "similarity_calculator.h"
@@ -232,39 +232,24 @@ int Console::runBuildDatabase(
 
 	auto filter = std::make_shared<MinHashFilter>(filterValue, kmerLength);
 
-	Loader loader(filter, inputFormat, numThreads);
-	loader.configure(multipleSamples);
-
-	loader.initPrefetch();
+	LoaderEx loader(filter, inputFormat, 4);
+	int numSamples = loader.configure(multipleSamples);
 
 	LOG_DEBUG << "Starting loop..." << endl;
 	auto totalStart = std::chrono::high_resolution_clock::now();
-	for (;;) {
-		auto start = std::chrono::high_resolution_clock::now();
-		loader.waitForPrefetch();
-		loader.initLoad();
-		loader.waitForLoad();
-		loadingTime += std::chrono::high_resolution_clock::now() - start;
-		
-		start = std::chrono::high_resolution_clock::now();
-		loader.initPrefetch();
-		if (!loader.getLoadedTasks().size()) {
-			break;
-		}
+	for (int i = 0; i < numSamples; ++i) {
 		
 		LOG_VERBOSE << "Loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl;
-
-		for (const auto& entry : loader.getLoadedTasks()) {
-			auto task = entry.second;
-			db->addKmers(task->sampleName, *task->kmers, task->kmerLength, task->fraction);
-			cout << db->printProgress() << endl;
-		}
 		
-		loader.getLoadedTasks().clear();
+		auto task = loader.popTask(i);
+		auto start = std::chrono::high_resolution_clock::now();
+		db->addKmers(task->sampleName, *task->kmers, task->kmerLength, task->fraction);
 		processingTime += std::chrono::high_resolution_clock::now() - start;
+		loader.releaseTask(*task);
+		cout << db->printProgress() << endl;
+		
+		
 	}
-
-	loader.waitForPrefetch();
 
 	auto totalTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
 
