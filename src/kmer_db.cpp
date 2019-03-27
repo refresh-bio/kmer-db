@@ -50,7 +50,7 @@ FastKmerDb::FastKmerDb(int _num_threads) :
 //	repeatedKmers(),
 	dictionarySearchQueue(1), 
 	patternExtensionQueue(1),
-	num_threads(_num_threads > 0 ? _num_threads : std::thread::hardware_concurrency()) {
+	num_threads(_num_threads) {
 
 	patternBytes = 0;
 	patterns.reserve(2 << 20);

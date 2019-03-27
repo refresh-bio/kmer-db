@@ -46,6 +46,7 @@ const string Params::OPTION_LENGTH = "-k";
 const string Params::OPTION_VERBOSE = "-v";
 const string Params::OPTION_DEBUG = "-vv";
 const string Params::OPTION_THREADS = "-t";
+const string Params::OPTION_READER_THREADS = "-rt";
 const string Params::OPTION_BUFFER = "-buffer";
 
 // *****************************************************************************************
@@ -56,6 +57,7 @@ int Console::parse(int argc, char** argv) {
 		<< "S. Deorowicz, A. Gudys, M. Dlugosz, M. Kokot, and A. Danek (c) 2018" << endl << endl;
 	
 	numThreads = 0;
+	numReaderThreads = 0;
 	cacheBufferMb = 8;
 
 	std::vector<string> params(argc - 1);
@@ -73,8 +75,17 @@ int Console::parse(int argc, char** argv) {
 		}
 
 		findOption(params, Params::OPTION_THREADS, numThreads);		// number of threads
+		if (numThreads <= 0) {
+			numThreads = std::thread::hardware_concurrency();
+		}
+
+		findOption(params, Params::OPTION_READER_THREADS, numReaderThreads);	// number of threads
+		if (numReaderThreads <= 0) {
+			numReaderThreads = numThreads / 2;
+		}
+
 		findOption(params, Params::OPTION_BUFFER, cacheBufferMb);	// size of temporary buffer in megabytes
-		if (cacheBufferMb == 0) {
+		if (cacheBufferMb <= 0) {
 			cacheBufferMb = 8;
 		}
 
@@ -232,14 +243,14 @@ int Console::runBuildDatabase(
 
 	auto filter = std::make_shared<MinHashFilter>(filterValue, kmerLength);
 
-	LoaderEx loader(filter, inputFormat, numThreads / 2);
+	LoaderEx loader(filter, inputFormat, numReaderThreads);
 	int numSamples = loader.configure(multipleSamples);
 
 	LOG_DEBUG << "Starting loop..." << endl;
 	auto totalStart = std::chrono::high_resolution_clock::now();
 	for (int i = 0; i < numSamples; ++i) {
-		
-		LOG_VERBOSE << "Loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl;
+		auto partialTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
+		LOG_VERBOSE << "Processing time: " << partialTime.count() <<  ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl;
 		
 		auto task = loader.popTask(i);
 		auto start = std::chrono::high_resolution_clock::now();

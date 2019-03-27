@@ -21,7 +21,7 @@ using namespace std;
 // *****************************************************************************************
 //
 PrefixKmerDb::PrefixKmerDb(int _num_threads) : 
-	num_threads(_num_threads > 0 ? _num_threads : std::thread::hardware_concurrency())
+	num_threads(_num_threads)
 {
 	patterns.reserve(2 << 20);
 	patterns.push_back(pattern_t());

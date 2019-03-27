@@ -32,6 +32,7 @@ public:
 	static const string OPTION_VERBOSE;
 	static const string OPTION_DEBUG;
 	static const string OPTION_THREADS;
+	static const string OPTION_READER_THREADS;
 	static const string OPTION_BUFFER;
 };
 
@@ -42,6 +43,7 @@ public:
 
 protected:
 	int numThreads;
+	int numReaderThreads;
 	int cacheBufferMb;
 
 	int runBuildDatabase(const std::string& multipleSamples, const std::string dbFilename, 
