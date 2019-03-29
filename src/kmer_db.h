@@ -80,8 +80,13 @@ public:
 	virtual std::string printProgress() const = 0;
 
 	
-	virtual sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction) {
-		LOG_VERBOSE << "Adding sample " << sampleNames.size() + 1 << ": " << sampleName << " (" << kmers.size() << " kmers)" << endl;
+	virtual sample_id_t addKmers(
+		const std::string& sampleName,
+		const kmer_t* kmers,
+		size_t kmersCount,
+		uint32_t kmerLength, 
+		double fraction) {
+		LOG_VERBOSE << "Adding sample " << sampleNames.size() + 1 << ": " << sampleName << " (" << kmersCount << " kmers)" << endl;
 		
 		if (!isInitialized) {
 			initialize(kmerLength, fraction);
@@ -96,7 +101,7 @@ public:
 
 		sample_id_t newId = (sample_id_t) sampleNames.size();
 		sampleNames.push_back(sampleName);
-		sampleKmersCount.push_back(kmers.size());
+		sampleKmersCount.push_back(kmersCount);
 
 		return newId;
 	}

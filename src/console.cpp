@@ -253,7 +253,7 @@ int Console::runBuildDatabase(
 		
 		auto task = loader.popTask(i);
 		auto start = std::chrono::high_resolution_clock::now();
-		db->addKmers(task->sampleName, *task->kmers, task->kmerLength, task->fraction);
+		db->addKmers(task->sampleName, task->kmers->data(), task->kmers->size(), task->kmerLength, task->fraction);
 		processingTime += std::chrono::high_resolution_clock::now() - start;
 		loader.releaseTask(*task);
 		cout << db->printProgress() << endl;

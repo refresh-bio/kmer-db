@@ -78,11 +78,12 @@ void PrefixKmerDb::initialize(uint32_t kmerLength, double fraction) {
 void PrefixKmerDb::hashtableJob() {
 
 	while (!this->queues.hashtableAddition.IsCompleted()) {
-		HashtableAdditionTask task;
+		HashtableTask task;
 
 		if (this->queues.hashtableAddition.Pop(task)) {
 			// determine ranges
-			const std::vector<kmer_t>& kmers = *(task.kmers);
+			const kmer_t* kmers = task.kmers;
+			size_t n_kmers = task.n_kmers;
 
 			size_t lo = task.lo;
 			size_t hi = task.hi;
@@ -241,10 +242,15 @@ void PrefixKmerDb::patternJob() {
 
 // *****************************************************************************************
 //
-sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction)
+sample_id_t PrefixKmerDb::addKmers(
+	const std::string& sampleName,
+	const kmer_t* kmers,
+	size_t kmersCount,
+	uint32_t kmerLength,
+	double fraction)
 {
-	sample_id_t sampleId = AbstractKmerDb::addKmers(sampleName, kmers, kmerLength, fraction);
-	size_t n_kmers = kmers.size();
+	sample_id_t sampleId = AbstractKmerDb::addKmers(sampleName, kmers, kmersCount, kmerLength, fraction);
+	size_t n_kmers = kmersCount;
 	
 //	std::fill(stats.workerReallocs.begin(), stats.workerReallocs.end(), 0);
 //	std::fill(stats.workerAdditions.begin(), stats.workerAdditions.end(), 0);
@@ -263,7 +269,7 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 	size_t block = n_kmers / num_blocks;
 
 	// prepare tasks
-	std::vector<HashtableAdditionTask> hashtableTasks(num_blocks, HashtableAdditionTask{0, 0, n_kmers, &kmers });
+	std::vector<HashtableTask> hashtableTasks(num_blocks, HashtableTask{0, 0, n_kmers, kmers, n_kmers });
 	auto currentHi = 0;
 
 	auto prefix_comparer = [this](kmer_t a, kmer_t b)->bool {
@@ -281,16 +287,16 @@ sample_id_t PrefixKmerDb::addKmers(std::string sampleName, const std::vector<kme
 		// check if it makes sense to search for upper bound
 		if (currentHi < n_kmers) {
 
-			auto it = std::upper_bound(kmers.begin() + currentHi, kmers.end(),
-				*(kmers.begin() + currentHi - 1), prefix_comparer);
+			auto it = std::upper_bound(kmers + currentHi, kmers + n_kmers,
+				*(kmers + currentHi - 1), prefix_comparer);
 
-			hashtableTasks[tid].hi = it - kmers.begin();
+			hashtableTasks[tid].hi = it - kmers;
 		}	
 	}
 
 	hashtableTasks.resize(tid);
 
-	std::sort(hashtableTasks.begin(), hashtableTasks.end(), [](const HashtableAdditionTask& x, const HashtableAdditionTask& y)->bool {
+	std::sort(hashtableTasks.begin(), hashtableTasks.end(), [](const HashtableTask& x, const HashtableTask& y)->bool {
 		return (x.hi - x.lo) > (y.hi - y.lo);
 	});
 

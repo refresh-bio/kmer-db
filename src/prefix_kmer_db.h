@@ -4,11 +4,12 @@
 #include <atomic>
 #include <numeric>
 
-struct HashtableAdditionTask {
+struct HashtableTask {
 	int block_id;
 	size_t lo;
 	size_t hi;
-	const std::vector<kmer_t>* kmers;
+	const kmer_t* kmers;
+	size_t n_kmers;
 };
 
 struct PatternTask {
@@ -52,7 +53,11 @@ public:
 
 	~PrefixKmerDb();
 
-	sample_id_t addKmers(std::string sampleName, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double fraction) override;
+	sample_id_t addKmers(const std::string& sampleName,
+		const kmer_t* kmers,
+		size_t kmersCount,
+		uint32_t kmerLength,
+		double fraction) override;
 
 	void serialize(std::ofstream& file) const override;
 
@@ -77,10 +82,11 @@ public:
 	std::string printStats() const override {
 		std::ostringstream oss;
 		oss << "Number of samples: " << Log::formatLargeNumber(getSamplesCount()) << endl
-			<< "Number of patterns: " << Log::formatLargeNumber(getPatternsCount()) << endl
+			<< "Number of patterns: " << Log::formatLargeNumber(getPatternsCount()) << "(" << Log::formatLargeNumber(stats.patternBytes) << ")" << endl
 			<< "Number of k-mers: " << Log::formatLargeNumber(getKmersCount()) << endl
 			<< "K-mer length: " << Log::formatLargeNumber(getKmerLength()) << endl
-			<< "Minhash fraction: " << getFraction() << endl;
+			<< "Minhash fraction: " << getFraction() << endl
+			<< "Workers count: " << num_threads << endl;
 		return oss.str();
 	}
 
@@ -119,7 +125,7 @@ protected:
 
 	// struct for storing queues
 	struct {
-		RegisteringQueue<HashtableAdditionTask> hashtableAddition{ 1 };
+		RegisteringQueue<HashtableTask> hashtableAddition{ 1 };
 
 		RegisteringQueue<PatternTask> patternExtension{ 1 };
 	} queues;
