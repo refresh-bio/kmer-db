@@ -321,10 +321,11 @@ bool KmcInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& posit
 	kmers.resize(kmersCount);
 
 	auto prefix_comparer = [this](kmer_t a, kmer_t b)->bool {
-		return GET_PREFIX_SHIFTED(a) < GET_PREFIX_SHIFTED(b);
+		return GET_PREFIX(a) < GET_PREFIX(b);
 	};
 
-	std::sort(kmers.begin(), kmers.end());
+	//std::sort(kmers.begin(), kmers.end(), prefix_comparer);
+	ParallelSort(kmers.data(), kmers.size());
 	
 	filterValue = ((double)kmers.size() / _total_kmers); // this may differ from theoretical
 	LOG_DEBUG << "Filter passed: " << kmers.size() << "/" << _total_kmers << "(" << filterValue << ")" << endl;

@@ -22,7 +22,7 @@ LoaderEx::LoaderEx(
 	int _num_threads, 
 	bool storePositions) :
 
-	numThreads(_num_threads > 0 ? _num_threads : std::thread::hardware_concurrency()),
+	numThreads(_num_threads),
 	inputFormat(inputFormat),
 	storePositions(storePositions)
 
