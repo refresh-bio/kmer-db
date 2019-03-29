@@ -234,7 +234,6 @@ int Console::runBuildDatabase(
 	cout << "Processing samples..." << endl;
 	
 	LOG_DEBUG << "Creating FastKmerDb object" << endl;
-	//FastKmerDb* db = new FastKmerDb(numThreads);
 	AbstractKmerDb* db = new PrefixKmerDb(numThreads);
 
 	std::chrono::duration<double> loadingTime, processingTime;
@@ -607,7 +606,7 @@ int Console::runAnalyzeDatabase(const std::string & multipleKmcSamples, const st
 	std::chrono::duration<double> loadingTime, processingTime;
 
 	std::ifstream dbFile(dbFilename, std::ios::binary);
-	FastKmerDb db(numThreads);
+	PrefixKmerDb db(numThreads);
 
 	cout << "Loading k-mer database " << dbFilename << "...";
 	if (!dbFile || !db.deserialize(dbFile)) {
@@ -663,7 +662,7 @@ int Console::runAnalyzeDatabase(const std::string & multipleKmcSamples, const st
 //
 int Console::runListPatterns(const std::string& dbFilename, const std::string& patternFile) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
-	FastKmerDb db(numThreads);
+	PrefixKmerDb db(numThreads);
 
 	cout << "Loading k-mer database " << dbFilename << "...";
 	if (!dbFile || !db.deserialize(dbFile)) {

@@ -596,3 +596,19 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 	return true;
 }
 
+
+// *****************************************************************************************
+//
+void PrefixKmerDb::savePatterns(std::ofstream& file) const {
+
+	std::vector<uint32_t> aux(getSamplesCount());
+
+	for (int i = 0; i < patterns.size(); ++i) {
+		const auto& p = patterns[i];
+		file << i << ": " << p.get_parent_id() << " | ";
+		p.decodeSamples(aux.data());
+		std::copy(aux.begin(), aux.begin() + p.get_num_local_samples(), std::ostream_iterator<uint32_t>(file, " "));
+		file << endl;
+	}
+
+}

@@ -190,7 +190,6 @@
     <ClCompile Include="kmc_api\kmer_api.cpp" />
     <ClCompile Include="kmc_api\mmer.cpp" />
     <ClCompile Include="kmc_file_wrapper.cpp" />
-    <ClCompile Include="kmer_db.cpp" />
     <ClCompile Include="loader.cpp" />
     <ClCompile Include="loader_ex.cpp" />
     <ClCompile Include="log.cpp" />

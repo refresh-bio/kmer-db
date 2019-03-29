@@ -95,6 +95,8 @@ public:
 		return oss.str();
 	}
 
+	void savePatterns(std::ofstream& file) const;
+
 protected:
 
 	static const size_t ioBufferBytes = (2 << 29); //512MB buffer 
