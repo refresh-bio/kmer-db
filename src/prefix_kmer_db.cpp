@@ -313,7 +313,7 @@ sample_id_t PrefixKmerDb::addKmers(
 	
 #ifdef _DEBUG
 	uint32_t histoSum = std::accumulate(prefixHistogram.begin(), prefixHistogram.end(), 0);
-	if (histoSum != kmers.size()) {
+	if (histoSum != n_kmers) {
 		throw std::runtime_error("PrefixKmerDb::addKmers() - invalid histogram sum");
 	}
 #endif

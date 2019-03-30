@@ -95,8 +95,12 @@ bool GenomeInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& po
 					break;
 				}
 
+				if (ret == Z_OK && stream.avail_out == 0) {
+					total = stream.total_out;
+				}
+
 				if (ret == Z_STREAM_END) {
-					total += stream.total_out;
+					total = stream.total_out;
 					//multistream detection
 					if (stream.avail_in >= 2 && stream.next_in[0] == 0x1f && stream.next_in[1] == 0x8b) {
 						if (inflateReset(&stream) != Z_OK) {
