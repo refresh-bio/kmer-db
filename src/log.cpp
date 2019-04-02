@@ -16,6 +16,15 @@ const int Log::LEVEL_DEBUG = 0;
 const int Log::LEVEL_VERBOSE = 1;
 const int Log::LEVEL_NORMAL = 2;
 
+
+// ************************************************************************************
+// NumericConversions statics
+char NumericConversions::digits[];
+NumericConversions::_si NumericConversions::_init;
+uint64_t NumericConversions::powers10[];
+
+
+
 // *****************************************************************************************
 //
 Log::Log()

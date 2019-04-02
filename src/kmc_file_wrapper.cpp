@@ -197,8 +197,8 @@ bool GenomeInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& po
 			extractKmers(chromosomes, lengths, kmerLength, setFilter, kmers, positions, storePositions);
 		}
 
-		std::sort(kmers.begin(), kmers.end());
-		//ParallelSort(kmers.data(), kmers.size());
+		//std::sort(kmers.begin(), kmers.end());
+		ParallelSort(kmers.data(), kmers.size());
 		auto it = std::unique(kmers.begin(), kmers.end());
 
 		// iterate over kmers to select repeated ones
@@ -324,10 +324,10 @@ bool KmcInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& posit
 	}
 	kmers.resize(kmersCount);
 
-	auto prefix_comparer = [this](kmer_t a, kmer_t b)->bool {
+/*	auto prefix_comparer = [this](kmer_t a, kmer_t b)->bool {
 		return GET_PREFIX(a) < GET_PREFIX(b);
 	};
-
+*/
 	//std::sort(kmers.begin(), kmers.end(), prefix_comparer);
 	ParallelSort(kmers.data(), kmers.size());
 	

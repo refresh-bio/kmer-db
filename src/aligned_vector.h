@@ -11,10 +11,11 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 //
 template<typename T, unsigned ALIGNMENT = 4096> class aligned_vector
 {
-	T *data_aligned;
-	char *data_raw;
+
 	size_t data_size;
 	size_t data_allocated;
+	T *data_aligned;
+	char *data_raw;
 
 	// *****************************************************************************************
 	//

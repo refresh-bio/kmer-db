@@ -17,8 +17,8 @@ using namespace std;
 // *****************************************************************************************
 //
 Loader::Loader(std::shared_ptr<AbstractFilter> filter, InputFile::Format inputFormat, int _num_threads, bool storePositions) :
-	numThreads(_num_threads > 0 ? _num_threads : std::thread::hardware_concurrency()),
 	inputFormat(inputFormat),
+	numThreads(_num_threads > 0 ? _num_threads : std::thread::hardware_concurrency()),
 	storePositions(storePositions)
 	{
 	kmersCollections.resize(numThreads);

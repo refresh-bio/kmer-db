@@ -49,6 +49,21 @@ const string Params::OPTION_THREADS = "-t";
 const string Params::OPTION_READER_THREADS = "-rt";
 const string Params::OPTION_BUFFER = "-buffer";
 
+
+// *****************************************************************************************
+//
+Console::Console() {
+	availableMetrics["jaccard"] = [](size_t common, size_t cnt1, size_t cnt2, int kmerLength) -> double { return (double)common / (cnt1 + cnt2 - common); };
+	availableMetrics["min"] = [](size_t common, size_t cnt1, size_t cnt2, int kmerLength) -> double { return (double)common / std::min(cnt1, cnt2); };
+	availableMetrics["max"] = [](size_t common, size_t cnt1, size_t cnt2, int kmerLength) -> double { return (double)common / std::max(cnt1, cnt2); };
+	availableMetrics["cosine"] = [](size_t common, size_t cnt1, size_t cnt2, int kmerLength) -> double { return (double)common / sqrt(cnt1 * cnt2); };
+	availableMetrics["mash"] = [](size_t common, size_t cnt1, size_t cnt2, int kmerLength) -> double {
+		double d_jaccard = (double)common / (cnt1 + cnt2 - common);
+		return  (d_jaccard == 0) ? 1.0 : (-1.0 / kmerLength) * log((2 * d_jaccard) / (d_jaccard + 1)); 
+	};
+}
+
+
 // *****************************************************************************************
 //
 int Console::parse(int argc, char** argv) {
@@ -145,9 +160,25 @@ int Console::parse(int argc, char** argv) {
 					return runMinHash(params[2], filter);
 				}
 			}
-			else if (params.size() == 2 && mode == Params::MODE_DISTANCE) {
+			else if (params.size() >= 2 && mode == Params::MODE_DISTANCE) {
+				
+				// check selected metrics
+				std::vector<string> metricNames;
+				for (const auto& entry : availableMetrics) {
+					if (findSwitch(params, entry.first)) {
+						metricNames.push_back(entry.first);
+					}
+				}
+
+				// if empty, add all
+				if (metricNames.empty()) {
+					for (const auto& entry : availableMetrics) {
+						metricNames.push_back(entry.first);
+					}
+				}
+				
 				cout << "Calculating distance measures" << endl;
-				return runDistanceCalculation(params[1]);
+				return runDistanceCalculation(params[1], metricNames);
 			}
 			// debug modes
 			else if (params.size() == 3 && mode == "list-patterns") {
@@ -253,10 +284,10 @@ int Console::runBuildDatabase(
 		
 		auto task = loader.popTask(i);
 		auto start = std::chrono::high_resolution_clock::now();
-		db->addKmers(task->sampleName, task->kmers->data(), task->kmers->size(), task->kmerLength, task->fraction);
+		db->addKmers(task->sampleName, task->kmers, task->kmersCount, task->kmerLength, task->fraction);
 		processingTime += std::chrono::high_resolution_clock::now() - start;
 		loader.releaseTask(*task);
-		cout << db->printProgress() << endl;
+		LOG_VERBOSE << db->printProgress() << endl;
 		
 		
 	}
@@ -358,7 +389,7 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 
 	std::chrono::duration<double> dt;
 
-	cout << "Loading k-mer database " << dbFilename << "...";
+	cout << "Loading k-mer database " << dbFilename << ":" << endl;
 	auto start = std::chrono::high_resolution_clock::now();
 	if (!dbFile || !db.deserialize(dbFile)) {
 		cout << "FAILED";
@@ -520,7 +551,7 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 
 // *****************************************************************************************
 //
-int Console::runDistanceCalculation(const std::string& similarityFilename) {
+int Console::runDistanceCalculation(const std::string& similarityFilename, const std::vector<string>& metricNames) {
 
 	std::vector<size_t> kmersCount;
 	uint32_t kmerLength;
@@ -535,22 +566,20 @@ int Console::runDistanceCalculation(const std::string& similarityFilename) {
 
 	cout << "Calculating distances...";
 
+	std::vector<metric_fun_t> metrics; 
+	for (const auto& name : metricNames) {
+		metrics.push_back(availableMetrics[name]);
+	}
 	
-	std::vector<std::string> metricNames = { "jaccard", "min", "max", "cosine", "mash" };
-	std::vector<std::function<double(size_t, size_t, size_t, int)>> metrics = {
-		[](size_t common, size_t cnt1, size_t cnt2, int kmerLength) -> double { return (double)common / (cnt1 + cnt2 - common); }, // jaccard
-		[](size_t common, size_t cnt1, size_t cnt2, int kmerLength) -> double { return (double)common / std::min(cnt1,cnt2); }, // min
-		[](size_t common, size_t cnt1, size_t cnt2, int kmerLength) -> double { return (double)common / std::max(cnt1,cnt2); }, // max
-		[](size_t common, size_t cnt1, size_t cnt2, int kmerLength) -> double { return (double)common / sqrt(cnt1 * cnt2); }, // cosine
-		[](size_t common, size_t cnt1, size_t cnt2, int kmerLength) -> double {
-			double d_jaccard = (double)common / (cnt1 + cnt2 - common); 
-			return  (d_jaccard == 0) ? 1.0 : (-1.0 / kmerLength) * log((2 * d_jaccard) / (d_jaccard + 1)); } // mash distance
-	};
-
 	std::vector<std::ofstream> files(metricNames.size());
+	std::vector<std::ofstream> histoFiles(metricNames.size());
+	
 	for (int i = 0; i < files.size(); ++i) {
 		files[i].open(similarityFilename + "." + metricNames[i]);
+		histoFiles[i].open(similarityFilename + "." + metricNames[i] + ".histo");
 	}
+
+	std::vector<std::vector<size_t>> histograms(metrics.size(), std::vector<size_t>(100));
 
 	string tmp, in;
 	double fraction;
@@ -565,34 +594,61 @@ int Console::runDistanceCalculation(const std::string& similarityFilename) {
 	iss2 >> tmp >> tmp;
 	std::copy(std::istream_iterator<size_t>(iss2), std::istream_iterator<size_t>(), std::back_inserter(kmersCount));
 
+	std::vector<size_t> intersections(kmersCount.size());
+	std::vector<double> values(kmersCount.size());
+
+	char* outBuffer = new char[10000000];
+
+	cout << "Processing rows..." << endl;
 	for (int i = 0; getline(similarityFile, in); ++i) {
+		if ((i + 1) % 10 == 0) {
+			cout << "\r" << i + 1 << "/" << kmersCount.size() << "...";
+		}
+
 		std::replace(in.begin(), in.end(), ',', ' ');
 		istringstream iss(in);
 		uint64_t queryKmersCount = 0;
 		string queryName;
 		iss >> queryName >> queryKmersCount;
+	
+		std::copy(std::istream_iterator<size_t>(iss), std::istream_iterator<size_t>(), intersections.begin());
 		
 		for (int m = 0; m < metrics.size(); ++m) {
-			files[m] << queryName << ",";
-		}
+			auto& metric = metrics[m];
+			
+			std::transform(intersections.begin(), intersections.end(), kmersCount.begin(), values.begin(),
+				[&metric, queryKmersCount, kmerLength](size_t intersection, size_t dbKmerCount)->double { return  metric(intersection, queryKmersCount, dbKmerCount, kmerLength); });
+			
+			char* ptr = outBuffer;
+			memcpy(ptr, queryName.c_str(), queryName.size());
+			ptr += queryName.size();
+			*ptr = ',';
+			++ptr;
 
-		size_t intersection;
-	
-		for (int j = 0; iss >> intersection; ++j) {
-			if (j >= kmersCount.size()) {
-				cout << "Invalid file format!";
-				return 0;
+			for (int j = 0; j < values.size(); ++j) {
+				// consider only lower triangle
+				if (i > j) {
+					ptr += NumericConversions::Double2PChar(values[j], 6, ptr);
+					int binId = (size_t)(values[j] * 100);
+					++histograms[m][binId];
+				}
+				*ptr = ',';
+				++ptr;
 			}
-			// calculate all metrices
-			for (int m = 0; m < metrics.size(); ++m) {
-				files[m] << metrics[m](intersection, queryKmersCount, kmersCount[j], kmerLength) << ","; 
-			}
+			*ptr = 0;
+			size_t len = ptr - outBuffer;
+			files[m].write(outBuffer, len);
+			files[m] << endl;
 		}
-		
-		for (auto & f : files) { f << endl; }
+	}
+
+	for (int m = 0; m < metrics.size(); ++m) {
+		std::copy(histograms[m].begin(), histograms[m].end(), std::ostream_iterator<size_t>(histoFiles[m], ","));
 	}
 
 	cout << "OK" << endl;
+
+	delete[] outBuffer;
 
 	return 0;
 }

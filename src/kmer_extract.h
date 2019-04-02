@@ -43,7 +43,7 @@ void extractKmers(
 
 		for (i = 0; i < kmerLength - 1; ++i, str_pos -= 2, rev_pos += 2)
 		{
-			char symb = map[seq[i]];
+			char symb = map[static_cast<unsigned char>(seq[i])];
 			if (symb < 0)
 			{
 				symb = 0;
@@ -55,7 +55,7 @@ void extractKmers(
 
 		for (; i < seq_size; ++i)
 		{
-			char symb = map[seq[i]];
+			char symb = map[static_cast<unsigned char>(seq[i])];
 			if (symb < 0)
 			{
 				symb = 0;

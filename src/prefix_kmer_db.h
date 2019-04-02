@@ -82,7 +82,7 @@ public:
 	std::string printStats() const override {
 		std::ostringstream oss;
 		oss << "Number of samples: " << Log::formatLargeNumber(getSamplesCount()) << endl
-			<< "Number of patterns: " << Log::formatLargeNumber(getPatternsCount()) << "(" << Log::formatLargeNumber(stats.patternBytes) << ")" << endl
+			<< "Number of patterns: " << Log::formatLargeNumber(getPatternsCount()) << " (" << Log::formatLargeNumber(stats.patternBytes) << " B)" << endl
 			<< "Number of k-mers: " << Log::formatLargeNumber(getKmersCount()) << endl
 			<< "K-mer length: " << Log::formatLargeNumber(getKmerLength()) << endl
 			<< "Minhash fraction: " << getFraction() << endl

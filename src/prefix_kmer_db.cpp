@@ -83,8 +83,7 @@ void PrefixKmerDb::hashtableJob() {
 		if (this->queues.hashtableAddition.Pop(task)) {
 			// determine ranges
 			const kmer_t* kmers = task.kmers;
-			size_t n_kmers = task.n_kmers;
-
+		
 			size_t lo = task.lo;
 			size_t hi = task.hi;
 
@@ -185,7 +184,6 @@ void PrefixKmerDb::patternJob() {
 			
 			size_t lo = task.lo;
 			size_t hi = task.hi;
-			size_t addedId = lo;
 			sample_id_t sampleId = (sample_id_t)(task.sample_id);
 			
 			threadPatterns[task.block_id].clear();
@@ -512,7 +510,7 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 	std::vector <hash_map_lp<suffix_t, pattern_id_t>::item_t> hashtableBuffer(numHastableElements);
 	char* buffer = reinterpret_cast<char*>(hashtableBuffer.data());
 
-	LOG_VERBOSE << "Loading general info..." << endl;
+	cout << "Loading general info..." << endl;
 
 	// load sample info
 	size_t temp;
@@ -534,7 +532,7 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 		return false;
 	}
 
-	LOG_VERBOSE << "Loading kmer hashtables..." << endl;
+	cout << "Loading kmer hashtables..." << endl;
 
 	// load number of hashmaps
 	file.read(reinterpret_cast<char*>(&temp), sizeof(temp));
@@ -542,7 +540,9 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 
 	// load all hashtables
 	for (int i = 0; i < hashtables.size(); ++i) {
-		cout << i << ",";
+		if ((i + 1) % 10 == 0) {
+			cout << "\r" << i + 1 << "/" << hashtables.size() << "...";
+		}
 		auto& ht = hashtables[i];
 		// loal ht size
 		file.read(reinterpret_cast<char*>(&temp), sizeof(temp));

@@ -27,8 +27,8 @@ struct TaskEx {
 	std::string filePath;
 	std::string sampleName;
 	std::shared_ptr<InputFile> file;
-	std::vector<kmer_t>* kmers;
-	std::vector<uint32_t>* positions;
+	kmer_t *kmers;
+	size_t kmersCount;
 	uint32_t kmerLength;
 	double fraction;
 	int bufferId;
@@ -36,7 +36,7 @@ struct TaskEx {
 	// *****************************************************************************************
 	//
 	TaskEx(size_t fileId, const std::string& filePath) :
-		fileId(fileId), filePath(filePath), file(nullptr), kmers(nullptr), positions(nullptr) {
+		fileId(fileId), filePath(filePath), file(nullptr), kmers(nullptr), kmersCount(0) {
 
 		size_t pos = filePath.find_last_of("/\\");
 		if (pos != string::npos) {
@@ -90,11 +90,11 @@ public:
 
 private:
 
+	InputFile::Format inputFormat;
+
 	int numThreads;
 
 	bool storePositions;
-
-	InputFile::Format inputFormat;
 
 	int numFiles;
 

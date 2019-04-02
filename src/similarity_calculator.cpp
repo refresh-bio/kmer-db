@@ -29,7 +29,6 @@ void SimilarityCalculator::operator()(PrefixKmerDb& db, LowerTriangularMatrix<ui
 
 	size_t bufsize = cacheBufferMb * 1000000 / sizeof(uint32_t);
 	std::vector<uint32_t> patternsBuffer(bufsize);
-	uint32_t* currentPtr;
 
 	std::vector<uint32_t*> rawPatterns(bufsize);
 	std::vector<std::tuple<sample_id_t, uint32_t, uint32_t>> sample2pattern(bufsize);
@@ -273,7 +272,6 @@ void SimilarityCalculator::operator()(PrefixKmerDb& db, LowerTriangularMatrix<ui
 		}
 
 		first_pid = pid;
-		currentPtr = patternsBuffer.data();
 		size_t samplesCount = 0;
 
 		auto t1 = std::chrono::high_resolution_clock::now();
@@ -306,9 +304,6 @@ void SimilarityCalculator::operator()(PrefixKmerDb& db, LowerTriangularMatrix<ui
 		semaphore_decomp.inc(v_tmp.size());
 		tasks_decomp_queue.PushRange(v_tmp);
 		semaphore_decomp.waitForZero();
-
-		int last_pid = pid;
-		int num_samples = db.getSamplesCount();
 
 		auto t2 = std::chrono::high_resolution_clock::now();
 
@@ -477,8 +472,6 @@ void  SimilarityCalculator::operator()(const PrefixKmerDb& db, const std::vector
 		workers[tid] = std::thread([this, &patterns, samples_count, tid, &patterns2countVector, &localSimilarities, &range_boundaries]() {
 			std::vector<uint32_t> samples(samples_count);
 
-			size_t n_patterns = patterns2countVector.size();
-			size_t block_size = n_patterns / num_threads;
 			size_t lo = range_boundaries[tid];
 			size_t hi = range_boundaries[tid + 1];
 			auto &my_localSimilarities = localSimilarities[tid];

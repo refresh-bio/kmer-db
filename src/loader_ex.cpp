@@ -22,8 +22,8 @@ LoaderEx::LoaderEx(
 	int _num_threads, 
 	bool storePositions) :
 
-	numThreads(_num_threads),
 	inputFormat(inputFormat),
+	numThreads(_num_threads),
 	storePositions(storePositions)
 
 {
@@ -88,7 +88,8 @@ LoaderEx::LoaderEx(
 					
 					if (task->file->load(kmersCollections[bufferId], positionsCollections[bufferId], task->kmerLength, task->fraction)) {
 						LOG_VERBOSE << "Sample loaded successfully: " << task->fileId + 1 << endl << std::flush;
-						task->kmers = &kmersCollections[bufferId];
+						task->kmers = kmersCollections[bufferId].data();
+						task->kmersCount = kmersCollections[bufferId].size();
 						
 						queues.output.Push(task->fileId, task);
 
