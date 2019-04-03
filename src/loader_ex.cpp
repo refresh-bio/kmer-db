@@ -33,6 +33,7 @@ LoaderEx::LoaderEx(
 	queues.readers.Restart(1, buffersCount);
 	kmersCollections.resize(buffersCount);
 	positionsCollections.resize(buffersCount);
+	bufferRefCounters.resize(buffersCount);
 	
 	for (int id = 0; id < kmersCollections.size(); ++id) {
 		queues.freeBuffers.Push(id);
@@ -90,7 +91,7 @@ LoaderEx::LoaderEx(
 						LOG_VERBOSE << "Sample loaded successfully: " << task->fileId + 1 << endl << std::flush;
 						task->kmers = kmersCollections[bufferId].data();
 						task->kmersCount = kmersCollections[bufferId].size();
-						
+						++bufferRefCounters[bufferId];
 						queues.output.Push(task->fileId, task);
 
 					}

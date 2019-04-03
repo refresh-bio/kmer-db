@@ -75,8 +75,10 @@ public:
 	}
 
 	void releaseTask(TaskEx& t) {
-		queues.freeBuffers.Push(t.bufferId);
-		LOG_DEBUG << "Released readers buffer: " << t.fileId + 1 << std::endl << std::flush;
+		if (--bufferRefCounters[t.bufferId] == 0) {
+			queues.freeBuffers.Push(t.bufferId);
+			LOG_DEBUG << "Released readers buffer: " << t.fileId + 1 << std::endl << std::flush;
+		}
 	}
 	
 	size_t getBytes() {
@@ -104,10 +106,11 @@ private:
 
 	std::vector<std::thread> readers;
 
-
 	std::vector<std::vector<kmer_t>> kmersCollections;
 
 	std::vector<std::vector<uint32_t>> positionsCollections;
+
+	std::vector<int> bufferRefCounters;
 
 	struct {
 		RegisteringQueue<std::shared_ptr<TaskEx>> input{ 1 };

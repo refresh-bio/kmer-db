@@ -7,7 +7,7 @@ public:
 
 	virtual void operator()(PrefixKmerDb& db, LowerTriangularMatrix<uint32_t>& matrix) const;
 
-	virtual void operator()(const PrefixKmerDb& db, const std::vector<kmer_t>& kmers, std::vector<uint32_t>& vector) const;
+	virtual void operator()(const PrefixKmerDb& db, const kmer_t* kmers, size_t kmersCount, std::vector<uint32_t>& vector) const;
 
 
 protected:

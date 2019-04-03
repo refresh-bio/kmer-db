@@ -12,12 +12,15 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include "kmer_extract.h"
 #include "parallel_sorter.h"
 
+#include <raduls.h>
+
 #include <zlib.h>
 
 #include <memory>
 #include <fstream>
 #include <string>
 #include <cassert>
+#include <bitset>
 
 
  bool GenomeInputFile::open(const std::string& filename) {
@@ -197,6 +200,8 @@ bool GenomeInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& po
 			extractKmers(chromosomes, lengths, kmerLength, setFilter, kmers, positions, storePositions);
 		}
 
+		//auto bs = bitset<64>(kmers.front());
+
 		//std::sort(kmers.begin(), kmers.end());
 		ParallelSort(kmers.data(), kmers.size());
 		auto it = std::unique(kmers.begin(), kmers.end());
@@ -270,12 +275,12 @@ bool MihashedInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& 
 	return true;
 }
 
-bool MihashedInputFile::store(const std::string& filename, const std::vector<kmer_t>& kmers, uint32_t kmerLength, double filterValue) {
+bool MihashedInputFile::store(const std::string& filename, const kmer_t* kmers, size_t kmersCount, uint32_t kmerLength, double filterValue) {
 	ofstream ofs(filename + ".minhash", std::ios_base::binary);
 	ofs.write(reinterpret_cast<const char*>(&MINHASH_FORMAT_SIGNATURE), sizeof(MINHASH_FORMAT_SIGNATURE));
-	size_t numKmers = kmers.size();
-	ofs.write(reinterpret_cast<const char*>(&numKmers), sizeof(size_t));
-	ofs.write(reinterpret_cast<const char*>(kmers.data()), kmers.size() * sizeof(kmer_t));
+	
+	ofs.write(reinterpret_cast<const char*>(&kmersCount), sizeof(size_t));
+	ofs.write(reinterpret_cast<const char*>(kmers), kmersCount * sizeof(kmer_t));
 	ofs.write(reinterpret_cast<const char*>(&kmerLength), sizeof(kmerLength));
 	ofs.write(reinterpret_cast<const char*>(&filterValue), sizeof(filterValue));
 	return true;
@@ -322,7 +327,7 @@ bool KmcInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& posit
 			kmers[kmersCount++] = u_kmer;
 		}
 	}
-	kmers.resize(kmersCount);
+	kmers.resize(kmersCount * 2);
 
 /*	auto prefix_comparer = [this](kmer_t a, kmer_t b)->bool {
 		return GET_PREFIX(a) < GET_PREFIX(b);
@@ -330,6 +335,13 @@ bool KmcInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& posit
 */
 	//std::sort(kmers.begin(), kmers.end(), prefix_comparer);
 	ParallelSort(kmers.data(), kmers.size());
+
+
+//	kmer_t* input = reinterpret_cast<uint8_t*>(kmers.data());
+//	kmer_t* aux = kmers.data() + kmersCount;
+
+//	raduls::RadixSortMSD(
+//		 input, uint8_t* tmp, uint64_t n_recs, uint32_t rec_size, uint32_t key_size, uint32_t n_threads);
 	
 	filterValue = ((double)kmers.size() / _total_kmers); // this may differ from theoretical
 	LOG_DEBUG << "Filter passed: " << kmers.size() << "/" << _total_kmers << "(" << filterValue << ")" << endl;

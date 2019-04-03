@@ -393,7 +393,7 @@ void SimilarityCalculator::operator()(PrefixKmerDb& db, LowerTriangularMatrix<ui
 
 // *****************************************************************************************
 //
-void  SimilarityCalculator::operator()(const PrefixKmerDb& db, const std::vector<kmer_t>& kmers, std::vector<uint32_t>& similarities) const {
+void  SimilarityCalculator::operator()(const PrefixKmerDb& db, const kmer_t* kmers, size_t kmersCount, std::vector<uint32_t>& similarities) const {
 	
 	// get stuff from database
 	const auto& patterns = db.getPatterns();
@@ -410,9 +410,9 @@ void  SimilarityCalculator::operator()(const PrefixKmerDb& db, const std::vector
 	auto start = std::chrono::high_resolution_clock::now();
 
 	// iterate over kmers in analyzed sample
-	for (int i = 0; i < kmers.size(); ++i) {
+	for (int i = 0; i < kmersCount; ++i) {
 
-		if (i + prefetch_dist < kmers.size()) {
+		if (i + prefetch_dist < kmersCount) {
 			kmer_t prefetch_kmer = kmers[i + prefetch_dist];
 
 			kmer_t prefix = GET_PREFIX_SHIFTED(prefetch_kmer);

@@ -96,7 +96,7 @@ int Console::parse(int argc, char** argv) {
 
 		findOption(params, Params::OPTION_READER_THREADS, numReaderThreads);	// number of threads
 		if (numReaderThreads <= 0) {
-			numReaderThreads = numThreads / 2;
+			numReaderThreads = numThreads / 4;
 		}
 
 		findOption(params, Params::OPTION_BUFFER, cacheBufferMb);	// size of temporary buffer in megabytes
@@ -207,40 +207,23 @@ int Console::runMinHash(const std::string& multipleKmcSamples, double filterValu
 
 	auto filter = std::make_shared<MinHashFilter>(filterValue, 0);
 
-	Loader loader(filter, InputFile::KMC, numThreads);
-	loader.configure(multipleKmcSamples);
-
-	LOG_VERBOSE << "Init prefetch (group " << loader.getCurrentFileId() << ")" << endl;
-	loader.initPrefetch();
+	LoaderEx loader(filter, InputFile::KMC, numReaderThreads);
+	int numSamples = loader.configure(multipleKmcSamples);
 
 	LOG_DEBUG << "Starting loop..." << endl;
+	auto totalStart = std::chrono::high_resolution_clock::now();
+	for (int i = 0; i < numSamples; ++i) {
+		auto partialTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
+		LOG_VERBOSE << "Processing time: " << partialTime.count() << ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl;
 
-	for (;;) {
+		auto task = loader.popTask(i);
 		auto start = std::chrono::high_resolution_clock::now();
-		LOG_VERBOSE << "Wait for prefetcher... " << endl;
-		loader.waitForPrefetch();
-		LOG_VERBOSE << "Init Loading... " << endl;
-		loader.initLoad();
-		LOG_VERBOSE << "Load... " << endl;
-		loader.waitForLoad();
-		loadingTime += std::chrono::high_resolution_clock::now() - start;
+		
+		MihashedInputFile file(nullptr);
+		file.store(task->filePath, task->kmers, task->kmersCount, task->kmerLength, filterValue);
 
-		start = std::chrono::high_resolution_clock::now();
-		LOG_VERBOSE << "Init prefetch (group " << loader.getCurrentFileId() << ")" << endl;
-		loader.initPrefetch();
-		if (!loader.getLoadedTasks().size()) {
-			break;
-		}
-
-		LOG_VERBOSE << "Process loaded tasks..." << endl;
-		for (const auto& entry : loader.getLoadedTasks()) {
-			auto task = entry.second;
-			MihashedInputFile file(nullptr); 
-			file.store(task->filePath, *task->kmers, task->kmerLength, filterValue);
-		}
-
-		loader.getLoadedTasks().clear();
 		processingTime += std::chrono::high_resolution_clock::now() - start;
+		loader.releaseTask(*task);
 	}
 
 	return 0;
@@ -288,8 +271,6 @@ int Console::runBuildDatabase(
 		processingTime += std::chrono::high_resolution_clock::now() - start;
 		loader.releaseTask(*task);
 		LOG_VERBOSE << db->printProgress() << endl;
-		
-		
 	}
 
 	auto totalTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
@@ -438,7 +419,7 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 	cout << "Calculating similarity vector...";
 	start = std::chrono::high_resolution_clock::now();
 	std::vector<uint32_t> sims;
-	calculator(db, queryKmers, sims);
+	calculator(db, queryKmers.data(), queryKmers.size(), sims);
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "OK (" << dt.count() << " seconds)" << endl;
 
@@ -494,49 +475,34 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 	LOG_DEBUG << "Creating Loader object..." << endl;
 	shared_ptr<MinHashFilter> filter = shared_ptr<MinHashFilter>(new MinHashFilter(db.getFraction(), db.getKmerLength()));
 
-	Loader loader(filter, inputFormat, numThreads);
-	loader.configure(multipleSamples);
-
-	loader.initPrefetch();
-
-	LOG_DEBUG << "Starting loop..." << endl;
+	LoaderEx loader(filter, inputFormat, numReaderThreads);
+	int numSamples = loader.configure(multipleSamples);
 
 	std::vector<uint32_t> sims;
 
+	LOG_DEBUG << "Starting loop..." << endl;
 	auto totalStart = std::chrono::high_resolution_clock::now();
-	for (;;) {
+	for (int i = 0; i < numSamples; ++i) {
+		auto partialTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
+		LOG_VERBOSE << "Processing time: " << partialTime.count() << ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl;
+
+		auto task = loader.popTask(i);
+		
+		if (task->kmerLength != db.getKmerLength()) {
+			cout << "Error: sample and database k-mer length differ." << endl;
+			return -1;
+		}
+
 		auto start = std::chrono::high_resolution_clock::now();
-		loader.waitForPrefetch();
-		loader.initLoad();
-		loader.waitForLoad();
-		loadingTime += std::chrono::high_resolution_clock::now() - start;
+		
+		sims.clear();
+		calculator(db, task->kmers, task->kmersCount, sims);
+		ofs << endl << task->sampleName << "," << task->kmersCount << ",";
+		std::copy(sims.begin(), sims.end(), ostream_iterator<uint32_t>(ofs, ","));
 
-		start = std::chrono::high_resolution_clock::now();
-		loader.initPrefetch();
-		if (!loader.getLoadedTasks().size()) {
-			break;
-		}
-
-		for (const auto& entry : loader.getLoadedTasks()) {
-			auto task = entry.second;
-
-			if (task->kmerLength != db.getKmerLength()) {
-				cout << "Error: sample and database k-mer length differ." << endl;
-				return -1;
-			}
-
-			// use position vector for storing common kmer counts
-			sims.clear();
-			calculator(db, *task->kmers, sims);
-			ofs << endl << task->sampleName << "," << task->kmers->size() << ",";
-			std::copy(sims.begin(), sims.end(), ostream_iterator<uint32_t>(ofs, ","));
-		}
-
-		loader.getLoadedTasks().clear();
 		processingTime += std::chrono::high_resolution_clock::now() - start;
+		loader.releaseTask(*task);
 	}
-
-	loader.waitForPrefetch();
 
 	auto totalTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
 
