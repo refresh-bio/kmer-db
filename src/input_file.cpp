@@ -5,14 +5,14 @@ The homepage of the Kmer-db project is http://sun.aei.polsl.pl/REFRESH/kmer-db
 Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka Danek
 
 */
-#include "kmc_file_wrapper.h"
+#include "input_file.h"
 #include "kmc_api/kmc_file.h"
 #include "kmer_db.h"
 #include "filter.h"
 #include "kmer_extract.h"
 #include "parallel_sorter.h"
 
-#include <raduls.h>
+//#include <raduls.h>
 
 #include <zlib.h>
 

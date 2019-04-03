@@ -637,45 +637,23 @@ int Console::runAnalyzeDatabase(const std::string & multipleKmcSamples, const st
 	}
 	cout << "OK" << endl << db.printStats();
 
-	Analyzer aligner;
+	Analyzer analyzer;
 	
-	aligner.printStats(db);
+	analyzer.printStats(db);
 
-	std::shared_ptr<AbstractFilter> filter = aligner.selectSeedKmers(db, std::max((size_t)1, db.getSamplesCount() / 100));
+	std::shared_ptr<AbstractFilter> filter = analyzer.selectSeedKmers(db, std::max((size_t)1, db.getSamplesCount() / 100));
 	return 0;
-	Loader loader(filter, InputFile::GENOME, numThreads, true);
-	loader.configure(multipleKmcSamples);
+	LoaderEx loader(filter, InputFile::GENOME, numReaderThreads, true);
+	int numSamples = loader.configure(multipleKmcSamples);
 
-	loader.initPrefetch();
-	
 	LOG_DEBUG << "Starting loop..." << endl;
-	auto totalStart = std::chrono::high_resolution_clock::now();
-	for (;;) {
-		auto start = std::chrono::high_resolution_clock::now();
-		loader.waitForPrefetch();
-		loader.initLoad();
-		loader.waitForLoad();
-		loadingTime += std::chrono::high_resolution_clock::now() - start;
-
-		start = std::chrono::high_resolution_clock::now();
-		loader.initPrefetch();
-		if (!loader.getLoadedTasks().size()) {
-			break;
-		}
-
-		for (const auto& entry : loader.getLoadedTasks()) {
-			auto task = entry.second;
-			
-			// use task result
-		}
-
-		loader.getLoadedTasks().clear();
-		processingTime += std::chrono::high_resolution_clock::now() - start;
+	for (int i = 0; i < numSamples; ++i) {
+		
+		auto task = loader.popTask(i);
+		// use task result
 	}
 
-	loader.waitForPrefetch();
-
-	aligner(db);
+	analyzer(db);
 
 	return 0;
 }

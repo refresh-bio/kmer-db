@@ -7,7 +7,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 */
 
 #pragma once
-#include "kmc_file_wrapper.h"
+#include "input_file.h"
 #include <stdexcept>
 #include <functional>
 

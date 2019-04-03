@@ -7,10 +7,9 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 
 */
 
-#include "kmc_file_wrapper.h"
+#include "input_file.h"
 #include "queue.h"
 #include "filter.h"
-#include "loader.h"
 
 #include <vector>
 #include <memory>

@@ -162,15 +162,14 @@
     <ClInclude Include="elias_gamma.h" />
     <ClInclude Include="filter.h" />
     <ClInclude Include="hashmap_lp.h" />
+    <ClInclude Include="input_file.h" />
     <ClInclude Include="instrset.h" />
-    <ClInclude Include="kmc_file_wrapper.h" />
     <ClInclude Include="kmer_db.h" />
     <ClInclude Include="kmc_api\kmc_file.h" />
     <ClInclude Include="kmc_api\kmer_api.h" />
     <ClInclude Include="kmc_api\kmer_defs.h" />
     <ClInclude Include="kmc_api\mmer.h" />
     <ClInclude Include="kmer_extract.h" />
-    <ClInclude Include="loader.h" />
     <ClInclude Include="loader_ex.h" />
     <ClInclude Include="log.h" />
     <ClInclude Include="parallel_sorter.h" />
@@ -185,12 +184,11 @@
   <ItemGroup>
     <ClCompile Include="analyzer.cpp" />
     <ClCompile Include="console.cpp" />
+    <ClCompile Include="input_file.cpp" />
     <ClCompile Include="instrset_detect.cpp" />
     <ClCompile Include="kmc_api\kmc_file.cpp" />
     <ClCompile Include="kmc_api\kmer_api.cpp" />
     <ClCompile Include="kmc_api\mmer.cpp" />
-    <ClCompile Include="kmc_file_wrapper.cpp" />
-    <ClCompile Include="loader.cpp" />
     <ClCompile Include="loader_ex.cpp" />
     <ClCompile Include="log.cpp" />
     <ClCompile Include="main.cpp" />
