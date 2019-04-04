@@ -6,18 +6,18 @@
 
 struct HashtableTask {
 	int block_id;
-	size_t lo;
-	size_t hi;
+	uint32_t lo;
+	uint32_t hi;
 	const kmer_t* kmers;
 	size_t n_kmers;
 };
 
 struct PatternTask {
 	int block_id;
-	size_t lo;
-	size_t hi;
-	size_t sample_id;
-	std::atomic<size_t>* new_pid;
+	uint32_t lo;
+	uint32_t hi;
+	sample_id_t sample_id;
+	std::atomic<pattern_id_t>* new_pid;
 };
 
 

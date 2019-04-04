@@ -84,8 +84,8 @@ void PrefixKmerDb::hashtableJob() {
 			// determine ranges
 			const kmer_t* kmers = task.kmers;
 		
-			size_t lo = task.lo;
-			size_t hi = task.hi;
+			uint32_t lo = task.lo;
+			uint32_t hi = task.hi;
 
 			if (lo != hi) {
 
@@ -97,7 +97,7 @@ void PrefixKmerDb::hashtableJob() {
 				size_t begin = lo;
 				kmer_t prevPrefix = lo_prefix;
 
-				for (size_t i = lo + 1; i < hi; ++i) {
+				for (uint32_t i = lo + 1; i < hi; ++i) {
 					kmer_t prefix = GET_PREFIX_SHIFTED(kmers[i]);
 					if (prefix != prevPrefix) {
 						prefixHistogram[prevPrefix] = i - begin;
@@ -127,15 +127,15 @@ void PrefixKmerDb::hashtableJob() {
 
 				start = std::chrono::high_resolution_clock::now();
 
-				size_t existing_id = lo;
-				size_t to_add = 0;
+				uint32_t existing_id = lo;
+				uint32_t to_add = 0;
 				kmer_t u_kmer;
 #ifdef USE_PREFETCH
 				kmer_t prefetch_kmer;
 				const size_t prefetch_dist = 48;
 #endif
 
-				for (size_t i = lo; i < hi; ++i) {
+				for (uint32_t i = lo; i < hi; ++i) {
 					u_kmer = kmers[i];
 					kmer_t prefix = GET_PREFIX_SHIFTED(u_kmer);
 					suffix_t suffix = GET_SUFFIX(u_kmer);
@@ -182,15 +182,15 @@ void PrefixKmerDb::patternJob() {
 		if (this->queues.patternExtension.Pop(task)) {
 			LOG_DEBUG << "Pattern job " << task.block_id << " started" << endl;
 			
-			size_t lo = task.lo;
-			size_t hi = task.hi;
+			uint32_t lo = task.lo;
+			uint32_t hi = task.hi;
 			sample_id_t sampleId = (sample_id_t)(task.sample_id);
 			
 			threadPatterns[task.block_id].clear();
 			int64_t deltaSize = 0; // get current pattern memory size (atomic)
 
-			for (size_t i = lo; i < hi;) {
-				size_t j;
+			for (uint32_t i = lo; i < hi;) {
+				uint32_t j;
 				auto p_id = samplePatterns[i].first.pattern_id;
 
 				// count k-mers from current sample with considered template 
@@ -199,7 +199,7 @@ void PrefixKmerDb::patternJob() {
 						break;
 					}
 				}
-				size_t pid_count = j - i;
+				uint32_t pid_count = j - i;
 
 				if (patterns[p_id].get_num_kmers() == pid_count && !patterns[p_id].get_is_parrent()) {
 					// Extend pattern - all k-mers with considered template exist in the analyzed sample
@@ -212,17 +212,16 @@ void PrefixKmerDb::patternJob() {
 					// Generate new template 
 					pattern_id_t local_pid = task.new_pid->fetch_add(1);
 
-					threadPatterns[task.block_id].emplace_back( local_pid, pattern_t(patterns[p_id], p_id, sampleId, (uint32_t)pid_count) );
+					threadPatterns[task.block_id].emplace_back( local_pid, pattern_t(patterns[p_id], p_id, sampleId, pid_count) );
 					deltaSize += threadPatterns[task.block_id].back().second.get_bytes();
 
 					if (p_id) {
 						patterns[p_id].set_num_kmers(patterns[p_id].get_num_kmers() - pid_count);
 					}
 
-					for (size_t k = i; k < j; ++k) {
+					for (uint32_t k = i; k < j; ++k) {
 						*(samplePatterns[k].second) = local_pid;
 					}
-
 				}
 
 				i = j;
@@ -248,7 +247,7 @@ sample_id_t PrefixKmerDb::addKmers(
 	double fraction)
 {
 	sample_id_t sampleId = AbstractKmerDb::addKmers(sampleName, kmers, kmersCount, kmerLength, fraction);
-	size_t n_kmers = kmersCount;
+	uint32_t n_kmers = static_cast<uint32_t>(kmersCount);
 	
 //	std::fill(stats.workerReallocs.begin(), stats.workerReallocs.end(), 0);
 //	std::fill(stats.workerAdditions.begin(), stats.workerAdditions.end(), 0);
@@ -328,7 +327,7 @@ sample_id_t PrefixKmerDb::addKmers(
 	// exdtend patterns
 	LOG_DEBUG << "Extending patterns (parallel)..." << endl;
 	start = std::chrono::high_resolution_clock::now();
-	std::atomic<size_t> new_pid(patterns.size());
+	std::atomic<pattern_id_t> new_pid(patterns.size());
 
 	// prepare tasks
 	num_blocks = num_threads;

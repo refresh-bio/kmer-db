@@ -41,7 +41,19 @@ public:
 		uint32_t& kmerLength, 
 		double& filterValue) = 0;
 
+
+	static std::string removePathFromFile(const std::string& filePath) {
+		size_t pos = filePath.find_last_of("/\\");
+		if (pos != string::npos) {
+			return filePath.substr(pos + 1);
+		}
+		else {
+			return filePath;
+		}
+	}
+
 protected:
+
 	std::shared_ptr<AbstractFilter> filter;
 
 };

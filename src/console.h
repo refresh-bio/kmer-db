@@ -27,6 +27,7 @@ public:
 
 	static const string SWITCH_KMC_SAMPLES;
 	static const string SWITCH_MINHASH_SAMPLES;
+	static const string SWITCH_MULTISAMPLE_FASTA;
 	
 	static const string OPTION_FILTER;
 	static const string OPTION_LENGTH;
@@ -51,6 +52,7 @@ protected:
 	int numThreads;
 	int numReaderThreads;
 	int cacheBufferMb;
+	bool multisampleFasta;
 
 	std::map<std::string, metric_fun_t> availableMetrics;
 

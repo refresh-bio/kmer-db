@@ -19,11 +19,12 @@ using namespace std;
 LoaderEx::LoaderEx(
 	std::shared_ptr<AbstractFilter> filter, 
 	InputFile::Format inputFormat, 
-	int _num_threads, 
+	int numThreads, 
+	bool multisampleFasta,
 	bool storePositions) :
 
 	inputFormat(inputFormat),
-	numThreads(_num_threads),
+	numThreads(numThreads),
 	storePositions(storePositions)
 
 {
@@ -47,7 +48,7 @@ LoaderEx::LoaderEx(
 	// generate preloader thread
 	prefetcher = std::thread([this, filter]() {
 		while (!this->queues.input.IsCompleted()) {
-			std::shared_ptr<TaskEx> task;
+			std::shared_ptr<InputTask> task;
 			if (this->queues.input.Pop(task)) {
 				LOG_DEBUG << "input queue -> (" << task->fileId + 1 << ")" << endl << std::flush;
 				
@@ -66,7 +67,7 @@ LoaderEx::LoaderEx(
 					LOG_DEBUG << "(" << task->fileId + 1  << ") -> readers queue " << endl << std::flush;
 				}
 				else {
-					cout << "failed:" << task->sampleName << endl << std::flush;
+					cout << "failed:" << task->filePath << endl << std::flush;
 				}
 			}
 		}
@@ -75,29 +76,32 @@ LoaderEx::LoaderEx(
 	for (int tid = 0; tid < numThreads; ++tid) {
 		readers[tid] = std::thread([this, tid]() {
 			while (!this->queues.readers.IsCompleted()) {
-				std::shared_ptr<TaskEx> task;
+				std::shared_ptr<InputTask> inputTask;
 				int bufferId;
 
-				if (this->queues.freeBuffers.Pop(bufferId) && this->queues.readers.Pop(task)) {
+				if (this->queues.freeBuffers.Pop(bufferId) && this->queues.readers.Pop(inputTask)) {
 					
-					task->bufferId = bufferId;
+					auto sampleTask = make_shared<SampleTask>(
+						inputTask->fileId,
+						inputTask->filePath,
+						InputFile::removePathFromFile(inputTask->filePath),
+						bufferId);
 					
-					LOG_DEBUG << "readers queue -> (" << task->fileId + 1 << "), tid: " << tid << ", buf: " << bufferId  << endl << std::flush;
-					if ((task->fileId + 1) % 10 == 0) {
-						cout << "\r" << task->fileId + 1 << "/" << numFiles << "...                      " << std::flush;
+					LOG_DEBUG << "readers queue -> (" << sampleTask->fileId + 1 << "), tid: " << tid << ", buf: " << bufferId  << endl << std::flush;
+					if ((sampleTask->fileId + 1) % 10 == 0) {
+						cout << "\r" << sampleTask->fileId + 1 << "/" << numFiles << "...                      " << std::flush;
 					}
-					
-					if (task->file->load(
+				
+					if (inputTask->file->load(
 						kmersCollections[bufferId], positionsCollections[bufferId], 
-						task->kmers, task->kmersCount, task->kmerLength, task->fraction)) {
+						sampleTask->kmers, sampleTask->kmersCount, sampleTask->kmerLength, sampleTask->fraction)) {
 						
-						LOG_VERBOSE << "Sample loaded successfully: " << task->fileId + 1 << endl << std::flush;
+						LOG_VERBOSE << "Sample loaded successfully: " << sampleTask->fileId + 1 << endl << std::flush;
 						++bufferRefCounters[bufferId];
-						queues.output.Push(task->fileId, task);
-
+						queues.output.Push(sampleTask->fileId, sampleTask);
 					}
 					else {
-						cout << "Sample load failed: " << task->fileId + 1 << endl << std::flush;
+						cout << "Sample load failed: " << sampleTask->fileId + 1 << endl << std::flush;
 					}
 				}
 			}
@@ -127,7 +131,7 @@ int LoaderEx::configure(const std::string& multipleKmcSamples) {
 	string fname;
 	int fid = 0;
 	while (ifs >> fname) {
-		queues.input.Push(std::make_shared<TaskEx>(fid, fname));
+		queues.input.Push(std::make_shared<InputTask>(fid, fname));
 		++fid;
 	}
 

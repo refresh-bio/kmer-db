@@ -12,6 +12,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include <memory>
 #include <string>
 #include <cstdint>
+#include <cstring>
 
 #define LOG_NORMAL Log::getInstance(Log::LEVEL_NORMAL)
 #define LOG_VERBOSE Log::getInstance(Log::LEVEL_VERBOSE)
@@ -115,10 +116,10 @@ public:
 
 			int ndig = NDigits(dig1);
 
-			memcpy(str, digits + dig1 * 5 + (5 - ndig), ndig);
-			memcpy(str + ndig, digits + dig2 * 5, 5);
-			memcpy(str + ndig + 5, digits + dig3 * 5, 5);
-			memcpy(str + ndig + 10, digits + dig4 * 5, 5);
+			std::memcpy(str, digits + dig1 * 5 + (5 - ndig), ndig);
+			std::memcpy(str + ndig, digits + dig2 * 5, 5);
+			std::memcpy(str + ndig + 5, digits + dig3 * 5, 5);
+			std::memcpy(str + ndig + 10, digits + dig4 * 5, 5);
 
 			return ndig + 15;
 		}
@@ -131,9 +132,9 @@ public:
 
 			int ndig = NDigits(dig1);
 
-			memcpy(str, digits + dig1 * 5 + (5 - ndig), ndig);
-			memcpy(str + ndig, digits + dig2 * 5, 5);
-			memcpy(str + ndig + 5, digits + dig3 * 5, 5);
+			std::memcpy(str, digits + dig1 * 5 + (5 - ndig), ndig);
+			std::memcpy(str + ndig, digits + dig2 * 5, 5);
+			std::memcpy(str + ndig + 5, digits + dig3 * 5, 5);
 
 			return ndig + 10;
 		}

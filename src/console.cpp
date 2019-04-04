@@ -40,6 +40,7 @@ const string Params::MODE_DISTANCE = "distance";
 
 const string Params::SWITCH_KMC_SAMPLES = "-from-kmers";
 const string Params::SWITCH_MINHASH_SAMPLES = "-from-minhash";
+const string Params::SWITCH_MULTISAMPLE_FASTA = "-multisample-fasta";
 
 const string Params::OPTION_FILTER = "-f";
 const string Params::OPTION_LENGTH = "-k";
@@ -74,6 +75,7 @@ int Console::parse(int argc, char** argv) {
 	numThreads = 0;
 	numReaderThreads = 0;
 	cacheBufferMb = 8;
+	multisampleFasta = false;
 
 	std::vector<string> params(argc - 1);
 	std::transform(argv + 1, argv + argc, params.begin(), [](char* c)->string { return c; });
@@ -88,6 +90,8 @@ int Console::parse(int argc, char** argv) {
 		if (findSwitch(params, Params::OPTION_DEBUG)) { // verbose mode
 			Log::getInstance(Log::LEVEL_DEBUG).enable();
 		}
+
+		multisampleFasta = findSwitch(params, Params::SWITCH_MULTISAMPLE_FASTA);
 
 		findOption(params, Params::OPTION_THREADS, numThreads);		// number of threads
 		if (numThreads <= 0) {
@@ -207,7 +211,7 @@ int Console::runMinHash(const std::string& multipleKmcSamples, double filterValu
 
 	auto filter = std::make_shared<MinHashFilter>(filterValue, 0);
 
-	LoaderEx loader(filter, InputFile::KMC, numReaderThreads);
+	LoaderEx loader(filter, InputFile::KMC, numReaderThreads, multisampleFasta);
 	int numSamples = loader.configure(multipleKmcSamples);
 
 	LOG_DEBUG << "Starting loop..." << endl;
@@ -256,7 +260,7 @@ int Console::runBuildDatabase(
 
 	auto filter = std::make_shared<MinHashFilter>(filterValue, kmerLength);
 
-	LoaderEx loader(filter, inputFormat, numReaderThreads);
+	LoaderEx loader(filter, inputFormat, numReaderThreads, multisampleFasta);
 	int numSamples = loader.configure(multipleSamples);
 
 	LOG_DEBUG << "Starting loop..." << endl;
@@ -477,7 +481,7 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 	LOG_DEBUG << "Creating Loader object..." << endl;
 	shared_ptr<MinHashFilter> filter = shared_ptr<MinHashFilter>(new MinHashFilter(db.getFraction(), db.getKmerLength()));
 
-	LoaderEx loader(filter, inputFormat, numReaderThreads);
+	LoaderEx loader(filter, inputFormat, numReaderThreads, multisampleFasta);
 	int numSamples = loader.configure(multipleSamples);
 
 	std::vector<uint32_t> sims;
