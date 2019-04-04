@@ -88,60 +88,38 @@ bool GenomeInputFile::load(
 		extractSubsequences(data, totalLen, chromosomes, lengths, headers);
 
 		std::shared_ptr<MinHashFilter> minhashFilter = dynamic_pointer_cast<MinHashFilter>(filter);
-		std::shared_ptr<SetFilter> setFilter = dynamic_pointer_cast<SetFilter>(filter);
-
-		if (minhashFilter) {
-			kmerLength = minhashFilter->getLength();
-			filterValue = minhashFilter->getFilterValue();
-		}
-		else if (setFilter) {
 		
-		}
-		else {
+		if (!minhashFilter) {
 			throw std::runtime_error("unsupported filter type!");
 		}
-
-		//przewidywana liczba k-merow, zeby tylko raz byla alokacja pamieci w wektorze
-		//przez 'N'ki i filtrowanie moze byc mniej faktycznie k-merow
+			
+		kmerLength = minhashFilter->getLength();
+		filterValue = minhashFilter->getFilterValue();
+	
+		// determine max k-mers count
 		size_t sum_sizes = 0;
 		for (auto e : lengths)
-			sum_sizes += e - kmerLength + 1;
+			sum_sizes += e - kmerLength + 1; 
 
 		kmersBuffer.clear();
 		kmersBuffer.reserve(sum_sizes);
 
 		if (storePositions) {
+			positionsBuffer.clear();
 			positionsBuffer.reserve(sum_sizes);
 		}
 
-		if (minhashFilter) {
-			extractKmers(chromosomes, lengths, kmerLength, minhashFilter, kmersBuffer, positionsBuffer, storePositions);
+		for (int i = 0; i < chromosomes.size(); ++i) {
+			extractKmers(chromosomes[i], lengths[i], kmerLength, minhashFilter, kmersBuffer, positionsBuffer, storePositions);
 		}
-		else {
-			extractKmers(chromosomes, lengths, kmerLength, setFilter, kmersBuffer, positionsBuffer, storePositions);
-		}
-
-
+	
 		ParallelSort(kmersBuffer.data(), kmersBuffer.size());
 		auto it = std::unique(kmersBuffer.begin(), kmersBuffer.end());
-
-		// iterate over kmers to select repeated ones
-/*		size_t repeated = 0;
-		auto nixt = std::next(kmers.begin());
-		auto end = std::prev(kmers.end()); // the last kmer is either unique or will be reduced in std::unique operation
-		for (auto it = kmers.begin(); it != end; ++it, ++nixt) {
-			if (*it == *nixt) {
-				*it |= KMER_MSB;
-				++repeated;
-			}
-		}
-
-	//	cout << "Repeated kmers: " << repeated << endl;
-		auto it = std::unique(kmers.begin(), kmers.end(), 
-			[](kmer_t a, kmer_t b)->bool { return (a << 1) == (b << 1);  }); // ignore MSB during comparison
-	*/	
 		kmersBuffer.erase(it, kmersBuffer.end());
-	
+
+		kmers = kmersBuffer.data();
+		kmersCount = kmersBuffer.size();
+
 		LOG_DEBUG << "Extraction: " << kmersBuffer.size() << " kmers, " << chromosomes.size() << " chromosomes, " << totalLen << " bases" << endl;
 	}
 	
@@ -151,9 +129,6 @@ bool GenomeInputFile::load(
 	}
 	free(reinterpret_cast<void*>(rawData));
 	
-	kmers = kmersBuffer.data();
-	kmersCount = kmersBuffer.size();
-
 	return status;
 }
 
