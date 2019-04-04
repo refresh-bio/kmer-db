@@ -89,7 +89,7 @@ LoaderEx::LoaderEx(
 					
 					LOG_DEBUG << "readers queue -> (" << sampleTask->fileId + 1 << "), tid: " << tid << ", buf: " << bufferId  << endl << std::flush;
 					if ((sampleTask->fileId + 1) % 10 == 0) {
-						cout << "\r" << sampleTask->fileId + 1 << "/" << numFiles << "...                      " << std::flush;
+						cout << "\r" << sampleTask->fileId + 1 << "/" << fileNames.size() << "...                      " << std::flush;
 					}
 				
 					if (inputTask->file->load(
@@ -129,15 +129,16 @@ int LoaderEx::configure(const std::string& multipleKmcSamples) {
 	std::ifstream ifs(multipleKmcSamples);
 
 	string fname;
-	int fid = 0;
+	
 	while (ifs >> fname) {
-		queues.input.Push(std::make_shared<InputTask>(fid, fname));
-		++fid;
+		fileNames.push_back(fname);
 	}
 
-	this->numFiles = fid;
-
-	return fid;
+	for (int i = 0; i < fileNames.size(); ++i) {
+		queues.input.Push(std::make_shared<InputTask>(i, fileNames[i]));
+	}
+	
+	return fileNames.size();
 }
 
 

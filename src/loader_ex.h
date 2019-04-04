@@ -23,7 +23,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 //
 struct InputTask {
 	size_t fileId;
-	std::string filePath;
+	const std::string& filePath;
 	std::shared_ptr<InputFile> file;
 	
 	// *****************************************************************************************
@@ -36,7 +36,7 @@ struct InputTask {
 
 struct SampleTask {
 	size_t fileId;
-	std::string filePath;
+	const std::string& filePath;
 	std::string sampleName;
 	kmer_t *kmers;
 	size_t kmersCount;
@@ -98,11 +98,12 @@ private:
 
 	bool storePositions;
 
-	int numFiles;
 
 	uint32_t kmerLength;
 
 	std::thread prefetcher;
+
+	std::vector<std::string> fileNames;
 
 	std::vector<std::thread> readers;
 
