@@ -43,11 +43,11 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 	
 	if (in) {
 		my_fseek(in, 0, SEEK_END);
-		compressedSize = my_ftell(in);
+		rawSize = my_ftell(in);
 		my_fseek(in, 0, SEEK_SET);
 
-		compressedData = reinterpret_cast<char*>(malloc(compressedSize));
-		fread(compressedData, compressedSize, 1, in);
+		rawData = reinterpret_cast<char*>(malloc(rawSize));
+		fread(rawData, rawSize, 1, in);
 
 		fclose(in);
 		status = true;
@@ -69,111 +69,23 @@ bool GenomeInputFile::load(
 	}
 
 	char* data;
-	
 	size_t total = 0;
 
 	if (isGzipped) {
-		size_t blockSize = 10000000;
-		data = reinterpret_cast<char*>(malloc(blockSize));
-
-		// Init stream structure
-		z_stream stream;
-		stream.zalloc = Z_NULL;
-		stream.zfree = Z_NULL;
-		stream.opaque = Z_NULL;
-		stream.avail_in = compressedSize;
-		stream.next_in = reinterpret_cast<Bytef*>(compressedData);
-
-		if (inflateInit2(&stream, 31) == Z_OK) {
-
-			// read data in portions
-			char *ptr = data;
-
-			size_t allocated = blockSize;
-
-			// decompress file in portions
-			for (;;) {
-				stream.avail_out = blockSize;
-				stream.next_out = reinterpret_cast<Bytef*>(ptr);
-				int ret = inflate(&stream, Z_NO_FLUSH);
-
-				switch (ret)
-				{
-				case Z_NEED_DICT:
-				case Z_DATA_ERROR:
-				case Z_MEM_ERROR:
-					status = false;
-					ret = Z_STREAM_END;
-					break;
-				}
-
-				if (ret == Z_OK && stream.avail_out == 0) {
-					total = stream.total_out;
-				}
-
-				if (ret == Z_STREAM_END) {
-					total = stream.total_out;
-					//multistream detection
-					if (stream.avail_in >= 2 && stream.next_in[0] == 0x1f && stream.next_in[1] == 0x8b) {
-						if (inflateReset(&stream) != Z_OK) {
-							LOG_NORMAL << "Error while reading gzip file\n";
-							exit(1);
-						}
-					}
-					else
-						break;
-				}
-
-				// reallocate only when some data left
-				allocated += blockSize;
-				data = reinterpret_cast<char*>(realloc(data, allocated));
-				ptr = data + total;
-			}
-
-			inflateEnd(&stream);
-		}
-		else {
-			status = false;
-		}
+		status = unzip(rawData, rawSize, data, total);
 	}
 	else {
-		data = compressedData;
-		total = compressedSize;
+		data = rawData;
+		total = rawSize;
 	}
 
 	if (status) {
 		std::vector<char*> chromosomes;
 		std::vector<size_t> lengths;
-
-		// extract contigs
-		char * header = nullptr;
-		char * ptr = data;
-		size_t totalLen = 0;
-
-		while (header = strchr(ptr, '>')) { // find begining of header
-			*header = 0; // put 0 as separator (end of previous chromosome)
-			if (chromosomes.size()) {
-				lengths.push_back(header - chromosomes.back());
-			}
-
-			++header;
-			ptr = strchr(header, '\n'); // find end of header
-			*ptr = 0; // put 0 as separator
-			++ptr; // move to next character (begin of chromosome)
-			chromosomes.push_back(ptr); // store chromosome
-		}
-
-		lengths.push_back(data + total - chromosomes.back());
-
-		// remove newline characters from chromosome
-		for (int i = 0; i < chromosomes.size(); ++i) {
-			// determine chromosome end
-			char* newend = std::remove_if(chromosomes[i], chromosomes[i] + lengths[i], [](char c) -> bool { return c == '\n' || c == '\r';  });
-			*newend = 0;
-			lengths[i] = newend - chromosomes[i];
-			totalLen += lengths[i];
-			assert(lengths[i] == strlen(chromosomes[i]));
-		}
+		std::vector<char*> headers;
+		
+		size_t totalLen = total;
+		extractSubsequences(data, totalLen, chromosomes, lengths, headers);
 
 		std::shared_ptr<MinHashFilter> minhashFilter = dynamic_pointer_cast<MinHashFilter>(filter);
 		std::shared_ptr<SetFilter> setFilter = dynamic_pointer_cast<SetFilter>(filter);
@@ -234,10 +146,10 @@ bool GenomeInputFile::load(
 	}
 	
 	// free memory
-	if (data != compressedData) {
+	if (data != rawData) {
 		free(reinterpret_cast<void*>(data));
 	}
-	free(reinterpret_cast<void*>(compressedData));
+	free(reinterpret_cast<void*>(rawData));
 	
 	kmers = kmersBuffer.data();
 	kmersCount = kmersBuffer.size();
@@ -245,6 +157,117 @@ bool GenomeInputFile::load(
 	return status;
 }
 
+
+bool GenomeInputFile::unzip(char* compressedData, size_t compressedSize, char*&outData, size_t &outSize) {
+	bool ok = true;
+	size_t blockSize = 10000000;
+	outData = reinterpret_cast<char*>(malloc(blockSize));
+
+	// Init stream structure
+	z_stream stream;
+	stream.zalloc = Z_NULL;
+	stream.zfree = Z_NULL;
+	stream.opaque = Z_NULL;
+	stream.avail_in = compressedSize;
+	stream.next_in = reinterpret_cast<Bytef*>(compressedData);
+
+	if (inflateInit2(&stream, 31) == Z_OK) {
+
+		// read data in portions
+		char *ptr = outData;
+
+		size_t allocated = blockSize;
+
+		// decompress file in portions
+		for (;;) {
+			stream.avail_out = blockSize;
+			stream.next_out = reinterpret_cast<Bytef*>(ptr);
+			int ret = inflate(&stream, Z_NO_FLUSH);
+
+			switch (ret)
+			{
+			case Z_NEED_DICT:
+			case Z_DATA_ERROR:
+			case Z_MEM_ERROR:
+				ok = false;
+				ret = Z_STREAM_END;
+				break;
+			}
+
+			if (ret == Z_OK && stream.avail_out == 0) {
+				outSize = stream.total_out;
+			}
+
+			if (ret == Z_STREAM_END) {
+				outSize = stream.total_out;
+				//multistream detection
+				if (stream.avail_in >= 2 && stream.next_in[0] == 0x1f && stream.next_in[1] == 0x8b) {
+					if (inflateReset(&stream) != Z_OK) {
+						LOG_NORMAL << "Error while reading gzip file\n";
+						exit(1);
+					}
+				}
+				else
+					break;
+			}
+
+			// reallocate only when some data left
+			allocated += blockSize;
+			outData = reinterpret_cast<char*>(realloc(outData, allocated));
+			ptr = outData + outSize;
+		}
+
+		inflateEnd(&stream);
+	}
+	else {
+		ok = false;
+	}
+
+	return ok;
+}
+
+
+bool GenomeInputFile::extractSubsequences(
+	char* data,
+	size_t& totalLen,
+	std::vector<char*>& subsequences,
+	std::vector<size_t>& lengths,
+	std::vector<char*>& headers) {
+
+	// extract contigs
+	char * header = nullptr;
+	char * ptr = data;
+	
+	while (header = strchr(ptr, '>')) { // find begining of header
+		*header = 0; // put 0 as separator (end of previous chromosome)
+		if (subsequences.size()) {
+			lengths.push_back(header - subsequences.back());
+		}
+
+		++header;
+		headers.push_back(header);
+
+		ptr = strchr(header, '\n'); // find end of header
+		*ptr = 0; // put 0 as separator
+		++ptr; // move to next character (begin of chromosome)
+		subsequences.push_back(ptr); // store chromosome
+	}
+
+	lengths.push_back(data + totalLen - subsequences.back());
+
+	// remove newline characters from chromosome
+	totalLen = 0;
+	for (int i = 0; i < subsequences.size(); ++i) {
+		// determine chromosome end
+		char* newend = std::remove_if(subsequences[i], subsequences[i] + lengths[i], [](char c) -> bool { return c == '\n' || c == '\r';  });
+		*newend = 0;
+		lengths[i] = newend - subsequences[i];
+		totalLen += lengths[i];
+		assert(lengths[i] == strlen(subsequences[i]));
+	}
+
+	return true;
+}
 
 bool MihashedInputFile::open(const std::string& filename)  {
 	std::ifstream file(filename + ".minhash", std::ios_base::binary);

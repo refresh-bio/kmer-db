@@ -76,14 +76,20 @@ public:
 
 	
 protected:
-	size_t compressedSize;
-	char* compressedData;
+	size_t rawSize;
+	char* rawData;
 
 	bool status;
 	bool isGzipped;
 	bool storePositions;
 	
-
+	bool unzip(char* compressedData, size_t compressedSize, char*&outData, size_t &outSize);
+	bool extractSubsequences(
+		char* data,
+		size_t& totalLen,
+		std::vector<char*>& subsequences,
+		std::vector<size_t>& lengths,
+		std::vector<char*>& headers);
 };
 
 class MihashedInputFile : public InputFile {
