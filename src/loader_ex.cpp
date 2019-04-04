@@ -87,10 +87,11 @@ LoaderEx::LoaderEx(
 						cout << "\r" << task->fileId + 1 << "/" << numFiles << "...                      " << std::flush;
 					}
 					
-					if (task->file->load(kmersCollections[bufferId], positionsCollections[bufferId], task->kmerLength, task->fraction)) {
+					if (task->file->load(
+						kmersCollections[bufferId], positionsCollections[bufferId], 
+						task->kmers, task->kmersCount, task->kmerLength, task->fraction)) {
+						
 						LOG_VERBOSE << "Sample loaded successfully: " << task->fileId + 1 << endl << std::flush;
-						task->kmers = kmersCollections[bufferId].data();
-						task->kmersCount = kmersCollections[bufferId].size();
 						++bufferRefCounters[bufferId];
 						queues.output.Push(task->fileId, task);
 

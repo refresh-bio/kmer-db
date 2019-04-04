@@ -12,8 +12,6 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include "kmer_extract.h"
 #include "parallel_sorter.h"
 
-//#include <raduls.h>
-
 #include <zlib.h>
 
 #include <memory>
@@ -21,6 +19,10 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include <string>
 #include <cassert>
 #include <bitset>
+
+#ifdef USE_RADULS
+	#include <raduls.h>
+#endif
 
 
  bool GenomeInputFile::open(const std::string& filename) {
@@ -54,7 +56,14 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 	return status;
 }
 
-bool GenomeInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& positions, uint32_t& kmerLength, double& filterValue) {
+bool GenomeInputFile::load(
+	std::vector<kmer_t>& kmersBuffer,
+	std::vector<uint32_t>& positionsBuffer,
+	kmer_t*& kmers,
+	size_t& kmersCount,
+	uint32_t& kmerLength,
+	double& filterValue) {
+	
 	if (!status) {
 		return false;
 	}
@@ -186,25 +195,23 @@ bool GenomeInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& po
 		for (auto e : lengths)
 			sum_sizes += e - kmerLength + 1;
 
-		kmers.clear();
-		kmers.reserve(sum_sizes);
+		kmersBuffer.clear();
+		kmersBuffer.reserve(sum_sizes);
 
 		if (storePositions) {
-			positions.reserve(sum_sizes);
+			positionsBuffer.reserve(sum_sizes);
 		}
 
 		if (minhashFilter) {
-			extractKmers(chromosomes, lengths, kmerLength, minhashFilter, kmers, positions, storePositions);
+			extractKmers(chromosomes, lengths, kmerLength, minhashFilter, kmersBuffer, positionsBuffer, storePositions);
 		}
 		else {
-			extractKmers(chromosomes, lengths, kmerLength, setFilter, kmers, positions, storePositions);
+			extractKmers(chromosomes, lengths, kmerLength, setFilter, kmersBuffer, positionsBuffer, storePositions);
 		}
 
-		//auto bs = bitset<64>(kmers.front());
 
-		//std::sort(kmers.begin(), kmers.end());
-		ParallelSort(kmers.data(), kmers.size());
-		auto it = std::unique(kmers.begin(), kmers.end());
+		ParallelSort(kmersBuffer.data(), kmersBuffer.size());
+		auto it = std::unique(kmersBuffer.begin(), kmersBuffer.end());
 
 		// iterate over kmers to select repeated ones
 /*		size_t repeated = 0;
@@ -221,9 +228,9 @@ bool GenomeInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& po
 		auto it = std::unique(kmers.begin(), kmers.end(), 
 			[](kmer_t a, kmer_t b)->bool { return (a << 1) == (b << 1);  }); // ignore MSB during comparison
 	*/	
-		kmers.erase(it, kmers.end());	
-
-		LOG_DEBUG << "Extraction: " << kmers.size() << " kmers, " << chromosomes.size() << " chromosomes, " << totalLen << " bases" << endl;
+		kmersBuffer.erase(it, kmersBuffer.end());
+	
+		LOG_DEBUG << "Extraction: " << kmersBuffer.size() << " kmers, " << chromosomes.size() << " chromosomes, " << totalLen << " bases" << endl;
 	}
 	
 	// free memory
@@ -232,6 +239,9 @@ bool GenomeInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& po
 	}
 	free(reinterpret_cast<void*>(compressedData));
 	
+	kmers = kmersBuffer.data();
+	kmersCount = kmersBuffer.size();
+
 	return status;
 }
 
@@ -264,12 +274,20 @@ bool MihashedInputFile::open(const std::string& filename)  {
 	return status;
 }
 
-bool MihashedInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& positions, uint32_t& kmerLength, double& filterValue) {
+bool MihashedInputFile::load(
+	std::vector<kmer_t>& kmersBuffer,
+	std::vector<uint32_t>& positionsBuffer,
+	kmer_t*& kmers,
+	size_t& kmersCount,
+	uint32_t& kmerLength,
+	double& filterValue) {
 	if (!status) {
 		return false;
 	}
 
-	kmers = std::move(this->kmers);
+	kmersBuffer = std::move(this->kmers);
+	kmers = kmersBuffer.data();
+	kmersCount = kmersBuffer.size();
 	kmerLength = this->kmerLength;
 	filterValue = this->fraction;
 	return true;
@@ -287,9 +305,13 @@ bool MihashedInputFile::store(const std::string& filename, const kmer_t* kmers, 
 }
 
 
-
-
-bool KmcInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& positions, uint32_t& kmerLength, double& filterValue)  {
+bool KmcInputFile::load(
+	std::vector<kmer_t>& kmersBuffer,
+	std::vector<uint32_t>& positionsBuffer,
+	kmer_t*& kmers,
+	size_t& kmersCount,
+	uint32_t& kmerLength,
+	double& filterValue) {
 
 	uint32_t counter;
 
@@ -310,11 +332,19 @@ bool KmcInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& posit
 
 	// Wczytuje wszystkie k-mery z pliku do wektora, zeby pozniej moc robic prefetcha
 	filter->setParams(kmerLength);
-	kmers.resize(_total_kmers);
-	size_t kmersCount = 0;
-	//filter->initialize(_total_kmers);
-
 	std::shared_ptr<MinHashFilter> minhashFilter = std::dynamic_pointer_cast<MinHashFilter>(filter);
+
+	// allocate buffers
+#ifdef USE_RADULS
+	kmersBuffer.resize(2 * _total_kmers + 4 * raduls::ALIGNMENT / sizeof(kmer_t));
+	kmers = kmersBuffer.data();
+	kmer_t* aux = kmersBuffer.data() + kmersBuffer.size() / 2;
+	while (reinterpret_cast<uintptr_t>(kmers) % raduls::ALIGNMENT) ++kmers;
+	while (reinterpret_cast<uintptr_t>(aux) % raduls::ALIGNMENT) ++aux;
+#else
+	kmersBuffer.resize(_total_kmers);
+	kmers = kmersBuffer.data();
+#endif
 
 	while (!kmcfile->Eof())
 	{
@@ -327,24 +357,19 @@ bool KmcInputFile::load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& posit
 			kmers[kmersCount++] = u_kmer;
 		}
 	}
-	kmers.resize(kmersCount * 2);
 
-/*	auto prefix_comparer = [this](kmer_t a, kmer_t b)->bool {
-		return GET_PREFIX(a) < GET_PREFIX(b);
-	};
-*/
-	//std::sort(kmers.begin(), kmers.end(), prefix_comparer);
-	ParallelSort(kmers.data(), kmers.size());
+#ifdef USE_RADULS
+	size_t key_size = ((kmerLength * 2) + 7) / 8;
+	raduls::PartialRadixSortMSD(reinterpret_cast<uint8_t*>(kmers), reinterpret_cast<uint8_t*>(aux), kmersCount, sizeof(kmer_t), key_size, key_size - 4, 4);
+	if (key_size % 2) {
+		std::swap(kmers, aux);
+	}
+#else
+	ParallelSort(kmers, kmersCount);
+#endif
 
-
-//	kmer_t* input = reinterpret_cast<uint8_t*>(kmers.data());
-//	kmer_t* aux = kmers.data() + kmersCount;
-
-//	raduls::RadixSortMSD(
-//		 input, uint8_t* tmp, uint64_t n_recs, uint32_t rec_size, uint32_t key_size, uint32_t n_threads);
-	
-	filterValue = ((double)kmers.size() / _total_kmers); // this may differ from theoretical
-	LOG_DEBUG << "Filter passed: " << kmers.size() << "/" << _total_kmers << "(" << filterValue << ")" << endl;
+	filterValue = ((double)kmersCount / _total_kmers); // this may differ from theoretical
+	LOG_DEBUG << "Filter passed: " << kmersCount << "/" << _total_kmers << "(" << filterValue << ")" << endl;
 	filterValue = minhashFilter->getFilterValue(); // use proper value
 	return kmcfile->Close();
 }

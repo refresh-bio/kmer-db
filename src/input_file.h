@@ -33,7 +33,13 @@ public:
 	InputFile(std::shared_ptr<AbstractFilter> filter) : filter(filter) {}
 
 	virtual bool open(const std::string& filename) = 0;
-	virtual bool load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& positions, uint32_t& kmerLength, double& filterValue) = 0;
+	virtual bool load(
+		std::vector<kmer_t>& kmersBuffer, 
+		std::vector<uint32_t>& positionsBuffer, 
+		kmer_t*& kmers,
+		size_t& kmersCount, 
+		uint32_t& kmerLength, 
+		double& filterValue) = 0;
 
 protected:
 	std::shared_ptr<AbstractFilter> filter;
@@ -48,7 +54,13 @@ public:
 
 	bool open(const std::string& filename) override;
 	
-	bool load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& positions, uint32_t& kmerLength, double& filterValue) override;
+	bool load(
+		std::vector<kmer_t>& kmersBuffer,
+		std::vector<uint32_t>& positionsBuffer,
+		kmer_t*& kmers,
+		size_t& kmersCount,
+		uint32_t& kmerLength,
+		double& filterValue) override;
 
 	
 protected:
@@ -68,7 +80,13 @@ public:
 
 	bool open(const std::string& filename) override;
 	
-	bool load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& positions, uint32_t& kmerLength, double& filterValue) override;
+	bool load(
+		std::vector<kmer_t>& kmersBuffer,
+		std::vector<uint32_t>& positionsBuffer,
+		kmer_t*& kmers,
+		size_t& kmersCount,
+		uint32_t& kmerLength,
+		double& filterValue) override;
 
 	bool store(const std::string& filename, const kmer_t* kmers, size_t kmersCount, uint32_t kmerLength, double filterValue);
 
@@ -95,7 +113,13 @@ public:
 		return kmcfile->OpenForListing(filename);
 	}
 
-	bool load(std::vector<kmer_t>& kmers, std::vector<uint32_t>& positions, uint32_t& kmerLength, double& filterValue) override;
+	bool load(
+		std::vector<kmer_t>& kmersBuffer,
+		std::vector<uint32_t>& positionsBuffer,
+		kmer_t*& kmers,
+		size_t& kmersCount,
+		uint32_t& kmerLength,
+		double& filterValue) override;
 
 protected:
 	std::shared_ptr<CKMCFile> kmcfile{ nullptr };

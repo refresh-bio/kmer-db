@@ -250,7 +250,7 @@ int Console::runBuildDatabase(
 	LOG_DEBUG << "Creating FastKmerDb object" << endl;
 	AbstractKmerDb* db = new PrefixKmerDb(numThreads);
 
-	std::chrono::duration<double> loadingTime, processingTime;
+	std::chrono::duration<double> processingTime;
 	
 	LOG_DEBUG << "Creating Loader object..." << endl;
 
@@ -282,7 +282,6 @@ int Console::runBuildDatabase(
 
 	cout << endl << endl << "EXECUTION TIMES" << endl
 		<< "Total: " << totalTime.count() << endl
-		<< "Loading k-mers: " << loadingTime.count() << endl
 		<< "Processing time: " << processingTime.count() << endl
 		<< db->printDetailedTimes() << endl
 		<< "STATISTICS" << endl << db->printStats() << endl;
@@ -383,7 +382,7 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 
 	start = std::chrono::high_resolution_clock::now();
 	
-	std::vector<kmer_t> queryKmers;
+	std::vector<kmer_t> kmersBuffer;
 	std::vector<uint32_t> positions;
 	uint32_t kmerLength;
 	shared_ptr<MinHashFilter> filter = shared_ptr<MinHashFilter>(new MinHashFilter(db.getFraction(), db.getKmerLength()));
@@ -401,7 +400,10 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 	}
 
 	double dummy;
-	if (!file->open(singleKmcSample) || !file->load(queryKmers, positions, kmerLength, dummy)) {
+	size_t queryKmersCount;
+	kmer_t* queryKmers;
+
+	if (!file->open(singleKmcSample) || !file->load(kmersBuffer, positions, queryKmers, queryKmersCount, kmerLength, dummy)) {
 		cout << "FAILED";
 		return -1;
 	}
@@ -413,13 +415,13 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "OK (" << dt.count() << " seconds)" << endl
-		<< "Number of k-mers: " << queryKmers.size() << endl
+		<< "Number of k-mers: " << queryKmersCount << endl
 		<< "Minhash fraction: " << db.getFraction() << endl;
 
 	cout << "Calculating similarity vector...";
 	start = std::chrono::high_resolution_clock::now();
 	std::vector<uint32_t> sims;
-	calculator(db, queryKmers.data(), queryKmers.size(), sims);
+	calculator(db, queryKmers, queryKmersCount, sims);
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "OK (" << dt.count() << " seconds)" << endl;
 
@@ -431,7 +433,7 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 
 	ofs << endl << "query-samples,total-kmers,";
 	std::copy(db.getSampleKmersCount().cbegin(), db.getSampleKmersCount().cend(), ostream_iterator<size_t>(ofs, ","));
-	ofs << endl << singleKmcSample << "," << queryKmers.size() << ",";
+	ofs << endl << singleKmcSample << "," << queryKmersCount << ",";
 	std::copy(sims.begin(), sims.end(), ostream_iterator<uint32_t>(ofs, ","));
 
 	ofs.close();
