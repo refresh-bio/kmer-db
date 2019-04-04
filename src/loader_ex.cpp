@@ -25,13 +25,18 @@ LoaderEx::LoaderEx(
 
 	inputFormat(inputFormat),
 	numThreads(numThreads),
+	multisampleFasta(multisampleFasta),
 	storePositions(storePositions)
-
 {
 	readers.resize(numThreads);
 	int buffersCount = std::max(numThreads, 8);
 
+	// configure queues
+	queues.input.Restart(1);
 	queues.readers.Restart(1, buffersCount);
+	queues.output.Restart(numThreads);
+	queues.freeBuffers.Restart(1);
+	
 	kmersCollections.resize(buffersCount);
 	positionsCollections.resize(buffersCount);
 	bufferRefCounters.resize(buffersCount);
@@ -71,6 +76,8 @@ LoaderEx::LoaderEx(
 				}
 			}
 		}
+
+		queues.readers.MarkCompleted();
 	});
 
 	for (int tid = 0; tid < numThreads; ++tid) {
@@ -80,31 +87,46 @@ LoaderEx::LoaderEx(
 				int bufferId;
 
 				if (this->queues.freeBuffers.Pop(bufferId) && this->queues.readers.Pop(inputTask)) {
-					
+
 					auto sampleTask = make_shared<SampleTask>(
 						inputTask->fileId,
 						inputTask->filePath,
 						InputFile::removePathFromFile(inputTask->filePath),
 						bufferId);
-					
-					LOG_DEBUG << "readers queue -> (" << sampleTask->fileId + 1 << "), tid: " << tid << ", buf: " << bufferId  << endl << std::flush;
+
+					LOG_DEBUG << "readers queue -> (" << sampleTask->fileId + 1 << "), tid: " << tid << ", buf: " << bufferId << endl << std::flush;
 					if ((sampleTask->fileId + 1) % 10 == 0) {
 						cout << "\r" << sampleTask->fileId + 1 << "/" << fileNames.size() << "...                      " << std::flush;
 					}
-				
-					if (inputTask->file->load(
-						kmersCollections[bufferId], positionsCollections[bufferId], 
-						sampleTask->kmers, sampleTask->kmersCount, sampleTask->kmerLength, sampleTask->fraction)) {
-						
-						LOG_VERBOSE << "Sample loaded successfully: " << sampleTask->fileId + 1 << endl << std::flush;
-						++bufferRefCounters[bufferId];
-						queues.output.Push(sampleTask->fileId, sampleTask);
+
+					bool ok = false;
+
+					if (this->multisampleFasta) {
+						auto genomicFile = std::dynamic_pointer_cast<GenomeInputFile>(inputTask->file);
+						int count = genomicFile->loadMultiple(kmersCollections[bufferId], positionsCollections[bufferId], sampleTask, queues.output);
+						bufferRefCounters[bufferId] += count;
+						ok = (count > 0);
 					}
 					else {
-						cout << "Sample load failed: " << sampleTask->fileId + 1 << endl << std::flush;
+						ok = inputTask->file->load(
+							kmersCollections[bufferId], positionsCollections[bufferId],
+							sampleTask->kmers, sampleTask->kmersCount, sampleTask->kmerLength, sampleTask->fraction);
+						
+						if (ok) {
+							++bufferRefCounters[bufferId];
+							queues.output.Push(sampleTask->fileId, sampleTask);
+						}
+					}
+
+					if (ok) {
+						LOG_VERBOSE << "File loaded successfully: " << sampleTask->fileId + 1 << endl << std::flush;
+					} else {
+						cout << "File load failed: " << sampleTask->fileId + 1 << endl << std::flush;
 					}
 				}
 			}
+
+			queues.output.MarkCompleted();
 		});
 	}
 }
@@ -114,7 +136,8 @@ LoaderEx::LoaderEx(
 LoaderEx::~LoaderEx() {
 	queues.input.MarkCompleted();
 	queues.readers.MarkCompleted();
-	queues.output.MarkCompleted();
+	queues.output.MarkCompleted();	
+	queues.freeBuffers.MarkCompleted();
 
 	for (auto& t : readers) {
 		t.join();
@@ -138,6 +161,7 @@ int LoaderEx::configure(const std::string& multipleKmcSamples) {
 		queues.input.Push(std::make_shared<InputTask>(i, fileNames[i]));
 	}
 	
+	queues.input.MarkCompleted();
 	return fileNames.size();
 }
 

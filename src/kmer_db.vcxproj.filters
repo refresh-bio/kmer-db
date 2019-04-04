@@ -44,5 +44,6 @@
     <ClInclude Include="types.h" />
     <ClInclude Include="loader_ex.h" />
     <ClInclude Include="input_file.h" />
+    <ClInclude Include="loader_tasks.h" />
   </ItemGroup>
 </Project>

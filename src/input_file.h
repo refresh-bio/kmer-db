@@ -10,12 +10,15 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include "kmc_api/kmc_file.h"
 #include "kmer_db.h"
 #include "filter.h"
+#include "loader_tasks.h"
 
 #include <memory>
 #include <fstream>
 #include <string>
 #include <cassert>
 
+// *****************************************************************************************
+//
 class InputFile {
 public:
 	enum Format { KMC, MINHASH, GENOME };
@@ -58,7 +61,8 @@ protected:
 
 };
 
-
+// *****************************************************************************************
+//
 class GenomeInputFile : public InputFile {
 public:
 	GenomeInputFile(std::shared_ptr<AbstractFilter> filter, bool storePositions)
@@ -73,6 +77,12 @@ public:
 		size_t& kmersCount,
 		uint32_t& kmerLength,
 		double& filterValue) override;
+
+	int loadMultiple(
+		std::vector<kmer_t>& kmersBuffer,
+		std::vector<uint32_t>& positionsBuffer,
+		std::shared_ptr<SampleTask> reftask,
+		SynchronizedPriorityQueue<std::shared_ptr<SampleTask>>& outputQueue);
 
 	
 protected:
@@ -92,6 +102,8 @@ protected:
 		std::vector<char*>& headers);
 };
 
+// *****************************************************************************************
+//
 class MihashedInputFile : public InputFile {
 public:
 	MihashedInputFile(std::shared_ptr<AbstractFilter> filter) : InputFile(filter), status(false) {}
@@ -120,7 +132,8 @@ protected:
 	bool status;
 };
 
-
+// *****************************************************************************************
+//
 class KmcInputFile : public InputFile {
 public:
 	

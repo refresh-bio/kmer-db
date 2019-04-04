@@ -212,11 +212,11 @@ int Console::runMinHash(const std::string& multipleKmcSamples, double filterValu
 	auto filter = std::make_shared<MinHashFilter>(filterValue, 0);
 
 	LoaderEx loader(filter, InputFile::KMC, numReaderThreads, multisampleFasta);
-	int numSamples = loader.configure(multipleKmcSamples);
+	loader.configure(multipleKmcSamples);
 
 	LOG_DEBUG << "Starting loop..." << endl;
 	auto totalStart = std::chrono::high_resolution_clock::now();
-	for (int i = 0; i < numSamples; ++i) {
+	for (int i = 0; !loader.isCompleted(); ++i) {
 		auto partialTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
 		LOG_VERBOSE << "Processing time: " << partialTime.count() << ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl;
 
@@ -261,11 +261,11 @@ int Console::runBuildDatabase(
 	auto filter = std::make_shared<MinHashFilter>(filterValue, kmerLength);
 
 	LoaderEx loader(filter, inputFormat, numReaderThreads, multisampleFasta);
-	int numSamples = loader.configure(multipleSamples);
+	loader.configure(multipleSamples);
 
 	LOG_DEBUG << "Starting loop..." << endl;
 	auto totalStart = std::chrono::high_resolution_clock::now();
-	for (int i = 0; i < numSamples; ++i) {
+	for (int i = 0; !loader.isCompleted(); ++i) {
 		auto partialTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
 		LOG_VERBOSE << "Processing time: " << partialTime.count() <<  ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl;
 		
@@ -482,17 +482,20 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 	shared_ptr<MinHashFilter> filter = shared_ptr<MinHashFilter>(new MinHashFilter(db.getFraction(), db.getKmerLength()));
 
 	LoaderEx loader(filter, inputFormat, numReaderThreads, multisampleFasta);
-	int numSamples = loader.configure(multipleSamples);
+	loader.configure(multipleSamples);
 
 	std::vector<uint32_t> sims;
 
-	LOG_DEBUG << "Starting loop..." << endl;
+	cout << "Processing queries..." << endl;
 	auto totalStart = std::chrono::high_resolution_clock::now();
-	for (int i = 0; i < numSamples; ++i) {
+	for (int i = 0; !loader.isCompleted(); ++i) {
 		auto partialTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
 		LOG_VERBOSE << "Processing time: " << partialTime.count() << ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl;
-
+		
 		auto task = loader.popTask(i);
+		if ((i + 1) % 10 == 0) {
+			cout << "\r" << i + 1  << "...                      " << std::flush;
+		}
 		
 		if (task->kmerLength != db.getKmerLength()) {
 			cout << "Error: sample and database k-mer length differ." << endl;

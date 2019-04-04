@@ -24,7 +24,8 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 	#include <raduls.h>
 #endif
 
-
+// *****************************************************************************************
+//
  bool GenomeInputFile::open(const std::string& filename) {
 
 	status = false;
@@ -32,11 +33,13 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 	FILE * in;
 	
 	if ((in = fopen((filename + ".gz").c_str(), "rb")) || 
+		(in = fopen((filename + ".fa.gz").c_str(), "rb")) ||
 		(in = fopen((filename + ".fna.gz").c_str(), "rb")) || 
 		(in = fopen((filename + ".fasta.gz").c_str(), "rb"))) {
 		isGzipped = true;
 	}
 	else {
+		(in = fopen((filename + ".fa").c_str(), "rb")) ||
 		(in = fopen((filename + ".fna").c_str(), "rb")) || 
 		(in = fopen((filename + ".fasta").c_str(), "rb"));
 	}
@@ -56,6 +59,8 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 	return status;
 }
 
+ // *****************************************************************************************
+ //
 bool GenomeInputFile::load(
 	std::vector<kmer_t>& kmersBuffer,
 	std::vector<uint32_t>& positionsBuffer,
@@ -132,7 +137,87 @@ bool GenomeInputFile::load(
 	return status;
 }
 
+// *****************************************************************************************
+//
+int GenomeInputFile::loadMultiple(
+	std::vector<kmer_t>& kmersBuffer,
+	std::vector<uint32_t>& positionsBuffer,
+	std::shared_ptr<SampleTask> reftask,
+	SynchronizedPriorityQueue<std::shared_ptr<SampleTask>>& outputQueue) {
 
+	if (!status) {
+		return 0;
+	}
+
+	char* data;
+	size_t total = 0;
+
+	if (isGzipped) {
+		status = unzip(rawData, rawSize, data, total);
+	}
+	else {
+		data = rawData;
+		total = rawSize;
+	}
+
+	if (status) {
+		std::vector<char*> chromosomes;
+		std::vector<size_t> lengths;
+		std::vector<char*> headers;
+
+		size_t totalLen = total;
+		extractSubsequences(data, totalLen, chromosomes, lengths, headers);
+
+		std::shared_ptr<MinHashFilter> minhashFilter = dynamic_pointer_cast<MinHashFilter>(filter);
+
+		if (!minhashFilter) {
+			throw std::runtime_error("unsupported filter type!");
+		}
+
+		
+		reftask->kmerLength = minhashFilter->getLength();
+		reftask->fraction = minhashFilter->getFilterValue();
+
+		// determine max k-mers count
+		size_t sum_sizes = 0;
+		for (auto e : lengths)
+			sum_sizes += e - reftask->kmerLength + 1;
+
+		kmersBuffer.clear();
+		kmersBuffer.reserve(sum_sizes);
+
+		if (storePositions) {
+			positionsBuffer.clear();
+			positionsBuffer.reserve(sum_sizes);
+		}
+
+		kmer_t* currentPos = kmersBuffer.data();
+		for (int i = 0; i < chromosomes.size(); ++i) {
+
+			auto task = std::make_shared<SampleTask>(*reftask);
+			task->sampleName = headers[i];
+
+			size_t count = extractKmers(chromosomes[i], lengths[i], task->kmerLength, minhashFilter, kmersBuffer, positionsBuffer, storePositions);
+
+			ParallelSort(currentPos, count);
+			auto it = std::unique(currentPos, currentPos + count);
+
+			task->kmers = currentPos;
+			task->kmersCount = it - currentPos;
+
+			outputQueue.Push(i, task);
+			currentPos = it;
+		}
+
+		return chromosomes.size();
+	}
+	
+	return 0;
+}
+
+
+// *****************************************************************************************
+//
 bool GenomeInputFile::unzip(char* compressedData, size_t compressedSize, char*&outData, size_t &outSize) {
 	bool ok = true;
 	size_t blockSize = 10000000;
@@ -201,7 +286,8 @@ bool GenomeInputFile::unzip(char* compressedData, size_t compressedSize, char*&o
 	return ok;
 }
 
-
+// *****************************************************************************************
+//
 bool GenomeInputFile::extractSubsequences(
 	char* data,
 	size_t& totalLen,
@@ -244,6 +330,8 @@ bool GenomeInputFile::extractSubsequences(
 	return true;
 }
 
+// *****************************************************************************************
+//
 bool MihashedInputFile::open(const std::string& filename)  {
 	std::ifstream file(filename + ".minhash", std::ios_base::binary);
 	status = false;
@@ -272,6 +360,8 @@ bool MihashedInputFile::open(const std::string& filename)  {
 	return status;
 }
 
+// *****************************************************************************************
+//
 bool MihashedInputFile::load(
 	std::vector<kmer_t>& kmersBuffer,
 	std::vector<uint32_t>& positionsBuffer,
@@ -291,6 +381,8 @@ bool MihashedInputFile::load(
 	return true;
 }
 
+// *****************************************************************************************
+//
 bool MihashedInputFile::store(const std::string& filename, const kmer_t* kmers, size_t kmersCount, uint32_t kmerLength, double filterValue) {
 	ofstream ofs(filename + ".minhash", std::ios_base::binary);
 	ofs.write(reinterpret_cast<const char*>(&MINHASH_FORMAT_SIGNATURE), sizeof(MINHASH_FORMAT_SIGNATURE));
@@ -302,7 +394,8 @@ bool MihashedInputFile::store(const std::string& filename, const kmer_t* kmers, 
 	return true;
 }
 
-
+// *****************************************************************************************
+//
 bool KmcInputFile::load(
 	std::vector<kmer_t>& kmersBuffer,
 	std::vector<uint32_t>& positionsBuffer,
@@ -344,6 +437,7 @@ bool KmcInputFile::load(
 	kmers = kmersBuffer.data();
 #endif
 
+	kmersCount = 0;
 	while (!kmcfile->Eof())
 	{
 		if (!kmcfile->ReadNextKmer(kmer, counter))

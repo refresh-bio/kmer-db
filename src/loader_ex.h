@@ -10,6 +10,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include "input_file.h"
 #include "queue.h"
 #include "filter.h"
+#include "loader_tasks.h"
 
 #include <vector>
 #include <memory>
@@ -18,36 +19,6 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include <sstream>
 
 
-
-// *****************************************************************************************
-//
-struct InputTask {
-	size_t fileId;
-	const std::string& filePath;
-	std::shared_ptr<InputFile> file;
-	
-	// *****************************************************************************************
-	//
-	InputTask(size_t fileId, const std::string& filePath) :
-		fileId(fileId), filePath(filePath), file(nullptr) {
-	}
-};
-
-
-struct SampleTask {
-	size_t fileId;
-	const std::string& filePath;
-	std::string sampleName;
-	kmer_t *kmers;
-	size_t kmersCount;
-	uint32_t kmerLength;
-	double fraction;
-	int bufferId;
-
-	SampleTask(size_t fileId, const std::string& filePath, const std::string& sampleName, int bufferId) :
-		filePath(filePath), fileId(fileId), sampleName(sampleName), bufferId(bufferId) {}
-	
-};
 
 // *****************************************************************************************
 //
@@ -88,6 +59,10 @@ public:
 		return mem;
 	}
 
+	bool isCompleted() {
+		return queues.output.IsCompleted();
+	}
+
 private:
 
 	InputFile::Format inputFormat;
@@ -97,7 +72,6 @@ private:
 	bool multisampleFasta;
 
 	bool storePositions;
-
 
 	uint32_t kmerLength;
 
