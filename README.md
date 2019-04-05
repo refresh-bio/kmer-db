@@ -59,7 +59,7 @@ Construction of k-mers database is an obligatory step for further analyses. The 
 
     ```kmer-db build -from-kmers [-f <filter>] <sample_list> <database>```
   
-* minhashed k-mers produced by `minhash` mode:
+* [minhashed k-mers](#24-storing-minhashed-k-mers) produced by `minhash` mode:
 
     ```kmer-db build -from-minhash <sample_list> <database>```
 
@@ -127,7 +127,7 @@ where:
 * &#124;*a*&#124; - number of k-mers in sample *a*,
 * &#124;*a &cap; b*&#124; - number of k-mers common for samples *a* and *b*.
 
-
+For performance reasons, `all2all` mode produces a lower triangular matrix.
  
  ## 2.3. Calculating similarities or distances
 
