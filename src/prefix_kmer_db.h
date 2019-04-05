@@ -59,7 +59,7 @@ public:
 		uint32_t kmerLength,
 		double fraction) override;
 
-	void serialize(std::ofstream& file) const override;
+	void serialize(std::ofstream& file, bool rawHashtables) const override;
 
 	bool deserialize(std::ifstream& file) override;
 
@@ -105,8 +105,10 @@ public:
 
 protected:
 
-	static const size_t ioBufferBytes = (2 << 29); //512MB buffer 
-	static const int prefetch_dist = 48;
+	static const size_t IO_BUFFER_BYTES = (2 << 29); //512MB buffer 
+	static const int PREFETCH_DIST = 48;
+
+	static const uint64_t SERIALIZATION_RAW_HASHTABLES = 0x01;
 
 	int num_threads;
 	

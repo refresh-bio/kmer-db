@@ -412,8 +412,8 @@ void  SimilarityCalculator::operator()(const PrefixKmerDb& db, const kmer_t* kme
 	// iterate over kmers in analyzed sample
 	for (int i = 0; i < kmersCount; ++i) {
 
-		if (i + prefetch_dist < kmersCount) {
-			kmer_t prefetch_kmer = kmers[i + prefetch_dist];
+		if (i + PREFETCH_DIST < kmersCount) {
+			kmer_t prefetch_kmer = kmers[i + PREFETCH_DIST];
 
 			kmer_t prefix = GET_PREFIX_SHIFTED(prefetch_kmer);
 			suffix_t suffix = GET_SUFFIX(prefetch_kmer);

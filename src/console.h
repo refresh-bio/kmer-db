@@ -28,6 +28,7 @@ public:
 	static const string SWITCH_KMC_SAMPLES;
 	static const string SWITCH_MINHASH_SAMPLES;
 	static const string SWITCH_MULTISAMPLE_FASTA;
+	static const string COMPACT_DB;
 	
 	static const string OPTION_FILTER;
 	static const string OPTION_LENGTH;
@@ -62,7 +63,7 @@ protected:
 	int runNewVsAll(const std::string& dbFilename, const std::string& multipleSamples, const std::string& similarityFilename, InputFile::Format inputFormat);
 	int runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFilename, InputFile::Format inputFormat);
 
-	int runMinHash(const std::string& multipleKmcSamples, double fraction);
+	int runMinHash(const std::string& multipleKmcSamples, InputFile::Format inputFormat, double fraction);
 	int runDistanceCalculation(const std::string& similarityFilename, const std::vector<string>& metricNames);
 
 	int runListPatterns(const std::string& dbFilename, const std::string& patternFile);

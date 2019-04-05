@@ -324,7 +324,7 @@ bool GenomeInputFile::extractSubsequences(
 		*newend = 0;
 		lengths[i] = newend - subsequences[i];
 		totalLen += lengths[i];
-		assert(lengths[i] == strlen(subsequences[i]));
+	//	assert(lengths[i] == strlen(subsequences[i]));
 	}
 
 	return true;

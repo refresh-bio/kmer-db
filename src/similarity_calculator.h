@@ -12,7 +12,7 @@ public:
 
 protected:
 
-	static const int prefetch_dist = 48;
+	static const int PREFETCH_DIST = 48;
 
 	int num_threads;
 

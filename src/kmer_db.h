@@ -69,7 +69,7 @@ public:
 
 	virtual size_t getHashtableEntrySize() const = 0;
 
-	virtual void serialize(std::ofstream& file) const = 0;
+	virtual void serialize(std::ofstream& file, bool rawHashtables) const = 0;
 
 	virtual bool deserialize(std::ifstream& file) = 0;
 

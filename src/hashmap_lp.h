@@ -67,6 +67,7 @@ private:
 	size_t ht_total;
 	size_t ht_match;
 
+	
 	// *****************************************************************************************
 	//
 	void restruct(void)
@@ -103,11 +104,12 @@ public:
 	item_t* end() { return data + allocated; }
 	const item_t* cend() const { return data + allocated; }
 
-	// *****************************************************************************************
-	//
-	bool is_free(const item_t& item) const {
-		return item.key == empty_key;
-	}
+	
+	size_t get_size(void) const { return filled; }
+	size_t get_capacity(void) const { return allocated; }
+	bool is_free(const item_t& item) const { return item.key == empty_key; }
+	
+
 
 	// *****************************************************************************************
 	//
@@ -294,13 +296,6 @@ public:
 #else
 		__builtin_prefetch(data + h);
 #endif
-	}
-
-	// *****************************************************************************************
-	//
-	size_t get_size(void) const
-	{
-		return filled;
 	}
 
 	// *****************************************************************************************

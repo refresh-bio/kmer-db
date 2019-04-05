@@ -41,6 +41,7 @@ const string Params::MODE_DISTANCE = "distance";
 const string Params::SWITCH_KMC_SAMPLES = "-from-kmers";
 const string Params::SWITCH_MINHASH_SAMPLES = "-from-minhash";
 const string Params::SWITCH_MULTISAMPLE_FASTA = "-multisample-fasta";
+const string Params::COMPACT_DB = "-compact-db";
 
 const string Params::OPTION_FILTER = "-f";
 const string Params::OPTION_LENGTH = "-k";
@@ -161,7 +162,7 @@ int Console::parse(int argc, char** argv) {
 				double filter = std::atof(params[1].c_str());
 				if (filter > 0) {
 					cout << "Minhashing k-mers" << endl;
-					return runMinHash(params[2], filter);
+					return runMinHash(params[2], inputFormat, filter);
 				}
 			}
 			else if (params.size() >= 2 && mode == Params::MODE_DISTANCE) {
@@ -174,11 +175,9 @@ int Console::parse(int argc, char** argv) {
 					}
 				}
 
-				// if empty, add all
+				// if empty, add jacard
 				if (metricNames.empty()) {
-					for (const auto& entry : availableMetrics) {
-						metricNames.push_back(entry.first);
-					}
+					metricNames.push_back("jaccard");
 				}
 				
 				cout << "Calculating distance measures" << endl;
@@ -202,7 +201,7 @@ int Console::parse(int argc, char** argv) {
 
 // *****************************************************************************************
 //
-int Console::runMinHash(const std::string& multipleKmcSamples, double filterValue) {
+int Console::runMinHash(const std::string& multipleKmcSamples, InputFile::Format inputFormat, double filterValue) {
 	cout << "Minhashing samples..." << endl;
 
 	std::chrono::duration<double> loadingTime, processingTime;
@@ -211,7 +210,7 @@ int Console::runMinHash(const std::string& multipleKmcSamples, double filterValu
 
 	auto filter = std::make_shared<MinHashFilter>(filterValue, 0);
 
-	LoaderEx loader(filter, InputFile::KMC, numReaderThreads, multisampleFasta);
+	LoaderEx loader(filter, inputFormat, numReaderThreads, multisampleFasta);
 	loader.configure(multipleKmcSamples);
 
 	LOG_DEBUG << "Starting loop..." << endl;
@@ -296,7 +295,7 @@ int Console::runBuildDatabase(
 	auto start = std::chrono::high_resolution_clock::now();
 	std::ofstream ofs;
 	ofs.open(dbFilename, std::ios::binary);
-	db->serialize(ofs);
+	db->serialize(ofs, false);
 	ofs.close();
 
 	dt = std::chrono::high_resolution_clock::now() - start;
@@ -321,7 +320,7 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 	SimilarityCalculator calculator(numThreads, cacheBufferMb);
 	
 	std::chrono::duration<double> dt;
-	cout << "Loading k-mer database " << dbFilename << "...";
+	cout << "Loading k-mer database " << dbFilename << "..." << endl;
 	auto start = std::chrono::high_resolution_clock::now();
 	if (!dbFile || !db->deserialize(dbFile)) {
 		cout << "FAILED";
@@ -601,12 +600,17 @@ int Console::runDistanceCalculation(const std::string& similarityFilename, const
 			++ptr;
 
 			for (int j = 0; j < values.size(); ++j) {
-				// consider only lower triangle
-				if (i > j) {
-					ptr += NumericConversions::Double2PChar(values[j], 6, ptr);
-					int binId = (size_t)(values[j] * 100);
-					++histograms[m][binId];
+				
+				if (values[j] == 0) {
+					*ptr = '0';
+					++ptr;
 				}
+				else {
+					ptr += NumericConversions::Double2PChar(values[j], 6, ptr);
+				}
+					
+				int binId = (size_t)(values[j] * 100);
+				++histograms[m][binId];
 				*ptr = ',';
 				++ptr;
 			}

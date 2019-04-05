@@ -132,7 +132,6 @@ void PrefixKmerDb::hashtableJob() {
 				kmer_t u_kmer;
 #ifdef USE_PREFETCH
 				kmer_t prefetch_kmer;
-				const size_t prefetch_dist = 48;
 #endif
 
 				for (uint32_t i = lo; i < hi; ++i) {
@@ -142,8 +141,8 @@ void PrefixKmerDb::hashtableJob() {
 
 #ifdef USE_PREFETCH
 
-					if (i + prefetch_dist < hi) {
-						prefetch_kmer = kmers[i + prefetch_dist];
+					if (i + PREFETCH_DIST < hi) {
+						prefetch_kmer = kmers[i + PREFETCH_DIST];
 						kmer_t prefetch_prefix = GET_PREFIX_SHIFTED(prefetch_kmer);
 						suffix_t suffix = GET_SUFFIX(prefetch_kmer);
 						hashtables[prefetch_prefix].prefetch(suffix);
@@ -419,12 +418,19 @@ sample_id_t PrefixKmerDb::addKmers(
 
 // *****************************************************************************************
 //
-void PrefixKmerDb::serialize(std::ofstream& file) const {
+void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 
-	size_t numHastableElements = ioBufferBytes / sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t);
+	size_t numHastableElements = IO_BUFFER_BYTES / sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t);
 	std::vector <hash_map_lp<suffix_t, pattern_id_t>::item_t> hashtableBuffer(numHastableElements);
 	char* buffer = reinterpret_cast<char*>(hashtableBuffer.data());
-
+	
+	// generate format word
+	uint64_t formatWord = 0;
+	if (rawHashtables) {
+		formatWord |= SERIALIZATION_RAW_HASHTABLES;
+	}
+	file.write(reinterpret_cast<const char*>(&formatWord), sizeof(formatWord));
+	
 	// store number of samples
 	size_t temp = getSamplesCount();
 	file.write(reinterpret_cast<const char*>(&temp), sizeof(temp));
@@ -447,27 +453,42 @@ void PrefixKmerDb::serialize(std::ofstream& file) const {
 	// store all hashmaps
 	for (const auto& ht : hashtables) {
 
-		// store ht size
-		temp = ht.get_size();
-		file.write(reinterpret_cast<const char*>(&temp), sizeof(temp));
+		if (rawHashtables) {
+			// store ht capacity
+			temp = ht.get_capacity();
+			file.write(reinterpret_cast<const char*>(&temp), sizeof(temp));
 
-		// write ht elements in portions
-		size_t bufpos = 0;
-		for (auto it = ht.cbegin(); it < ht.cend(); ++it) {
-			if (ht.is_free(*it)) {
-				continue;
-			}
-
-			hashtableBuffer[bufpos++] = *it;
-			if (bufpos == numHastableElements) {
-				file.write(reinterpret_cast<const char*>(&bufpos), sizeof(size_t));
-				file.write(buffer, bufpos * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
-				bufpos = 0;
+			// write ht elements in portions
+			size_t bufpos = 0;
+			for (;;) {
+				
+	
 			}
 		}
-		// write remaining ht elements
-		file.write(reinterpret_cast<const char*>(&bufpos), sizeof(size_t));
-		file.write(buffer, bufpos * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
+		else {
+			// store ht size
+			temp = ht.get_size();
+			file.write(reinterpret_cast<const char*>(&temp), sizeof(temp));
+
+			// write ht elements in portions
+			size_t bufpos = 0;
+			for (auto it = ht.cbegin(); it < ht.cend(); ++it) {
+				if (ht.is_free(*it)) {
+					continue;
+				}
+
+				hashtableBuffer[bufpos++] = *it;
+				if (bufpos == numHastableElements) {
+					file.write(reinterpret_cast<const char*>(&bufpos), sizeof(size_t));
+					file.write(buffer, bufpos * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
+					bufpos = 0;
+				}
+			}
+
+			// write remaining ht elements
+			file.write(reinterpret_cast<const char*>(&bufpos), sizeof(size_t));
+			file.write(buffer, bufpos * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
+		}
 	}
 
 	// write patterns in portions
@@ -476,7 +497,7 @@ void PrefixKmerDb::serialize(std::ofstream& file) const {
 
 	char * currentPtr = buffer;
 	for (int pid = 0; pid < patterns.size(); ++pid) {
-		if (currentPtr + patterns[pid].get_bytes() > buffer + ioBufferBytes) {
+		if (currentPtr + patterns[pid].get_bytes() > buffer + IO_BUFFER_BYTES) {
 			size_t blockSize = currentPtr - buffer;
 			file.write(reinterpret_cast<const char*>(&blockSize), sizeof(size_t)); // write size of block to facilitate deserialization
 			file.write(buffer, blockSize);
@@ -485,7 +506,7 @@ void PrefixKmerDb::serialize(std::ofstream& file) const {
 
 		currentPtr = patterns[pid].pack(currentPtr);
 		// this should never happen
-		if (currentPtr > buffer + ioBufferBytes) {
+		if (currentPtr > buffer + IO_BUFFER_BYTES) {
 			throw std::runtime_error("Buffer overflow when saving patterns!");
 		}
 	}
@@ -505,11 +526,21 @@ void PrefixKmerDb::serialize(std::ofstream& file) const {
 //
 bool PrefixKmerDb::deserialize(std::ifstream& file) {
 
-	size_t numHastableElements = ioBufferBytes / sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t);
+	size_t numHastableElements = IO_BUFFER_BYTES / sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t);
 	std::vector <hash_map_lp<suffix_t, pattern_id_t>::item_t> hashtableBuffer(numHastableElements);
 	char* buffer = reinterpret_cast<char*>(hashtableBuffer.data());
 
 	cout << "Loading general info..." << endl;
+
+	// load format word
+	bool rawHashatable;
+
+	uint64_t formatWord = 0;
+	file.read(reinterpret_cast<char*>(&formatWord), sizeof(formatWord));
+	if (formatWord & SERIALIZATION_RAW_HASHTABLES) {
+		rawHashatable = true;
+	}
+
 
 	// load sample info
 	size_t temp;
@@ -540,26 +571,33 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 	// load all hashtables
 	for (int i = 0; i < hashtables.size(); ++i) {
 		if ((i + 1) % 10 == 0) {
-			cout << "\r" << i + 1 << "/" << hashtables.size() << "...";
+			cout << "\r" << i + 1 << "/" << hashtables.size() << "...                      " << std::flush;
 		}
 		auto& ht = hashtables[i];
-		// loal ht size
-		file.read(reinterpret_cast<char*>(&temp), sizeof(temp));
+		
+		if (rawHashatable) {
 
-		// load ht elements
-		ht.clear();
-		ht.reserve_for_additional(temp);
 
-		size_t readCount = 0;
-		while (readCount < temp) {
-			size_t portion = 0;
-			file.read(reinterpret_cast<char*>(&portion), sizeof(size_t));
-			file.read(buffer, portion * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
+		}
+		else {
+			// load ht size
+			file.read(reinterpret_cast<char*>(&temp), sizeof(temp));
 
-			for (size_t j = 0; j < portion; ++j) {
-				ht.insert(hashtableBuffer[j].key, hashtableBuffer[j].val);
+			// load ht elements
+			ht.clear();
+			ht.reserve_for_additional(temp);
+
+			size_t readCount = 0;
+			while (readCount < temp) {
+				size_t portion = 0;
+				file.read(reinterpret_cast<char*>(&portion), sizeof(size_t));
+				file.read(buffer, portion * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
+
+				for (size_t j = 0; j < portion; ++j) {
+					ht.insert(hashtableBuffer[j].key, hashtableBuffer[j].val);
+				}
+				readCount += portion;
 			}
-			readCount += portion;
 		}
 	}
 
@@ -584,6 +622,11 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 
 		char * currentPtr = buffer;
 		while (currentPtr < buffer + blockSize) {
+
+			if ((pid + 1) % 1000 == 0) {
+				cout << "\r" << pid + 1 << "/" << patterns.size() << "...                      " << std::flush;
+			}
+
 			currentPtr = patterns[pid].unpack(currentPtr);
 			++pid;
 		}
