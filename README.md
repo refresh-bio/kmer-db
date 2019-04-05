@@ -59,7 +59,7 @@ Construction of k-mers database is an obligatory step for further analyses. The 
 
     ```kmer-db build -from-kmers [-f <filter>] <sample_list> <database>```
   
-* minhashed k-mers produced by `minhash` mode:
+* [minhashed k-mers](#24-storing-minhashed-k-mers) produced by `minhash` mode:
 
     ```kmer-db build -from-minhash <sample_list> <database>```
 
