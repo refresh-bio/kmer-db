@@ -127,7 +127,7 @@ where:
 * &#124;*a*&#124; - number of k-mers in sample *a*,
 * &#124;*a &cap; b*&#124; - number of k-mers common for samples *a* and *b*.
 
-
+For performance reasons, `all2all` mode produces a lower triangular matrix.
  
  ## 2.3. Calculating similarities or distances
 
