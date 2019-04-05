@@ -3,7 +3,7 @@
 Kmer-db is a fast and memory-efficient tool for estimating evolutionary distances.
 
 
-# Table of contents
+### Table of contents
 
 1. [Installation](#1-installation)
 2. [Usage](#2-usage)
@@ -137,7 +137,7 @@ Parameters:
 * `common_table` (input) - file containing table with numbers of common k-mers produced by `all2all`, `new2all`, or `one2all` mode. 
 * `measures` - names of the similarity/distance measures to be calculated, can be one or several of the following: `jaccard`, `min`, `max`, `cosine`, `mash`. If measures are not specified, `jaccard` is used by default.
 
-This mode generates a file with similarity/distance table for each selected measure. File naming scheme is *<common_table>.<measure>*.
+This mode generates a file with similarity/distance table for each selected measure. Name of the output file is produced by adding to the input file an extension with a measure name.
     
     
 ## 2.4. Storing minhashed k-mers
