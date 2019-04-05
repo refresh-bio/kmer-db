@@ -533,7 +533,7 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 	cout << "Loading general info..." << endl;
 
 	// load format word
-	bool rawHashatable;
+	bool rawHashatable = false;
 
 	uint64_t formatWord = 0;
 	file.read(reinterpret_cast<char*>(&formatWord), sizeof(formatWord));
