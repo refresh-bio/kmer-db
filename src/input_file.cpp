@@ -49,9 +49,9 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 		rawSize = my_ftell(in);
 		my_fseek(in, 0, SEEK_SET);
 
-		rawData = reinterpret_cast<char*>(malloc(rawSize));
+		rawData = reinterpret_cast<char*>(malloc(rawSize + 1));
 		fread(rawData, rawSize, 1, in);
-
+		rawData[rawSize] = 0; // add null termination 
 		fclose(in);
 		status = true;
 	}
@@ -273,11 +273,12 @@ bool GenomeInputFile::unzip(char* compressedData, size_t compressedSize, char*&o
 
 			// reallocate only when some data left
 			allocated += blockSize;
-			outData = reinterpret_cast<char*>(realloc(outData, allocated));
+			outData = reinterpret_cast<char*>(realloc(outData, allocated + 1)); // allocate for null termination
 			ptr = outData + outSize;
 		}
 
 		inflateEnd(&stream);
+		outData[outSize] = 0;
 	}
 	else {
 		ok = false;
@@ -305,7 +306,7 @@ bool GenomeInputFile::extractSubsequences(
 			lengths.push_back(header - subsequences.back());
 		}
 
-		++header;
+		++header; // omit '<'
 		headers.push_back(header);
 
 		ptr = strchr(header, '\n'); // find end of header
