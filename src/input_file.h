@@ -82,7 +82,6 @@ public:
 		std::vector<kmer_t>& kmersBuffer,
 		std::vector<uint32_t>& positionsBuffer,
 		std::shared_ptr<SampleTask> reftask,
-		std::atomic<sample_id_t>& currentSampleId,
 		SynchronizedPriorityQueue<std::shared_ptr<SampleTask>>& outputQueue);
 
 	
