@@ -16,6 +16,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include <condition_variable>
 #include <atomic>
 #include <vector>
+#include <functional>
 
 using namespace std;
 

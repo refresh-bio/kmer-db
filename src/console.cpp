@@ -89,6 +89,7 @@ int Console::parse(int argc, char** argv) {
 		}
 
 		if (findSwitch(params, Params::OPTION_DEBUG)) { // verbose mode
+			Log::getInstance(Log::LEVEL_VERBOSE).enable();
 			Log::getInstance(Log::LEVEL_DEBUG).enable();
 		}
 
