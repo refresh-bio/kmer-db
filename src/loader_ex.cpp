@@ -88,22 +88,23 @@ LoaderEx::LoaderEx(
 
 				if (this->queues.freeBuffers.Pop(bufferId) && this->queues.readers.Pop(inputTask)) {
 
+					LOG_DEBUG << "readers queue -> (" << inputTask->fileId + 1 << "), tid: " << tid << ", buf: " << bufferId << endl << std::flush;
+					if ((inputTask->fileId + 1) % 10 == 0) {
+						cout << "\r" << inputTask->fileId + 1 << "/" << fileNames.size() << "...                      " << std::flush;
+					}
+
 					auto sampleTask = make_shared<SampleTask>(
-						inputTask->fileId,
 						inputTask->filePath,
 						InputFile::removePathFromFile(inputTask->filePath),
 						bufferId);
 
-					LOG_DEBUG << "readers queue -> (" << sampleTask->fileId + 1 << "), tid: " << tid << ", buf: " << bufferId << endl << std::flush;
-					if ((sampleTask->fileId + 1) % 10 == 0) {
-						cout << "\r" << sampleTask->fileId + 1 << "/" << fileNames.size() << "...                      " << std::flush;
-					}
-
 					bool ok = false;
+					int count = 1;
 
 					if (this->multisampleFasta) {
 						auto genomicFile = std::dynamic_pointer_cast<GenomeInputFile>(inputTask->file);
-						int count = genomicFile->loadMultiple(kmersCollections[bufferId], positionsCollections[bufferId], sampleTask, queues.output);
+						count = genomicFile->loadMultiple(
+							kmersCollections[bufferId], positionsCollections[bufferId], sampleTask, this->currentSampleId,  queues.output);
 						bufferRefCounters[bufferId] += count;
 						ok = (count > 0);
 					}
@@ -114,14 +115,17 @@ LoaderEx::LoaderEx(
 						
 						if (ok) {
 							++bufferRefCounters[bufferId];
-							queues.output.Push(sampleTask->fileId, sampleTask);
+							sampleTask->sampleId = this->currentSampleId.fetch_add(1);
+							queues.output.Push(sampleTask->sampleId, sampleTask);
 						}
 					}
 
 					if (ok) {
-						LOG_VERBOSE << "File loaded successfully: " << sampleTask->fileId + 1 << endl << std::flush;
+						LOG_VERBOSE << "File loaded successfully: " << inputTask->fileId + 1 << " (current sample: " << this->currentSampleId.load() << ")" <<  endl << std::flush;
 					} else {
-						cout << "File load failed: " << sampleTask->fileId + 1 << endl << std::flush;
+						cout << "File load failed: " << inputTask->fileId + 1 << endl << std::flush;
+						bufferRefCounters[bufferId] -= count;
+						this->queues.freeBuffers.Push(bufferId);
 					}
 				}
 			}

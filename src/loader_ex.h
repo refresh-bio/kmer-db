@@ -36,17 +36,17 @@ public:
 
 	int configure(const std::string& multipleKmcSamples);
 
-	std::shared_ptr<SampleTask> popTask(int fileId) {
+	std::shared_ptr<SampleTask> popTask(int sampleId) {
 		std::shared_ptr<SampleTask> task;
-		queues.output.Pop(fileId, task);
-		LOG_DEBUG << "output queue -> (" << fileId + 1 << ")" << std::endl << std::flush;
+		queues.output.Pop(sampleId, task);
+		LOG_DEBUG << "output queue -> (" << sampleId + 1 << ")" << std::endl << std::flush;
 		return task;
 	}
 
 	void releaseTask(SampleTask& t) {
 		if (--bufferRefCounters[t.bufferId] == 0) {
 			queues.freeBuffers.Push(t.bufferId);
-			LOG_DEBUG << "Released readers buffer: " << t.fileId + 1 << std::endl << std::flush;
+			LOG_DEBUG << "Released readers buffer: " << t.bufferId + 1 << std::endl << std::flush;
 		}
 	}
 	
@@ -74,6 +74,8 @@ private:
 	bool storePositions;
 
 	uint32_t kmerLength;
+
+	std::atomic<sample_id_t> currentSampleId{ 0 };
 
 	std::thread prefetcher;
 

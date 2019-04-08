@@ -143,6 +143,7 @@ int GenomeInputFile::loadMultiple(
 	std::vector<kmer_t>& kmersBuffer,
 	std::vector<uint32_t>& positionsBuffer,
 	std::shared_ptr<SampleTask> reftask,
+	std::atomic<sample_id_t>& currentSampleId,
 	SynchronizedPriorityQueue<std::shared_ptr<SampleTask>>& outputQueue) {
 
 	if (!status) {
@@ -204,8 +205,9 @@ int GenomeInputFile::loadMultiple(
 
 			task->kmers = currentPos;
 			task->kmersCount = it - currentPos;
+			task->sampleId = currentSampleId.fetch_add(1);
 
-			outputQueue.Push(i, task);
+			outputQueue.Push(task->sampleId, task);
 			currentPos = it;
 		}
 
