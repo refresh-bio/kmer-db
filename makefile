@@ -20,16 +20,17 @@ CFLAGS	= -Wall -O3 -m64 -std=c++14 -fopenmp -pthread -mavx -I $(KMER_DB_LIBS_DIR
 CFLAGS_AVX2	= -Wall -O3 -m64 -std=c++14 -fopenmp -pthread -mavx2 -I $(KMER_DB_LIBS_DIR) -I $(EXTRA_LIBS_DIR)
 CLINK	= -lm -O3 -std=c++14 -lpthread -fopenmp -mavx -fabi-version=6 
 
-OBJS := $(KMER_DB_MAIN_DIR)/kmer_db.o \
-	$(KMER_DB_MAIN_DIR)/analyzer.o \
+OBJS := $(KMER_DB_MAIN_DIR)/analyzer.o \
 	$(KMER_DB_MAIN_DIR)/console.o \
 	$(KMER_DB_MAIN_DIR)/instrset_detect.o \
-	$(KMER_DB_MAIN_DIR)/loader.o \
+	$(KMER_DB_MAIN_DIR)/loader_ex.o \
 	$(KMER_DB_MAIN_DIR)/log.o \
 	$(KMER_DB_MAIN_DIR)/main.o \
 	$(KMER_DB_MAIN_DIR)/parallel_sorter.o \
 	$(KMER_DB_MAIN_DIR)/pattern.o \
-	$(KMER_DB_MAIN_DIR)/kmc_file_wrapper.o \
+	$(KMER_DB_MAIN_DIR)/input_file.o \
+	$(KMER_DB_MAIN_DIR)/prefix_kmer_db.o \
+	$(KMER_DB_MAIN_DIR)/similarity_calculator.o \
 	$(KMER_DB_LIBS_DIR)/kmc_file.o \
 	$(KMER_DB_LIBS_DIR)/kmer_api.o \
 	$(KMER_DB_LIBS_DIR)/mmer.o 

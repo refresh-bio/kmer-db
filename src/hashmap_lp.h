@@ -50,8 +50,9 @@ public:
 		Value val;
 	} item_t;
 
+	static const Key empty_key = static_cast<Key>(-1);
+
 private:
-	Key empty_key;
 	double max_fill_factor;
 
 	size_t size;
@@ -66,6 +67,7 @@ private:
 	size_t ht_total;
 	size_t ht_match;
 
+	
 	// *****************************************************************************************
 	//
 	void restruct(void)
@@ -102,15 +104,16 @@ public:
 	item_t* end() { return data + allocated; }
 	const item_t* cend() const { return data + allocated; }
 
-	// *****************************************************************************************
-	//
-	bool is_free(const item_t& item) const {
-		return item.key == empty_key;
-	}
+	
+	size_t get_size(void) const { return filled; }
+	size_t get_capacity(void) const { return allocated; }
+	bool is_free(const item_t& item) const { return item.key == empty_key; }
+	
+
 
 	// *****************************************************************************************
 	//
-	hash_map_lp() : empty_key((Key)-1)
+	hash_map_lp()
 	{
 		ht_memory = 0;
 		ht_total = 0;
@@ -155,10 +158,10 @@ public:
 		filled = 0;
 		for (size_t i = 0; i < allocated; ++i)
 		{
-			if (i % (1 << 15) == 0)
+	/*		if (i % (1 << 15) == 0)
 			{
 				LOG_DEBUG << "Clear: " << i << " from " << allocated << std::endl;
-			}
+			} */
 			data[i].key = empty_key;
 		}
 	}
@@ -173,7 +176,7 @@ public:
 		int n_threads = std::thread::hardware_concurrency();
 		std::vector<std::thread> threads(n_threads);
 
-		LOG_DEBUG << "Clearing hashtable (parallel)...";
+		//LOG_DEBUG << "Clearing hashtable (parallel)...";
 
 		for (int tid = 0; tid < n_threads; ++tid) {
 			threads[tid] = std::thread([tid, n_threads, this] {
@@ -195,7 +198,6 @@ public:
 			t.join();
 		}
 
-		LOG_DEBUG << std::endl;
 	}
 
 	// *****************************************************************************************
@@ -224,6 +226,16 @@ public:
 		data[h].val = v;
 
 		return &(data[h].val);
+	}
+
+	// *****************************************************************************************
+	//
+	void insert(Key k, Value v, item_t* place) 
+	{
+		place->key = k;
+		place->val = v;
+		++filled;
+		++size;
 	}
 
 	// *****************************************************************************************
@@ -260,9 +272,22 @@ public:
 		return nullptr;
 	}
 
+
 	// *****************************************************************************************
 	//
-	void prefetch(Key k)
+	item_t* find_item(Key k) const
+	{
+		size_t h = my_hasher_lp<Key>(k) & allocated_mask;
+		
+		while (data[h].key != k && data[h].key != empty_key) {
+			h = (h + 1) & allocated_mask;
+		} 
+		return &(data[h]);
+	}
+
+	// *****************************************************************************************
+	//
+	void prefetch(Key k) const
 	{
 		size_t h = my_hasher_lp<Key>(k) & allocated_mask;
 
@@ -275,38 +300,31 @@ public:
 
 	// *****************************************************************************************
 	//
-	size_t get_size(void) const
-	{
-		return filled;
-	}
-
-	// *****************************************************************************************
-	//
-	void reserve_for_additional(size_t n_elems)
+	bool reserve_for_additional(size_t n_elems)
 	{
 		if (filled + n_elems <= allocated * max_fill_factor)
-			return;
+			return false;
 
 		item_t *old_data = data;
 		size_t old_allocated = allocated;
 
-		LOG_DEBUG << "reserve_for_additional - in\n";
+	//	LOG_DEBUG << "reserve_for_additional - in\n";
 		while (filled + n_elems > allocated * max_fill_factor)
 			allocated *= 2;
 
-		LOG_DEBUG << "reserve_for_additional - new_size: " << allocated << std::endl;
+	//	LOG_DEBUG << "reserve_for_additional - new_size: " << allocated << std::endl;
 
 		allocated_mask = allocated - 1ull;
 		allocated_mask2 = allocated_mask >> 1;
 		size_when_restruct = (size_t)(allocated * max_fill_factor);
 
-		LOG_NORMAL << "\n--- Realloc to: " << allocated << "..." << std::endl;
+	//	LOG_NORMAL << "\n--- Realloc to: " << allocated << "..." << std::endl;
 
 		data = new item_t[allocated];
-		LOG_DEBUG << "reserve_for_additional - after new: " << allocated << std::endl;
+	//	LOG_DEBUG << "reserve_for_additional - after new: " << allocated << std::endl;
 
 		parallel_clear();
-		LOG_DEBUG << "reserve_for_additional - after clear: " << allocated << std::endl;
+	//	LOG_DEBUG << "reserve_for_additional - after clear: " << allocated << std::endl;
 
 		ht_memory += allocated * sizeof(item_t);
 
@@ -317,11 +335,13 @@ public:
 
 			if (i % (1 << 15) == 0)
 			{
-				LOG_DEBUG << "Inserted (restr.): " << i << std::endl;
+	//			LOG_DEBUG << "Inserted (restr.): " << i << std::endl;
 			}
 		}
 
 		delete[] old_data;
 		ht_memory -= old_allocated * sizeof(item_t);
+
+		return true;
 	}
 };

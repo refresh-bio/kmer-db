@@ -112,7 +112,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>zlibstat.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>zlibstat.lib;Raduls.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -151,7 +151,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>Debug</GenerateDebugInformation>
       <Profile>true</Profile>
-      <AdditionalDependencies>zlibstat.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>zlibstat.lib;Raduls.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -162,40 +162,44 @@
     <ClInclude Include="elias_gamma.h" />
     <ClInclude Include="filter.h" />
     <ClInclude Include="hashmap_lp.h" />
+    <ClInclude Include="input_file.h" />
     <ClInclude Include="instrset.h" />
-    <ClInclude Include="kmc_file_wrapper.h" />
     <ClInclude Include="kmer_db.h" />
     <ClInclude Include="kmc_api\kmc_file.h" />
     <ClInclude Include="kmc_api\kmer_api.h" />
     <ClInclude Include="kmc_api\kmer_defs.h" />
     <ClInclude Include="kmc_api\mmer.h" />
     <ClInclude Include="kmer_extract.h" />
-    <ClInclude Include="loader.h" />
+    <ClInclude Include="loader_ex.h" />
     <ClInclude Include="log.h" />
     <ClInclude Include="parallel_sorter.h" />
     <ClInclude Include="pattern.h" />
+    <ClInclude Include="prefix_kmer_db.h" />
     <ClInclude Include="queue.h" />
     <ClInclude Include="row_add.h" />
+    <ClInclude Include="similarity_calculator.h" />
+    <ClInclude Include="types.h" />
     <ClInclude Include="version.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="analyzer.cpp" />
     <ClCompile Include="console.cpp" />
+    <ClCompile Include="input_file.cpp" />
     <ClCompile Include="instrset_detect.cpp" />
     <ClCompile Include="kmc_api\kmc_file.cpp" />
     <ClCompile Include="kmc_api\kmer_api.cpp" />
     <ClCompile Include="kmc_api\mmer.cpp" />
-    <ClCompile Include="kmc_file_wrapper.cpp" />
-    <ClCompile Include="kmer_db.cpp" />
-    <ClCompile Include="loader.cpp" />
+    <ClCompile Include="loader_ex.cpp" />
     <ClCompile Include="log.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="parallel_sorter.cpp" />
     <ClCompile Include="pattern.cpp" />
+    <ClCompile Include="prefix_kmer_db.cpp" />
     <ClCompile Include="row_add_avx.cpp" />
     <ClCompile Include="row_add_avx2.cpp">
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
+    <ClCompile Include="similarity_calculator.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

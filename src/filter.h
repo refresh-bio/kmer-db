@@ -7,6 +7,8 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 
 */
 
+#include "types.h"
+
 #include <cmath>
 #include <limits>
 #include <cstdint>
@@ -14,7 +16,6 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include <algorithm>
 #include <set>
 
-//#include "hashset_lp.h"
 
 class AbstractFilter {
 public:

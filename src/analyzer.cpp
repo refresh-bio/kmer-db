@@ -3,9 +3,9 @@
 #include <iomanip>
 
 
-std::unique_ptr<SetFilter> Analyzer::selectSeedKmers(const FastKmerDb& db, size_t minSamplesCount) {
+std::unique_ptr<SetFilter> Analyzer::selectSeedKmers(const PrefixKmerDb& db, size_t minSamplesCount) {
 
-	double seedFraction = (double)minSamplesCount / db.getSamplesCount();
+/*	double seedFraction = (double)minSamplesCount / db.getSamplesCount();
 
 	auto seedSet = make_unique<SetFilter>(db.getKmers2patternIds().get_size() * seedFraction); 
 	const auto& kmers2patternIds = db.getKmers2patternIds();
@@ -23,14 +23,19 @@ std::unique_ptr<SetFilter> Analyzer::selectSeedKmers(const FastKmerDb& db, size_
 
 
 	return seedSet;
+	*/
+
+	return nullptr;
 }
 
-void Analyzer::operator()(const FastKmerDb & db) {
+void Analyzer::operator()(const PrefixKmerDb & db) {
 
 }
 
-void Analyzer::printStats(const FastKmerDb & db)
+void Analyzer::printStats(const PrefixKmerDb & db)
 {
+	/*
+	
 	std::vector<size_t> histo = { 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 30000, 35000, 38000, 39000  };
 	std::vector<size_t> counts(histo.size());
 	std::vector<size_t> kmersCounts(histo.size());
@@ -87,5 +92,6 @@ void Analyzer::printStats(const FastKmerDb & db)
 			<< "\t(" << Log::formatLargeNumber(uniqueKmerInstances[ih]) << ")" << endl;
 	}
 
-	
+	*/
 }
+

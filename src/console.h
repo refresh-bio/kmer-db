@@ -7,8 +7,9 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 */
 
 #pragma once
-#include "kmc_file_wrapper.h"
+#include "input_file.h"
 #include <stdexcept>
+#include <functional>
 
 // *****************************************************************************************
 //
@@ -26,22 +27,35 @@ public:
 
 	static const string SWITCH_KMC_SAMPLES;
 	static const string SWITCH_MINHASH_SAMPLES;
+	static const string SWITCH_MULTISAMPLE_FASTA;
+	static const string COMPACT_DB;
 	
 	static const string OPTION_FILTER;
 	static const string OPTION_LENGTH;
 	static const string OPTION_VERBOSE;
+	static const string OPTION_DEBUG;
 	static const string OPTION_THREADS;
+	static const string OPTION_READER_THREADS;
 	static const string OPTION_BUFFER;
+
 };
 
 class Console
 {
 public:
+	using metric_fun_t = std::function<double(size_t, size_t, size_t, int)>;
+	
+	Console();
+
 	int parse(int argc, char** argv);
 
 protected:
 	int numThreads;
+	int numReaderThreads;
 	int cacheBufferMb;
+	bool multisampleFasta;
+
+	std::map<std::string, metric_fun_t> availableMetrics;
 
 	int runBuildDatabase(const std::string& multipleSamples, const std::string dbFilename, 
 		InputFile::Format inputFormat, double filterValue, uint32_t kmerLength);
@@ -49,8 +63,8 @@ protected:
 	int runNewVsAll(const std::string& dbFilename, const std::string& multipleSamples, const std::string& similarityFilename, InputFile::Format inputFormat);
 	int runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFilename, InputFile::Format inputFormat);
 
-	int runMinHash(const std::string& multipleKmcSamples, double fraction);
-	int runDistanceCalculation(const std::string& similarityFilename);
+	int runMinHash(const std::string& multipleKmcSamples, InputFile::Format inputFormat, double fraction);
+	int runDistanceCalculation(const std::string& similarityFilename, const std::vector<string>& metricNames);
 
 	int runListPatterns(const std::string& dbFilename, const std::string& patternFile);
 	int runAnalyzeDatabase(const std::string& multipleKmcSamples, const std::string& dbFilename);
