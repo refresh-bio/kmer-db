@@ -54,7 +54,7 @@ The meaning of other options and positional arguments depends on the selected mo
 Construction of k-mers database is an obligatory step for further analyses. The procedure accepts several input types:
 * compressed or uncompressed genomes:
 
-    ```kmer-db build [-f <filter> -k <kmer-length> -multisample-fasta] <sample_list> <database>```
+    ```kmer-db build [-f <filter>] [-k <kmer-length>] [-multisample-fasta] <sample_list> <database>```
 * [KMC-generated](https://github.com/refresh-bio/KMC) k-mers: 
 
     ```kmer-db build -from-kmers [-f <filter>] <sample_list> <database>```
@@ -90,11 +90,10 @@ Parameters:
 
 ### Counting common k-mers between set of new samples and all the samples in the database:
 
-`kmer-db new2all [-multisample-fasta|-from-kmers|-from-minhash] <database> <sample_list> <common_table>`
+`kmer-db new2all [-multisample-fasta | -from-kmers | -from-minhash] <database> <sample_list> <common_table>`
 
 Parameters:
-* `-multisample-fasta` - each sequence in a genome FASTA file is treated as a separate sample.
-* `-from-kmers`/`-from-minhash` - by default, the query samples are given as compressed or uncompressed genomes; use these switches for different sample formats (see `build` mode for details).
+* `-multisample-fasta | -from-kmers | -from-minhash` - see `build` mode for details.
 * `database` (input) - k-mer database file created by `build` mode.
 * `sample_list` (input) - file containing list of samples in the same format as in the `build` mode; if samples are given as genomes (default) or k-mers (`-from-kmers` switch), the minhashing is done automatically with the same filter as in the database.
  * `common_table` (output) - file containing table with common k-mer counts.
@@ -144,11 +143,12 @@ This mode generates a file with similarity/distance table for each selected meas
 
 This is an optional analysis step which stores minhashed k-mers on the hard disk to be later consumed by `build`, `new2all`, or `one2all` modes with `-from-minhash` switch. It can be skipped if one wants to use all k-mers from samples for distance estimation or employs minhashing during database construction. Syntax:
 
-`kmer-db minhash <sample_list> <filter>`
+`kmer-db [-multisample-fasta | -from-kmers] minhash <filter> <sample_list>`
 
 Parameters:
- * `sample_list` (input) - file containing list of [KMC-generated](https://github.com/refresh-bio/KMC) k-mer files for samples (a pair of *.pre* and *.suf* files per sample is needed). 
+ * `-multisample-fasta | -from-kmers` - see `build` mode for details).
  * `filter` (input) - number from [0,1] interval determining a fraction of all k-mers to be accepted by the filter.
+ * `sample_list` (input) - file containing list of [KMC-generated](https://github.com/refresh-bio/KMC) k-mer files for samples (a pair of *.pre* and *.suf* files per sample is needed). 
  
   For each sample from the list, a binary file with *.minhash* extension containing filtered k-mers is created.
 
