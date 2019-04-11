@@ -114,7 +114,7 @@ Modes `all2all`, `new2all`, and `one2all` produce a comma-separated table with n
 | kmer-length: *k* fraction: *f* 	| db-samples 					| *s<sub>1</sub>*									| *s<sub>2</sub>* 										| ... 	|  *s<sub>n</sub>* |
 | query-samples 					| total-kmers 					| &#124;*s<sub>1</sub>*&#124;						| &#124;*s<sub>2</sub>*&#124; 							| ... 	|  &#124;*s<sub>n</sub>*&#124; |
 | *q<sub>1</sub>* 					| &#124;*q<sub>1</sub>*&#124;	| &#124;*q<sub>1</sub> &cap; s<sub>1</sub>*&#124;	| &#124;*q<sub>1</sub> &cap; s<sub>2</sub>*&#124; 	| ... 	|  &#124;*q<sub>1</sub> &cap; s<sub>n</sub>*&#124; |
-| *q<sub>2</sub>* 					| &#124;*q<sub>1</sub>*&#124;	| &#124;*q<sub>2</sub> &cap; s<sub>1</sub>*&#124;	| &#124;*q<sub>2</sub> &cap; s<sub>2</sub>*&#124; 	| ... 	|  &#124;*q<sub>2</sub> &cap; s<sub>n</sub>*&#124; |
+| *q<sub>2</sub>* 					| &#124;*q<sub>2</sub>*&#124;	| &#124;*q<sub>2</sub> &cap; s<sub>1</sub>*&#124;	| &#124;*q<sub>2</sub> &cap; s<sub>2</sub>*&#124; 	| ... 	|  &#124;*q<sub>2</sub> &cap; s<sub>n</sub>*&#124; |
 | ... 								| ...							| ...												| ...													| ...	|	...												 |
 | *q<sub>m</sub>* 					| &#124;*q<sub>m</sub>*&#124;	| &#124;*q<sub>m</sub> &cap; s<sub>1</sub>*&#124;	| &#124;*q<sub>m</sub> &cap; s<sub>2</sub>*&#124; 	| ... 	|  &#124;*q<sub>m</sub> &cap; s<sub>n</sub>*&#124; |
 
@@ -177,7 +177,7 @@ kmer-db all2all pathogens.db matrix.csv
 kmer-db distance matrix.csv
 ```
 
-Calculating similarities/distances between samples listed in *pathogens.list* and *salmonella* (*salmonella.kmc_pre* and *salomnella.kmc_suf* must exist) using all 20-mers: 
+Calculating similarities/distances between samples listed in *pathogens.list* and *salmonella* using all 20-mers: 
 ```
 kmer-db build -k 20 pathogens.list pathogens.db
 kmer-db one2all pathogens.db salmonella vector.csv
