@@ -95,21 +95,6 @@ int Console::parse(int argc, char** argv) {
 
 		multisampleFasta = findSwitch(params, Params::SWITCH_MULTISAMPLE_FASTA);
 
-		findOption(params, Params::OPTION_THREADS, numThreads);		// number of threads
-		if (numThreads <= 0) {
-			numThreads = std::thread::hardware_concurrency();
-		}
-
-		findOption(params, Params::OPTION_READER_THREADS, numReaderThreads);	// number of threads
-		if (numReaderThreads <= 0) {
-			numReaderThreads = numThreads / 4;
-		}
-
-		findOption(params, Params::OPTION_BUFFER, cacheBufferMb);	// size of temporary buffer in megabytes
-		if (cacheBufferMb <= 0) {
-			cacheBufferMb = 8;
-		}
-
 		double filter = 1.0;
 		uint32_t kmerLength = 18;
 		InputFile::Format inputFormat = InputFile::GENOME;
@@ -117,6 +102,24 @@ int Console::parse(int argc, char** argv) {
 		findOption(params, Params::OPTION_FILTER, filter);	// minhash threshold
 		findOption(params, Params::OPTION_LENGTH, kmerLength); // kmer length
 		
+		findOption(params, Params::OPTION_THREADS, numThreads);		// number of threads
+		if (numThreads <= 0) {
+			numThreads = std::thread::hardware_concurrency();
+		}
+
+		findOption(params, Params::OPTION_READER_THREADS, numReaderThreads);	// number of threads
+		if (numReaderThreads <= 0) {
+			// more reader threads for smaller filters (from t/4 up to t)
+			int invFilter = (int)(1.0 / filter);
+			numReaderThreads = std::min(numThreads, (numThreads / 8) * invFilter); 
+		}
+
+		findOption(params, Params::OPTION_BUFFER, cacheBufferMb);	// size of temporary buffer in megabytes
+		if (cacheBufferMb <= 0) {
+			cacheBufferMb = 8;
+		}
+
+
 		if (findSwitch(params, Params::SWITCH_KMC_SAMPLES)) {
 			inputFormat = InputFile::KMC;
 			kmerLength = 0;
