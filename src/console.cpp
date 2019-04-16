@@ -111,7 +111,7 @@ int Console::parse(int argc, char** argv) {
 		if (numReaderThreads <= 0) {
 			// more reader threads for smaller filters (from t/4 up to t)
 			int invFilter = (int)(1.0 / filter);
-			numReaderThreads = std::min(numThreads, (numThreads / 8) * invFilter); 
+			numReaderThreads = std::max(std::min(numThreads, (numThreads / 8) * invFilter), 1); 
 		}
 
 		findOption(params, Params::OPTION_BUFFER, cacheBufferMb);	// size of temporary buffer in megabytes
@@ -224,13 +224,16 @@ int Console::runMinHash(const std::string& multipleKmcSamples, InputFile::Format
 		LOG_VERBOSE << "Processing time: " << partialTime.count() << ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl;
 
 		auto task = loader.popTask(i);
-		auto start = std::chrono::high_resolution_clock::now();
-		
-		MihashedInputFile file(nullptr);
-		file.store(task->filePath, task->kmers, task->kmersCount, task->kmerLength, filterValue);
 
-		processingTime += std::chrono::high_resolution_clock::now() - start;
-		loader.releaseTask(*task);
+		if (task) {
+			auto start = std::chrono::high_resolution_clock::now();
+
+			MihashedInputFile file(nullptr);
+			file.store(task->filePath, task->kmers, task->kmersCount, task->kmerLength, filterValue);
+
+			processingTime += std::chrono::high_resolution_clock::now() - start;
+			loader.releaseTask(*task);
+		}
 	}
 
 	return 0;
@@ -273,11 +276,14 @@ int Console::runBuildDatabase(
 		LOG_VERBOSE << "Processing time: " << partialTime.count() <<  ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl;
 		
 		auto task = loader.popTask(i);
-		auto start = std::chrono::high_resolution_clock::now();
-		db->addKmers(task->sampleName, task->kmers, task->kmersCount, task->kmerLength, task->fraction);
-		processingTime += std::chrono::high_resolution_clock::now() - start;
-		loader.releaseTask(*task);
-		LOG_VERBOSE << db->printProgress() << endl;
+
+		if (task) {
+			auto start = std::chrono::high_resolution_clock::now();
+			db->addKmers(task->sampleName, task->kmers, task->kmersCount, task->kmerLength, task->fraction);
+			processingTime += std::chrono::high_resolution_clock::now() - start;
+			loader.releaseTask(*task);
+			LOG_VERBOSE << db->printProgress() << endl;
+		}
 	}
 
 	auto totalTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
@@ -496,24 +502,26 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 		LOG_VERBOSE << "Processing time: " << partialTime.count() << ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl;
 		
 		auto task = loader.popTask(i);
-		if ((i + 1) % 10 == 0) {
-			cout << "\r" << i + 1  << "...                      " << std::flush;
-		}
-		
-		if (task->kmerLength != db.getKmerLength()) {
-			cout << "Error: sample and database k-mer length differ." << endl;
-			return -1;
-		}
+		if (task) {
+			if ((i + 1) % 10 == 0) {
+				cout << "\r" << i + 1 << "...                      " << std::flush;
+			}
 
-		auto start = std::chrono::high_resolution_clock::now();
-		
-		sims.clear();
-		calculator(db, task->kmers, task->kmersCount, sims);
-		ofs << endl << task->sampleName << "," << task->kmersCount << ",";
-		std::copy(sims.begin(), sims.end(), ostream_iterator<uint32_t>(ofs, ","));
+			if (task->kmerLength != db.getKmerLength()) {
+				cout << "Error: sample and database k-mer length differ." << endl;
+				return -1;
+			}
 
-		processingTime += std::chrono::high_resolution_clock::now() - start;
-		loader.releaseTask(*task);
+			auto start = std::chrono::high_resolution_clock::now();
+
+			sims.clear();
+			calculator(db, task->kmers, task->kmersCount, sims);
+			ofs << endl << task->sampleName << "," << task->kmersCount << ",";
+			std::copy(sims.begin(), sims.end(), ostream_iterator<uint32_t>(ofs, ","));
+
+			processingTime += std::chrono::high_resolution_clock::now() - start;
+			loader.releaseTask(*task);
+		}
 	}
 
 	auto totalTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
