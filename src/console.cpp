@@ -166,7 +166,7 @@ int Console::parse(int argc, char** argv) {
 				double filter = std::atof(params[1].c_str());
 				if (filter > 0) {
 					cout << "Minhashing k-mers" << endl;
-					return runMinHash(params[2], inputFormat, filter);
+					return runMinHash(params[2], inputFormat, filter, kmerLength);
 				}
 			}
 			else if (params.size() >= 2 && mode == Params::MODE_DISTANCE) {
@@ -205,14 +205,14 @@ int Console::parse(int argc, char** argv) {
 
 // *****************************************************************************************
 //
-int Console::runMinHash(const std::string& multipleKmcSamples, InputFile::Format inputFormat, double filterValue) {
+int Console::runMinHash(const std::string& multipleKmcSamples, InputFile::Format inputFormat, double filterValue, uint32_t kmerLength) {
 	cout << "Minhashing samples..." << endl;
 
 	std::chrono::duration<double> loadingTime, processingTime;
 
 	LOG_DEBUG << "Creating Loader object..." << endl;
 
-	auto filter = std::make_shared<MinHashFilter>(filterValue, 0);
+	auto filter = std::make_shared<MinHashFilter>(filterValue, kmerLength);
 
 	LoaderEx loader(filter, inputFormat, numReaderThreads, multisampleFasta);
 	loader.configure(multipleKmcSamples);
@@ -731,7 +731,7 @@ void Console::showInstructions() {
 		<< "    sample_list (input) - file containing list of samples in one of the following formats:" << endl
 		<< "                          fasta genomes or reads (default), KMC k-mers (" << Params::SWITCH_KMC_SAMPLES << "), or minhashed k-mers (" << Params::SWITCH_MINHASH_SAMPLES << ")," << endl
 		<< "    database (output) - file with generated k-mer database," << endl
-		<< "    " << Params::OPTION_FILTER << " <filter> - number from [0, 1] interval determining a fraction of all k-mers to be accepted by the minhash filter," << endl
+		<< "    " << Params::OPTION_FILTER << " <fraction> - fraction of all k-mers to be accepted by the minhash filter," << endl
 		<< "    " << Params::OPTION_LENGTH << " <kmer_length> - length of k-mers (default: 18)," << endl 
 		<< "    " << Params::SWITCH_MULTISAMPLE_FASTA << " - each sequence in a genome FASTA file is treated as a separate sample." << endl << endl
 
@@ -764,8 +764,9 @@ void Console::showInstructions() {
 		<< "Name of the output file is produced by adding to the input file an extension with a measure name." << endl << endl
 
 		<< "Storing minhashed k-mers:" << endl
-		<< "  kmer-db " << Params::MODE_MINHASH << " [" << Params::SWITCH_MULTISAMPLE_FASTA << " | " << Params::SWITCH_KMC_SAMPLES << "]  <fraction> <sample_list>" << endl
-		<< "    fraction (input) - fraction of kmers passing the filter," << endl
+		<< "  kmer-db " << Params::MODE_MINHASH << " [" << Params::OPTION_LENGTH << " <kmer-length>]" << " [" << Params::SWITCH_MULTISAMPLE_FASTA << "] <fraction> <sample_list>" << endl
+		<< "  kmer-db " << Params::MODE_MINHASH << " " << Params::SWITCH_KMC_SAMPLES << " <fraction> <sample_list>" << endl
+		<< "    fraction (input) - fraction of all k-mers to be accepted by the minhash filter," << endl
 		<< "    sample_list (input) - file containing list of query samples in one of the supported formats (see build mode)." << endl << endl;
 		
 }

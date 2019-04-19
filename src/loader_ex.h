@@ -87,6 +87,8 @@ private:
 
 	std::vector<int> bufferRefCounters;
 
+	std::atomic<sample_id_t> multisampleCounter{ 0 };
+
 	struct {
 		RegisteringQueue<std::shared_ptr<InputTask>> input{ 1 };
 

@@ -63,7 +63,7 @@ protected:
 	int runNewVsAll(const std::string& dbFilename, const std::string& multipleSamples, const std::string& similarityFilename, InputFile::Format inputFormat);
 	int runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFilename, InputFile::Format inputFormat);
 
-	int runMinHash(const std::string& multipleKmcSamples, InputFile::Format inputFormat, double fraction);
+	int runMinHash(const std::string& multipleKmcSamples, InputFile::Format inputFormat, double fraction, uint32_t kmerLength);
 	int runDistanceCalculation(const std::string& similarityFilename, const std::vector<string>& metricNames);
 
 	int runListPatterns(const std::string& dbFilename, const std::string& patternFile);

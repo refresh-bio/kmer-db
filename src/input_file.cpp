@@ -143,6 +143,7 @@ int GenomeInputFile::loadMultiple(
 	std::vector<kmer_t>& kmersBuffer,
 	std::vector<uint32_t>& positionsBuffer,
 	std::shared_ptr<SampleTask> reftask,
+	std::atomic<sample_id_t> &multisampleCounter,
 	SynchronizedPriorityQueue<std::shared_ptr<SampleTask>>& outputQueue) {
 
 	if (!status) {
@@ -168,13 +169,14 @@ int GenomeInputFile::loadMultiple(
 		size_t totalLen = total;
 		extractSubsequences(data, totalLen, chromosomes, lengths, headers);
 
+		sample_id_t startingId = multisampleCounter.fetch_add(chromosomes.size());
+
 		std::shared_ptr<MinHashFilter> minhashFilter = dynamic_pointer_cast<MinHashFilter>(filter);
 
 		if (!minhashFilter) {
 			throw std::runtime_error("unsupported filter type!");
 		}
 
-		
 		reftask->kmerLength = minhashFilter->getLength();
 		reftask->fraction = minhashFilter->getFilterValue();
 
@@ -205,7 +207,7 @@ int GenomeInputFile::loadMultiple(
 			task->kmers = currentPos;
 			task->kmersCount = it - currentPos;
 
-			outputQueue.Push(i, task);
+			outputQueue.Push(startingId + i, task);
 			currentPos = it;
 		}
 
