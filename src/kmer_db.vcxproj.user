@@ -9,11 +9,11 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>build -k 20 -v  E:\Data\kmers\genomes250.list E:\Data\kmers\test.db</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>all2all E:\Data\kmers\backup\genomes250_k20.db E:\Data\kmers\backup\genomes250_k20.csv</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommandArguments>build -k 20 -v  E:\Data\kmers\genomes250.list E:\Data\kmers\test.db</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>all2all E:\Data\kmers\backup\genomes250_k20.db E:\Data\kmers\backup\genomes250_k20.csv</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
 </Project>

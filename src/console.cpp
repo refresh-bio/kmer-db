@@ -357,7 +357,7 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 
 	for (int sid = 0; sid < db->getSamplesCount(); ++sid) {
 		ofs << db->getSampleNames()[sid] << ", " << db->getSampleKmersCount()[sid] << ", ";
-		matrix.saveRow(sid, ofs);
+		matrix.saveRow(sid, db->getSampleKmersCount()[sid], ofs);
 		ofs << endl;
 	}
 

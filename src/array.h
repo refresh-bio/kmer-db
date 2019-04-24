@@ -182,6 +182,21 @@ public:
 		}
 	}
 
+	void saveRow(size_t row, T diagElem, std::ofstream & file) {
+		size_t offset = row * (row - 1) / 2;
+		T * ptr = data.data() + offset;
+
+		for (int j = 0; j < row; ++j) {
+			file << *ptr++ << ',';
+		}
+
+		file << diagElem << ",";
+		
+		for (int j = row + 1; j < size; ++j) {
+			file << "0,";
+		}
+	}
+
 protected:
 	size_t size;
 	std::vector<T> data;
