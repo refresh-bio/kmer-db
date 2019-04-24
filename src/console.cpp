@@ -558,11 +558,11 @@ int Console::runDistanceCalculation(const std::string& similarityFilename, const
 	}
 	
 	std::vector<std::ofstream> files(metricNames.size());
-	std::vector<std::ofstream> histoFiles(metricNames.size());
+//	std::vector<std::ofstream> histoFiles(metricNames.size());
 	
 	for (int i = 0; i < files.size(); ++i) {
 		files[i].open(similarityFilename + "." + metricNames[i]);
-		histoFiles[i].open(similarityFilename + "." + metricNames[i] + ".histo");
+//		histoFiles[i].open(similarityFilename + "." + metricNames[i] + ".histo");
 	}
 
 	std::vector<std::vector<size_t>> histograms(metrics.size(), std::vector<size_t>(100));
@@ -622,7 +622,7 @@ int Console::runDistanceCalculation(const std::string& similarityFilename, const
 				}
 					
 				int binId = (size_t)(values[j] * 100);
-				++histograms[m][binId];
+//				++histograms[m][binId];
 				*ptr = ',';
 				++ptr;
 			}
@@ -634,7 +634,7 @@ int Console::runDistanceCalculation(const std::string& similarityFilename, const
 	}
 
 	for (int m = 0; m < metrics.size(); ++m) {
-		std::copy(histograms[m].begin(), histograms[m].end(), std::ostream_iterator<size_t>(histoFiles[m], ","));
+//		std::copy(histograms[m].begin(), histograms[m].end(), std::ostream_iterator<size_t>(histoFiles[m], ","));
 	}
 
 	cout << "OK" << endl;
