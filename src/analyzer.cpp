@@ -34,8 +34,7 @@ void Analyzer::operator()(const PrefixKmerDb & db) {
 
 void Analyzer::printStats(const PrefixKmerDb & db)
 {
-	/*
-	
+
 	std::vector<size_t> histo = { 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 30000, 35000, 38000, 39000  };
 	std::vector<size_t> counts(histo.size());
 	std::vector<size_t> kmersCounts(histo.size());
@@ -63,28 +62,30 @@ void Analyzer::printStats(const PrefixKmerDb & db)
 
 	size_t minSamplesCount = 10;
 
-	const auto& kmers2patternIds = db.getKmers2patternIds();
-	std::vector<size_t> kmerInstances(histo.size());
-	std::vector<size_t> uniqueKmerInstances(histo.size());
+	for (const auto& ht : db.getHashtables()) {
+		std::vector<size_t> kmerInstances(histo.size());
+	//	std::vector<size_t> uniqueKmerInstances(histo.size());
 
-	for (auto it = kmers2patternIds.cbegin(); it < kmers2patternIds.cend(); ++it) {
-		if (kmers2patternIds.is_free(*it)) {
-			continue;
-		}
-		pattern_id_t pid = it->val;
-		const pattern_t& p = db.getPatterns()[pid];
-		
-		for (int ih = 0; ih < histo.size(); ++ih) {
-			if (p.get_num_samples() <= histo[ih]) {
-				kmerInstances[ih] += p.get_num_samples();
-//				if (db.getRepeatedKmers().cfind(it->key) == nullptr) {
-//					uniqueKmerInstances[ih] += p.get_num_samples();
-//				}
-				break;
+		for (auto it = ht.cbegin(); it < ht.cend(); ++it) {
+			if (ht.is_free(*it)) {
+				continue;
+			}
+			pattern_id_t pid = it->val;
+			const pattern_t& p = db.getPatterns()[pid];
+
+			for (int ih = 0; ih < histo.size(); ++ih) {
+				if (p.get_num_samples() <= histo[ih]) {
+					kmerInstances[ih] += p.get_num_samples();
+					//				if (db.getRepeatedKmers().cfind(it->key) == nullptr) {
+					//					uniqueKmerInstances[ih] += p.get_num_samples();
+					//				}
+					break;
+				}
 			}
 		}
 	}
 
+	/*
 	cout << endl << desc1 << " k-mer instances (uniques)" << endl;
 	for (int ih = 0; ih < histo.size(); ++ih) {
 		cout << setw(desc1.length()) << histo[ih]
