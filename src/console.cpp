@@ -95,21 +95,6 @@ int Console::parse(int argc, char** argv) {
 
 		multisampleFasta = findSwitch(params, Params::SWITCH_MULTISAMPLE_FASTA);
 
-		findOption(params, Params::OPTION_THREADS, numThreads);		// number of threads
-		if (numThreads <= 0) {
-			numThreads = std::thread::hardware_concurrency();
-		}
-
-		findOption(params, Params::OPTION_READER_THREADS, numReaderThreads);	// number of threads
-		if (numReaderThreads <= 0) {
-			numReaderThreads = numThreads / 4;
-		}
-
-		findOption(params, Params::OPTION_BUFFER, cacheBufferMb);	// size of temporary buffer in megabytes
-		if (cacheBufferMb <= 0) {
-			cacheBufferMb = 8;
-		}
-
 		double filter = 1.0;
 		uint32_t kmerLength = 18;
 		InputFile::Format inputFormat = InputFile::GENOME;
@@ -117,6 +102,24 @@ int Console::parse(int argc, char** argv) {
 		findOption(params, Params::OPTION_FILTER, filter);	// minhash threshold
 		findOption(params, Params::OPTION_LENGTH, kmerLength); // kmer length
 		
+		findOption(params, Params::OPTION_THREADS, numThreads);		// number of threads
+		if (numThreads <= 0) {
+			numThreads = std::thread::hardware_concurrency();
+		}
+
+		findOption(params, Params::OPTION_READER_THREADS, numReaderThreads);	// number of threads
+		if (numReaderThreads <= 0) {
+			// more reader threads for smaller filters (from t/4 up to t)
+			int invFilter = (int)(1.0 / filter);
+			numReaderThreads = std::max(std::min(numThreads, (numThreads / 8) * invFilter), 1); 
+		}
+
+		findOption(params, Params::OPTION_BUFFER, cacheBufferMb);	// size of temporary buffer in megabytes
+		if (cacheBufferMb <= 0) {
+			cacheBufferMb = 8;
+		}
+
+
 		if (findSwitch(params, Params::SWITCH_KMC_SAMPLES)) {
 			inputFormat = InputFile::KMC;
 			kmerLength = 0;
@@ -163,7 +166,7 @@ int Console::parse(int argc, char** argv) {
 				double filter = std::atof(params[1].c_str());
 				if (filter > 0) {
 					cout << "Minhashing k-mers" << endl;
-					return runMinHash(params[2], inputFormat, filter);
+					return runMinHash(params[2], inputFormat, filter, kmerLength);
 				}
 			}
 			else if (params.size() >= 2 && mode == Params::MODE_DISTANCE) {
@@ -202,14 +205,14 @@ int Console::parse(int argc, char** argv) {
 
 // *****************************************************************************************
 //
-int Console::runMinHash(const std::string& multipleKmcSamples, InputFile::Format inputFormat, double filterValue) {
+int Console::runMinHash(const std::string& multipleKmcSamples, InputFile::Format inputFormat, double filterValue, uint32_t kmerLength) {
 	cout << "Minhashing samples..." << endl;
 
 	std::chrono::duration<double> loadingTime, processingTime;
 
 	LOG_DEBUG << "Creating Loader object..." << endl;
 
-	auto filter = std::make_shared<MinHashFilter>(filterValue, 0);
+	auto filter = std::make_shared<MinHashFilter>(filterValue, kmerLength);
 
 	LoaderEx loader(filter, inputFormat, numReaderThreads, multisampleFasta);
 	loader.configure(multipleKmcSamples);
@@ -221,13 +224,16 @@ int Console::runMinHash(const std::string& multipleKmcSamples, InputFile::Format
 		LOG_VERBOSE << "Processing time: " << partialTime.count() << ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl;
 
 		auto task = loader.popTask(i);
-		auto start = std::chrono::high_resolution_clock::now();
-		
-		MihashedInputFile file(nullptr);
-		file.store(task->filePath, task->kmers, task->kmersCount, task->kmerLength, filterValue);
 
-		processingTime += std::chrono::high_resolution_clock::now() - start;
-		loader.releaseTask(*task);
+		if (task) {
+			auto start = std::chrono::high_resolution_clock::now();
+
+			MihashedInputFile file(nullptr);
+			file.store(task->filePath, task->kmers, task->kmersCount, task->kmerLength, filterValue);
+
+			processingTime += std::chrono::high_resolution_clock::now() - start;
+			loader.releaseTask(*task);
+		}
 	}
 
 	return 0;
@@ -270,11 +276,14 @@ int Console::runBuildDatabase(
 		LOG_VERBOSE << "Processing time: " << partialTime.count() <<  ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl;
 		
 		auto task = loader.popTask(i);
-		auto start = std::chrono::high_resolution_clock::now();
-		db->addKmers(task->sampleName, task->kmers, task->kmersCount, task->kmerLength, task->fraction);
-		processingTime += std::chrono::high_resolution_clock::now() - start;
-		loader.releaseTask(*task);
-		LOG_VERBOSE << db->printProgress() << endl;
+
+		if (task) {
+			auto start = std::chrono::high_resolution_clock::now();
+			db->addKmers(task->sampleName, task->kmers, task->kmersCount, task->kmerLength, task->fraction);
+			processingTime += std::chrono::high_resolution_clock::now() - start;
+			loader.releaseTask(*task);
+			LOG_VERBOSE << db->printProgress() << endl;
+		}
 	}
 
 	auto totalTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
@@ -348,7 +357,7 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 
 	for (int sid = 0; sid < db->getSamplesCount(); ++sid) {
 		ofs << db->getSampleNames()[sid] << ", " << db->getSampleKmersCount()[sid] << ", ";
-		matrix.saveRow(sid, ofs);
+		matrix.saveRow(sid, db->getSampleKmersCount()[sid], ofs);
 		ofs << endl;
 	}
 
@@ -493,24 +502,26 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 		LOG_VERBOSE << "Processing time: " << partialTime.count() << ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl;
 		
 		auto task = loader.popTask(i);
-		if ((i + 1) % 10 == 0) {
-			cout << "\r" << i + 1  << "...                      " << std::flush;
-		}
-		
-		if (task->kmerLength != db.getKmerLength()) {
-			cout << "Error: sample and database k-mer length differ." << endl;
-			return -1;
-		}
+		if (task) {
+			if ((i + 1) % 10 == 0) {
+				cout << "\r" << i + 1 << "...                      " << std::flush;
+			}
 
-		auto start = std::chrono::high_resolution_clock::now();
-		
-		sims.clear();
-		calculator(db, task->kmers, task->kmersCount, sims);
-		ofs << endl << task->sampleName << "," << task->kmersCount << ",";
-		std::copy(sims.begin(), sims.end(), ostream_iterator<uint32_t>(ofs, ","));
+			if (task->kmerLength != db.getKmerLength()) {
+				cout << "Error: sample and database k-mer length differ." << endl;
+				return -1;
+			}
 
-		processingTime += std::chrono::high_resolution_clock::now() - start;
-		loader.releaseTask(*task);
+			auto start = std::chrono::high_resolution_clock::now();
+
+			sims.clear();
+			calculator(db, task->kmers, task->kmersCount, sims);
+			ofs << endl << task->sampleName << "," << task->kmersCount << ",";
+			std::copy(sims.begin(), sims.end(), ostream_iterator<uint32_t>(ofs, ","));
+
+			processingTime += std::chrono::high_resolution_clock::now() - start;
+			loader.releaseTask(*task);
+		}
 	}
 
 	auto totalTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
@@ -547,11 +558,11 @@ int Console::runDistanceCalculation(const std::string& similarityFilename, const
 	}
 	
 	std::vector<std::ofstream> files(metricNames.size());
-	std::vector<std::ofstream> histoFiles(metricNames.size());
+//	std::vector<std::ofstream> histoFiles(metricNames.size());
 	
 	for (int i = 0; i < files.size(); ++i) {
 		files[i].open(similarityFilename + "." + metricNames[i]);
-		histoFiles[i].open(similarityFilename + "." + metricNames[i] + ".histo");
+//		histoFiles[i].open(similarityFilename + "." + metricNames[i] + ".histo");
 	}
 
 	std::vector<std::vector<size_t>> histograms(metrics.size(), std::vector<size_t>(100));
@@ -611,7 +622,7 @@ int Console::runDistanceCalculation(const std::string& similarityFilename, const
 				}
 					
 				int binId = (size_t)(values[j] * 100);
-				++histograms[m][binId];
+//				++histograms[m][binId];
 				*ptr = ',';
 				++ptr;
 			}
@@ -623,7 +634,7 @@ int Console::runDistanceCalculation(const std::string& similarityFilename, const
 	}
 
 	for (int m = 0; m < metrics.size(); ++m) {
-		std::copy(histograms[m].begin(), histograms[m].end(), std::ostream_iterator<size_t>(histoFiles[m], ","));
+//		std::copy(histograms[m].begin(), histograms[m].end(), std::ostream_iterator<size_t>(histoFiles[m], ","));
 	}
 
 	cout << "OK" << endl;
@@ -714,33 +725,33 @@ void Console::showInstructions() {
 		<< "The meaning of other options and positional arguments depends on the selected mode." << endl << endl
 
 		<< "Building a database:" << endl
-		<< "  kmer-db " << Params::MODE_BUILD << " [" << Params::OPTION_FILTER << " <filter>] [" << Params::OPTION_LENGTH << " <kmer-length>] [" << Params::SWITCH_MULTISAMPLE_FASTA << "] <sample_list> <database>" << endl
-		<< "  kmer-db " << Params::MODE_BUILD << " " << Params::SWITCH_KMC_SAMPLES << " [" << Params::OPTION_FILTER << " <filter>] <sample_list> <database>" << endl
+		<< "  kmer-db " << Params::MODE_BUILD << " [" << Params::OPTION_LENGTH << " <kmer-length>] [" << Params::OPTION_FILTER << " <fraction>] [" << Params::SWITCH_MULTISAMPLE_FASTA << "] <sample_list> <database>" << endl
+		<< "  kmer-db " << Params::MODE_BUILD << " " << Params::SWITCH_KMC_SAMPLES << " [" << Params::OPTION_FILTER << " <fraction>] <sample_list> <database>" << endl
 		<< "  kmer-db " << Params::MODE_BUILD << " " << Params::SWITCH_MINHASH_SAMPLES << " <sample_list> <database>" << endl
 		<< "    sample_list (input) - file containing list of samples in one of the following formats:" << endl
 		<< "                          fasta genomes or reads (default), KMC k-mers (" << Params::SWITCH_KMC_SAMPLES << "), or minhashed k-mers (" << Params::SWITCH_MINHASH_SAMPLES << ")," << endl
 		<< "    database (output) - file with generated k-mer database," << endl
-		<< "    " << Params::OPTION_FILTER << " <filter> - number from [0, 1] interval determining a fraction of all k-mers to be accepted by the minhash filter," << endl
-		<< "    " << Params::OPTION_LENGTH << " <kmer_length> - length of k-mers (default: 18)," << endl 
+		<< "    " << Params::OPTION_LENGTH << " <kmer_length> - length of k-mers (default: 18)," << endl
+		<< "    " << Params::OPTION_FILTER << " <fraction> - fraction of all k-mers to be accepted by the minhash filter (default: 1)," << endl
 		<< "    " << Params::SWITCH_MULTISAMPLE_FASTA << " - each sequence in a genome FASTA file is treated as a separate sample." << endl << endl
 
 		<< "Counting common k-mers for all the samples in the database:" << endl
 		<< "  kmer-db " << Params::MODE_ALL_2_ALL << " [" << Params::OPTION_BUFFER << " <size_mb>] <database> <common_table>" << endl
+		<< "    database (input) - k-mer database file." << endl
+		<< "    common_table (output) - comma-separated table with number of common k-mers." << endl
 		<< "    " << Params::OPTION_BUFFER << " <size_mb> - size of cache buffer in megabytes, applies to all2all mode" << endl
-		<< "                      (use L3 size for Intel CPUs and L2 for AMD to maximize performance; default: 8)," << endl
-		<< "    database (input) - k-mer database file," << endl
-		<< "    common_table (output) - comma-separated table with number of common k-mers." << endl << endl
+		<< "                      (use L3 size for Intel CPUs and L2 for AMD to maximize performance; default: 8)." << endl << endl
 
 		<< "Counting common kmers between set of new samples and all the samples in the database:" << endl
-		<< "  kmer-db " << Params::MODE_NEW_2_ALL << " [" << Params::SWITCH_MULTISAMPLE_FASTA  << " | " << Params::SWITCH_KMC_SAMPLES << " | " << Params::SWITCH_MINHASH_SAMPLES << "] <database> <sample_list> <common_table>" << endl
-		<< "    database (input) - k-mer database file" << endl
-		<< "    sample_list (input) - file containing list of query samples in one of the supported formats (see build mode)" << endl                     
+		<< "  kmer-db " << Params::MODE_NEW_2_ALL << " [" << Params::SWITCH_MULTISAMPLE_FASTA << " | " << Params::SWITCH_KMC_SAMPLES << " | " << Params::SWITCH_MINHASH_SAMPLES << "] <database> <sample_list> <common_table>" << endl
+		<< "    database (input) - k-mer database file." << endl
+		<< "    sample_list (input) - file containing list of query samples in one of the supported formats (see build mode)." << endl
 		<< "    common_table (output) - comma-separated table with number of common k-mers." << endl << endl
 
 		<< "Counting common kmers between single sample and all the samples in the database:" << endl
 		<< "  kmer-db " << Params::MODE_ONE_2_ALL << " [" << Params::SWITCH_MULTISAMPLE_FASTA << " | " << Params::SWITCH_KMC_SAMPLES << " | " << Params::SWITCH_MINHASH_SAMPLES << "] <database> <sample> <common_table>" << endl
-		<< "    database (input) - k-mer database file" << endl
-		<< "    sample (input) - query sample in one of the supported formats (see build mode)" << endl
+		<< "    database (input) - k-mer database file." << endl
+		<< "    sample (input) - query sample in one of the supported formats (see build mode)." << endl
 		<< "    common_table (output) - comma-separated table with number of common k-mers." << endl << endl
 
 		<< "Calculating similarities/distances on the basis of common k-mers:" << endl
@@ -753,9 +764,11 @@ void Console::showInstructions() {
 		<< "Name of the output file is produced by adding to the input file an extension with a measure name." << endl << endl
 
 		<< "Storing minhashed k-mers:" << endl
-		<< "  kmer-db " << Params::MODE_MINHASH << " [" << Params::SWITCH_MULTISAMPLE_FASTA << " | " << Params::SWITCH_KMC_SAMPLES << "]  <fraction> <sample_list>" << endl
-		<< "    fraction (input) - fraction of kmers passing the filter," << endl
-		<< "    sample_list (input) - file containing list of query samples in one of the supported formats (see build mode)." << endl << endl;
+		<< "  kmer-db " << Params::MODE_MINHASH << " [" << Params::OPTION_LENGTH << " <kmer-length>]" << " [" << Params::SWITCH_MULTISAMPLE_FASTA << "] <fraction> <sample_list>" << endl
+		<< "  kmer-db " << Params::MODE_MINHASH << " " << Params::SWITCH_KMC_SAMPLES << " <fraction> <sample_list>" << endl
+		<< "    fraction (input) - fraction of all k-mers to be accepted by the minhash filter." << endl
+		<< "    sample_list (input) - file containing list of query samples in one of the supported formats (see build mode)." << endl
+		<< "For each sample from the list, a binary file with *.minhash* extension containing filtered k-mers is created." << endl << endl;
 		
 }
 

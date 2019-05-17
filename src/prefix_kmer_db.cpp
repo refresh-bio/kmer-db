@@ -601,6 +601,7 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 		}
 	}
 
+	cout << "\r" << hashtables.size() << "/" << hashtables.size() << "...                      " << std::flush;
 	cout << endl;
 
 	if (!file) {

@@ -103,7 +103,8 @@ LoaderEx::LoaderEx(
 
 					if (this->multisampleFasta) {
 						auto genomicFile = std::dynamic_pointer_cast<GenomeInputFile>(inputTask->file);
-						int count = genomicFile->loadMultiple(kmersCollections[bufferId], positionsCollections[bufferId], sampleTask, queues.output);
+						int count = genomicFile->loadMultiple(kmersCollections[bufferId], positionsCollections[bufferId], 
+							sampleTask, this->multisampleCounter, queues.output);
 						bufferRefCounters[bufferId] += count;
 						ok = (count > 0);
 					}
