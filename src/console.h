@@ -28,6 +28,8 @@ public:
 	static const string SWITCH_KMC_SAMPLES;
 	static const string SWITCH_MINHASH_SAMPLES;
 	static const string SWITCH_MULTISAMPLE_FASTA;
+	static const string SWITCH_PHYLIP_OUT;
+
 	static const string COMPACT_DB;
 	
 	static const string OPTION_FILTER;
@@ -37,6 +39,7 @@ public:
 	static const string OPTION_THREADS;
 	static const string OPTION_READER_THREADS;
 	static const string OPTION_BUFFER;
+	
 
 };
 
@@ -64,7 +67,8 @@ protected:
 	int runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFilename, InputFile::Format inputFormat);
 
 	int runMinHash(const std::string& multipleKmcSamples, InputFile::Format inputFormat, double fraction, uint32_t kmerLength);
-	int runDistanceCalculation(const std::string& similarityFilename, const std::vector<string>& metricNames);
+	int runDistanceCalculation(const std::string& similarityFilename, const std::vector<string>& metricNames, bool usePhylip);
+	int runDistanceCalculationPhylip(const std::string& similarityFilename, const std::vector<string>& metricNames);
 
 	int runListPatterns(const std::string& dbFilename, const std::string& patternFile);
 	int runAnalyzeDatabase(const std::string& multipleKmcSamples, const std::string& dbFilename);
