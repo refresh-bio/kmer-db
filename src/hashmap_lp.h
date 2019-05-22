@@ -50,7 +50,9 @@ public:
 		Value val;
 	} item_t;
 
+	static const size_t INITIAL_SIZE = 16;
 	static const Key empty_key = static_cast<Key>(-1);
+	
 
 private:
 	double max_fill_factor;
@@ -119,7 +121,7 @@ public:
 		ht_total = 0;
 		ht_match = 0;
 
-		allocated = 16;
+		allocated = INITIAL_SIZE;
 		allocated_mask = allocated - 1;
 		allocated_mask2 = allocated_mask >> 1;
 
@@ -323,7 +325,7 @@ public:
 		data = new item_t[allocated];
 	//	LOG_DEBUG << "reserve_for_additional - after new: " << allocated << std::endl;
 
-		parallel_clear();
+		clear();
 	//	LOG_DEBUG << "reserve_for_additional - after clear: " << allocated << std::endl;
 
 		ht_memory += allocated * sizeof(item_t);
