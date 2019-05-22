@@ -135,6 +135,7 @@ For performance reasons, `all2all` mode produces a lower triangular matrix.
 Parameters:
 * `common_table` (input) - file containing table with numbers of common k-mers produced by `all2all`, `new2all`, or `one2all` mode. 
 * `measures` - names of the similarity/distance measures to be calculated, can be one or several of the following: `jaccard`, `min`, `max`, `cosine`, `mash`. If measures are not specified, `jaccard` is used by default.
+* `-phylip-out` - store output distance matrix in a Phylip format.
 
 This mode generates a file with similarity/distance table for each selected measure. Name of the output file is produced by adding to the input file an extension with a measure name.
     

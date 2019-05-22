@@ -93,7 +93,7 @@ public:
 	std::string printDetailedTimes() const override {
 		std::ostringstream oss;
 		oss << "\tHashatable processing (parallel): " << times.hashtableProcess.count() <<  endl 
-			<< "\timbalance: " << stats.hashtableJobsImbalance / getSamplesCount() <<  endl
+		//	<< "\timbalance: " << stats.hashtableJobsImbalance / getSamplesCount() <<  endl
 			<< "\t\tResize: " << (times.hashtableResize_worker.count() / num_threads) << endl
 			<< "\t\tFind'n'add: " << (times.hashtableFind_worker.count() / num_threads) << endl
 			<< "\tSort time (parallel): " << times.sort.count() << endl

@@ -66,7 +66,12 @@ PrefixKmerDb::~PrefixKmerDb() {
 void PrefixKmerDb::initialize(uint32_t kmerLength, double fraction) {
 	AbstractKmerDb::initialize(kmerLength, fraction);
 
-	size_t prefixBits = (kmerLength - SUFFIX_LEN) * 2;
+	int prefixBits = ((int)kmerLength - SUFFIX_LEN) * 2;
+	
+	if (prefixBits < 8) {
+		prefixBits = 8;
+	}
+
 	size_t binsCount = 1 << prefixBits;
 
 	prefixHistogram.resize(binsCount);

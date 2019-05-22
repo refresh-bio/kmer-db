@@ -440,6 +440,17 @@ bool KmcInputFile::load(
 	kmers = kmersBuffer.data();
 #endif
 
+	// calculate k-mers shifting to get prefix of at least 8 bits
+	size_t kmer_prefix_shift = 0;
+	kmer_t tail_mask = 0;
+
+	int prefix_bits = ((int)kmerLength - SUFFIX_LEN) * 2;
+
+	if (prefix_bits < 8) {
+		kmer_prefix_shift = (size_t)(8 - prefix_bits);
+		tail_mask = (1ULL << kmer_prefix_shift) - 1;
+	}
+
 	kmersCount = 0;
 	while (!kmcfile->Eof())
 	{
@@ -447,6 +458,8 @@ bool KmcInputFile::load(
 			break;
 		kmer.to_long(tmp);
 		u_kmer = tmp.front();
+		
+		u_kmer = (u_kmer << kmer_prefix_shift) | (u_kmer & tail_mask);
 
 		if ((*minhashFilter)(u_kmer)) {
 			kmers[kmersCount++] = u_kmer;

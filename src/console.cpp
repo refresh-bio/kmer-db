@@ -667,146 +667,6 @@ int Console::runDistanceCalculation(const std::string& similarityFilename, const
 }
 
 
-
-// *****************************************************************************************
-//
-/*
-int Console::runDistanceCalculationPhylip(const std::string& similarityFilename, const std::vector<string>& metricNames) {
-
-	std::vector<size_t> kmersCount;
-	uint32_t kmerLength;
-
-	cout << "Loading file with common k-mer counts: " << similarityFilename << "...";
-	ifstream similarityFile(similarityFilename);
-	if (!similarityFile) {
-		cout << "FAILED" << endl;
-		return -1;
-	}
-	cout << "OK" << endl;
-
-	cout << "Calculating distances...";
-
-	std::vector<metric_fun_t> metrics;
-	for (const auto& name : metricNames) {
-		metrics.push_back(availableMetrics[name]);
-	}
-
-	std::vector<std::ofstream> files(metricNames.size());
-	//	std::vector<std::ofstream> histoFiles(metricNames.size());
-
-	for (int i = 0; i < files.size(); ++i) {
-		files[i].open(similarityFilename + "." + metricNames[i]);
-		//		histoFiles[i].open(similarityFilename + "." + metricNames[i] + ".histo");
-	}
-
-	std::vector<std::vector<size_t>> histograms(metrics.size(), std::vector<size_t>(100));
-	std::vector<string> refNames;
-
-	string tmp, in;
-	double fraction;
-	similarityFile >> tmp >> kmerLength >> tmp >> fraction >> tmp;
-
-	
-	getline(similarityFile, in); // copy sample names to output files
-	std::replace(in.begin(), in.end(), ',', ' ');
-	iss2 >> tmp >> tmp;
-	std::copy(std::istream_iterator<size_t>(iss2), std::istream_iterator<size_t>(), std::back_inserter(refNames));
-
-
-	
-	getline(similarityFile, in); // get number of kmers for all samples
-	std::replace(in.begin(), in.end(), ',', ' ');
-	istringstream iss2(in);
-	iss2 >> tmp >> tmp;
-	std::copy(std::istream_iterator<size_t>(iss2), std::istream_iterator<size_t>(), std::back_inserter(kmersCount));
-
-	size_t refSamplesCount = kmersCount.size();
-
-	for (auto & f : files) {
-		f << refSamplesCount << std::endl;
-	}
-
-	Array<size_t> intersectionMatrix(refSamplesCount);
-	std::vector<double> values(refSamplesCount);
-
-	char* outBuffer = new char[10000000];
-
-	cout << "Loading matrix rows..." << endl;
-	for (int i = 0; getline(similarityFile, in); ++i) {
-		if ((i + 1) % 10 == 0) {
-			cout << "\r" << i + 1 << "/" << kmersCount.size() << "...";
-		}
-
-		std::replace(in.begin(), in.end(), ',', ' ');
-		istringstream iss(in);
-		uint64_t queryKmersCount = 0;
-		string queryName;
-		iss >> queryName >> queryKmersCount;
-
-		std::copy(std::istream_iterator<size_t>(iss), std::istream_iterator<size_t>(), intersectionMatrix.getData().begin() + refSamplesCount * i);
-	}
-
-	// fill upper triangle
-	for (int i = 0; i < refSamplesCount; ++i) {
-		for (int j = i + 1; j < refSamplesCount; ++j) {
-			intersectionMatrix[i][j] = intersectionMatrix[j][i];
-		}
-	}
-
-	cout << "Storing matrix rows..." << endl;
-	for (int i = 0; getline(similarityFile, in); ++i) {
-		if ((i + 1) % 10 == 0) {
-			cout << "\r" << i + 1 << "/" << refSamplesCount << "...";
-		}
-
-		size_t* intersections = intersectionMatrix[i];
-
-		for (int m = 0; m < metrics.size(); ++m) {
-			auto& metric = metrics[m];
-
-			std::transform(intersections, intersections + refSamplesCount, kmersCount.begin(), values.begin(),
-				[&metric, queryKmersCount, kmerLength](size_t intersection, size_t dbKmerCount)->double { return  metric(intersection, queryKmersCount, dbKmerCount, kmerLength); });
-
-			char* ptr = outBuffer;
-			memcpy(ptr, queryName.c_str(), queryName.size());
-			ptr += queryName.size();
-			*ptr = ' ';
-			++ptr;
-
-			for (int j = 0; j < values.size(); ++j) {
-
-				if (values[j] == 0) {
-					*ptr = '0';
-					++ptr;
-				}
-				else {
-					ptr += NumericConversions::Double2PChar(values[j], 6, ptr);
-				}
-
-				int binId = (size_t)(values[j] * 100);
-				//				++histograms[m][binId];
-				*ptr = ' ';
-				++ptr;
-			}
-			*ptr = 0;
-			size_t len = ptr - outBuffer;
-			files[m].write(outBuffer, len);
-			files[m] << endl;
-		}
-	}
-
-	for (int m = 0; m < metrics.size(); ++m) {
-		//		std::copy(histograms[m].begin(), histograms[m].end(), std::ostream_iterator<size_t>(histoFiles[m], ","));
-	}
-
-	cout << "OK" << endl;
-
-	delete[] outBuffer;
-
-	return 0;
-}
-*/
-
 // *****************************************************************************************
 //
 int Console::runAnalyzeDatabase(const std::string & multipleKmcSamples, const std::string & dbFilename)
@@ -916,8 +776,9 @@ void Console::showInstructions() {
 		<< "    common_table (output) - comma-separated table with number of common k-mers." << endl << endl
 
 		<< "Calculating similarities/distances on the basis of common k-mers:" << endl
-		<< "  kmer-db " << Params::MODE_DISTANCE << " [<measures>] <common_table>" << endl
+		<< "  kmer-db " << Params::MODE_DISTANCE << " [<measures>] [" << Params::SWITCH_PHYLIP_OUT << "] <common_table>" << endl
 		<< "    common_table (input) - comma-separated table with number of common k-mers." << endl
+		<< "    " << Params::SWITCH_PHYLIP_OUT << " - store output distance matrix in a Phylip format" << endl	
 		<< "    measures - names of the similarity/distance measures to be calculated, one or more of the following" << endl
 		<< "               jaccard (default), min, max, cosine, mash." << endl
 
