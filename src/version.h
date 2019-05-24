@@ -1,4 +1,4 @@
 #pragma once
 
-#define VERSION "1.6.1"
-#define DATE "22.05.2019"
+#define VERSION "1.6.2"
+#define DATE "24.05.2019"

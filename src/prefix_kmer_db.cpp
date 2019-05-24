@@ -475,24 +475,26 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 			temp = ht.get_size();
 			file.write(reinterpret_cast<const char*>(&temp), sizeof(temp));
 
-			// write ht elements in portions
-			size_t bufpos = 0;
-			for (auto it = ht.cbegin(); it < ht.cend(); ++it) {
-				if (ht.is_free(*it)) {
-					continue;
+			if (temp > 0) {
+				// write ht elements in portions
+				size_t bufpos = 0;
+				for (auto it = ht.cbegin(); it < ht.cend(); ++it) {
+					if (ht.is_free(*it)) {
+						continue;
+					}
+
+					hashtableBuffer[bufpos++] = *it;
+					if (bufpos == numHastableElements) {
+						file.write(reinterpret_cast<const char*>(&bufpos), sizeof(size_t));
+						file.write(buffer, bufpos * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
+						bufpos = 0;
+					}
 				}
 
-				hashtableBuffer[bufpos++] = *it;
-				if (bufpos == numHastableElements) {
-					file.write(reinterpret_cast<const char*>(&bufpos), sizeof(size_t));
-					file.write(buffer, bufpos * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
-					bufpos = 0;
-				}
+				// write remaining ht elements
+				file.write(reinterpret_cast<const char*>(&bufpos), sizeof(size_t));
+				file.write(buffer, bufpos * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
 			}
-
-			// write remaining ht elements
-			file.write(reinterpret_cast<const char*>(&bufpos), sizeof(size_t));
-			file.write(buffer, bufpos * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
 		}
 	}
 
@@ -588,20 +590,22 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 			// load ht size
 			file.read(reinterpret_cast<char*>(&temp), sizeof(temp));
 
-			// load ht elements
-			ht.clear();
-			ht.reserve_for_additional(temp);
+			if (temp > 0) {
+				// load ht elements
+				ht.clear();
+				ht.reserve_for_additional(temp);
 
-			size_t readCount = 0;
-			while (readCount < temp) {
-				size_t portion = 0;
-				file.read(reinterpret_cast<char*>(&portion), sizeof(size_t));
-				file.read(buffer, portion * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
+				size_t readCount = 0;
+				while (readCount < temp) {
+					size_t portion = 0;
+					file.read(reinterpret_cast<char*>(&portion), sizeof(size_t));
+					file.read(buffer, portion * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
 
-				for (size_t j = 0; j < portion; ++j) {
-					ht.insert(hashtableBuffer[j].key, hashtableBuffer[j].val);
+					for (size_t j = 0; j < portion; ++j) {
+						ht.insert(hashtableBuffer[j].key, hashtableBuffer[j].val);
+					}
+					readCount += portion;
 				}
-				readCount += portion;
 			}
 		}
 	}
