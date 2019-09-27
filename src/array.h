@@ -176,10 +176,6 @@ public:
 		for (int j = 0; j < row; ++j) {
 			file << *ptr++ << ',';
 		}
-
-		for (int j = row; j < size; ++j) {
-			file << "0,";
-		}
 	}
 
 	void saveRow(size_t row, T diagElem, std::ofstream & file) {
@@ -191,11 +187,8 @@ public:
 		}
 
 		file << diagElem << ",";
-		
-		for (int j = row + 1; j < size; ++j) {
-			file << "0,";
-		}
 	}
+
 
 protected:
 	size_t size;

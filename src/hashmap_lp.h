@@ -334,11 +334,6 @@ public:
 		{
 			if (old_data[i].key != empty_key)
 				insert(old_data[i].key, old_data[i].val);
-
-			if (i % (1 << 15) == 0)
-			{
-	//			LOG_DEBUG << "Inserted (restr.): " << i << std::endl;
-			}
 		}
 
 		delete[] old_data;
@@ -346,4 +341,62 @@ public:
 
 		return true;
 	}
+
+
+	// *****************************************************************************************
+	//
+	void serialize(std::ofstream& file) const {
+		
+		file.write(reinterpret_cast<const char*>(&max_fill_factor), sizeof(max_fill_factor));
+
+		file.write(reinterpret_cast<const char*>(&size), sizeof(size));
+		file.write(reinterpret_cast<const char*>(&filled), sizeof(filled));
+		file.write(reinterpret_cast<const char*>(&allocated), sizeof(allocated));
+		file.write(reinterpret_cast<const char*>(&size_when_restruct), sizeof(size_when_restruct));
+		file.write(reinterpret_cast<const char*>(&allocated_mask), sizeof(allocated_mask));
+		file.write(reinterpret_cast<const char*>(&allocated_mask2), sizeof(allocated_mask2));
+
+		file.write(reinterpret_cast<const char*>(&ht_memory), sizeof(ht_memory));
+		file.write(reinterpret_cast<const char*>(&ht_total), sizeof(ht_total));
+		file.write(reinterpret_cast<const char*>(&ht_match), sizeof(ht_match));
+
+		// 1GB portion
+		const size_t portionSize = (2 << 30) / sizeof(item_t);
+
+		for (size_t offset = 0; offset < allocated; offset += portionSize) {
+			size_t toWrite = std::min(portionSize, allocated - offset);
+			file.write(reinterpret_cast<const char*>(data + offset), sizeof(item_t) * toWrite);
+		}
+	}
+
+	// *****************************************************************************************
+	//
+	bool deserialize(std::ifstream& file) {
+
+		file.read(reinterpret_cast<char*>(&max_fill_factor), sizeof(max_fill_factor));
+
+		file.read(reinterpret_cast<char*>(&size), sizeof(size));
+		file.read(reinterpret_cast<char*>(&filled), sizeof(filled));
+		file.read(reinterpret_cast<char*>(&allocated), sizeof(allocated));
+		file.read(reinterpret_cast<char*>(&size_when_restruct), sizeof(size_when_restruct));
+		file.read(reinterpret_cast<char*>(&allocated_mask), sizeof(allocated_mask));
+		file.read(reinterpret_cast<char*>(&allocated_mask2), sizeof(allocated_mask2));
+
+		file.read(reinterpret_cast<char*>(&ht_memory), sizeof(ht_memory));
+		file.read(reinterpret_cast<char*>(&ht_total), sizeof(ht_total));
+		file.read(reinterpret_cast<char*>(&ht_match), sizeof(ht_match));
+
+		data = new item_t[allocated];
+		
+		// 1GB portion
+		const size_t portionSize = (2 << 30) / sizeof(item_t);
+
+		for (size_t offset = 0; offset < allocated; offset += portionSize) {
+			size_t toRead = std::min(portionSize, allocated - offset);
+			file.read(reinterpret_cast<char*>(data + offset), sizeof(item_t) * toRead);
+		}
+
+		return file.good();
+	}
+
 };

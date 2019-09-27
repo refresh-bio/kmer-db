@@ -429,6 +429,8 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 	std::vector <hash_map_lp<suffix_t, pattern_id_t>::item_t> hashtableBuffer(numHastableElements);
 	char* buffer = reinterpret_cast<char*>(hashtableBuffer.data());
 	
+	cout << "Storing general info..." << endl;
+
 	// generate format word
 	uint64_t formatWord = 0;
 	if (rawHashtables) {
@@ -452,23 +454,20 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 	}
 
 	// store number of hashmaps
+	cout << "Storing k-mer hashtables (" << (rawHashtables ? "raw" : "compressed") << ")..." << endl;
+	
 	temp = hashtables.size();
 	file.write(reinterpret_cast<const char*>(&temp), sizeof(temp));
-
+	
 	// store all hashmaps
-	for (const auto& ht : hashtables) {
+	for (int i = 0; i < hashtables.size(); ++i) {
+		if ((i + 1) % 10 == 0) {
+			cout << "\r" << i + 1 << "/" << hashtables.size() << "...                      " << std::flush;
+		}
+		auto& ht = hashtables[i];
 
 		if (rawHashtables) {
-			// store ht capacity
-			temp = ht.get_capacity();
-			file.write(reinterpret_cast<const char*>(&temp), sizeof(temp));
-
-			// write ht elements in portions
-			size_t bufpos = 0;
-			for (;;) {
-				
-	
-			}
+			ht.serialize(file);
 		}
 		else {
 			// store ht size
@@ -498,12 +497,22 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 		}
 	}
 
+	cout << "\r" << hashtables.size() << "/" << hashtables.size() << "...                      " << std::flush;
+	cout << endl;
+
 	// write patterns in portions
+	cout << "Storing patterns..." << endl;
+
 	temp = patterns.size();
 	file.write(reinterpret_cast<const char*>(&temp), sizeof(temp));
 
 	char * currentPtr = buffer;
 	for (int pid = 0; pid < patterns.size(); ++pid) {
+		
+		if ((pid + 1) % 1000 == 0) {
+			cout << "\r" << pid + 1 << "/" << patterns.size() << "...                      " << std::flush;
+		}
+		
 		if (currentPtr + patterns[pid].get_bytes() > buffer + IO_BUFFER_BYTES) {
 			size_t blockSize = currentPtr - buffer;
 			file.write(reinterpret_cast<const char*>(&blockSize), sizeof(size_t)); // write size of block to facilitate deserialization
@@ -523,6 +532,9 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 	file.write(reinterpret_cast<const char*>(&blockSize), sizeof(size_t)); // write size of block to facilitate deserialization
 	file.write(buffer, blockSize);
 
+	cout << "\r" << patterns.size() << "/" << patterns.size() << "...                      " << std::flush;
+	cout << endl;
+
 	// save kmer length and fraction
 	file.write(reinterpret_cast<const char*>(&kmerLength), sizeof(kmerLength)); // write size of block to facilitate deserialization
 
@@ -540,12 +552,12 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 	cout << "Loading general info..." << endl;
 
 	// load format word
-	bool rawHashatable = false;
+	bool rawHashtables = false;
 
 	uint64_t formatWord = 0;
 	file.read(reinterpret_cast<char*>(&formatWord), sizeof(formatWord));
 	if (formatWord & SERIALIZATION_RAW_HASHTABLES) {
-		rawHashatable = true;
+		rawHashtables = true;
 	}
 
 
@@ -569,7 +581,7 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 		return false;
 	}
 
-	cout << "Loading kmer hashtables..." << endl;
+	cout << "Loading k-mer hashtables (" << (rawHashtables ? "raw" : "compressed") << ")..." << endl;
 
 	// load number of hashmaps
 	file.read(reinterpret_cast<char*>(&temp), sizeof(temp));
@@ -582,9 +594,8 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 		}
 		auto& ht = hashtables[i];
 		
-		if (rawHashatable) {
-
-
+		if (rawHashtables) {
+			ht.deserialize(file);
 		}
 		else {
 			// load ht size
@@ -641,6 +652,9 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 			++pid;
 		}
 	}
+
+	cout << "\r" << patterns.size() << "/" << patterns.size() << "...                      " << std::flush;
+	cout << endl;
 
 	if (!file) {
 		return false;
