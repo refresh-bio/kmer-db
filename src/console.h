@@ -32,7 +32,8 @@ public:
 
 	static const string COMPACT_DB;
 	
-	static const string OPTION_FILTER;
+	static const string OPTION_FRACTION;
+	static const string OPTION_FRACTION_START;
 	static const string OPTION_LENGTH;
 	static const string OPTION_VERBOSE;
 	static const string OPTION_DEBUG;
@@ -61,7 +62,7 @@ protected:
 	std::map<std::string, metric_fun_t> availableMetrics;
 
 	int runBuildDatabase(const std::string& multipleSamples, const std::string dbFilename, 
-		InputFile::Format inputFormat, double filterValue, uint32_t kmerLength);
+		InputFile::Format inputFormat, double fraction, double fractionStart, uint32_t kmerLength);
 	int runAllVsAll(const std::string& dbFilename, const std::string& similarityFile);
 	int runNewVsAll(const std::string& dbFilename, const std::string& multipleSamples, const std::string& similarityFilename, InputFile::Format inputFormat);
 	int runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFilename, InputFile::Format inputFormat);

@@ -54,11 +54,15 @@ class MinHashFilter : public AbstractFilter {
 public:
 
 	uint64_t getLength() const { return kmer_length; }
-	double getFilterValue() const { return filterValue; }
+	double getFraction() const { return fraction; }
+	double getStartValue() const { return startValue;  }
 
-	MinHashFilter(double filterValue, uint64_t kmer_length) : kmer_length(kmer_length), filterValue(filterValue) {
-		if (filterValue <= 0.99999) {
-			threshold = (uint64_t)((double)std::numeric_limits<uint64_t>::max() * filterValue);
+
+	MinHashFilter(double fraction, double startValue, uint64_t kmer_length) : kmer_length(kmer_length), fraction(fraction), startValue(startValue) {
+		
+		if (fraction <= 0.99999) {
+			minThreshold = (uint64_t)((double)std::numeric_limits<uint64_t>::max() * startValue);
+			maxThreshold = (uint64_t)((double)std::numeric_limits<uint64_t>::max() * (startValue + fraction));
 			mode = THRESHOLD_BASED;
 		}
 		else {
@@ -74,7 +78,7 @@ public:
 		}
 
 		uint64_t h = hash(kmer);
-		return (h < threshold);
+		return (h >= minThreshold && h < maxThreshold);
 	}
 	
 	void setParams(uint64_t kmer_length) override {
@@ -93,10 +97,12 @@ protected:
 	enum Mode { PASS_ALL, THRESHOLD_BASED, SKETCH_BASED };
 
 	uint64_t kmer_length; 
-	double filterValue;
+	double fraction;
+	double startValue;
 	
 	Mode mode;
-	uint64_t threshold;
+	uint64_t maxThreshold;
+	uint64_t minThreshold;
 	uint64_t k_div_4;
 	uint64_t c42_xor_k_div_4;
 
@@ -144,91 +150,4 @@ protected:
 	}
 
 
-};
-
-// *****************************************************************************************
-//
-class SketchFilter : public MinHashFilter {
-	
-
-
-public:
-	
-	// *****************************************************************************************
-	//
-	SketchFilter(double filterValue, uint64_t kmer_length) : MinHashFilter(filterValue, kmer_length)
-	{
-		if (filterValue <= 0.99999) {
-			threshold = (uint64_t)((double)std::numeric_limits<uint64_t>::max() * filterValue);
-			mode = THRESHOLD_BASED;
-		}
-		else if (filterValue >= 2.0) {
-			mode = SKETCH_BASED;
-			kmer_heap.resize((int)std::round(filterValue));
-		}
-		
-		setParams(kmer_length);
-	}
-
-	
-	// *****************************************************************************************
-	//
-	virtual void initialize(size_t maxKmersCount) {
-		if (mode == THRESHOLD_BASED || mode == PASS_ALL) {
-			kmers.resize(maxKmersCount);
-			kmersCount = 0;
-		}
-	}
-
-	// *****************************************************************************************
-	//
-	virtual std::vector<kmer_t> finalize() {
-		if (mode == SKETCH_BASED) {
-			kmers.resize(kmer_heap.size());
-			std::transform(kmer_heap.getData().begin(), kmer_heap.getData().end(), kmers.begin(),
-				[](hashed_kmer_t& a)->kmer_t { return a.kmer; });
-			
-		}
-		
-		kmers.resize(kmersCount);
-		return std::move(kmers);
-	}
-
-	// *****************************************************************************************
-	//
-	virtual void add(kmer_t kmer) const {
-		// perform hashing only when needed
-		if (mode == PASS_ALL) {
-			kmers[kmersCount++] = kmer;
-			return;
-		}
-
-		uint64_t h = hash(kmer);
-
-		if (mode == THRESHOLD_BASED) {
-			// threshold-based filtering
-			if (h < threshold) {
-				kmers[kmersCount++] = kmer;
-			}
-		}
-		else {
-			kmer_heap.push(hashed_kmer_t(h, kmer));
-		}
-	}
-
-	
-private:
-
-	struct hashed_kmer_t {
-		uint64_t hash;
-		kmer_t kmer;
-		
-		hashed_kmer_t() {}
-		hashed_kmer_t(uint64_t hash, kmer_t kmer) : hash(hash), kmer(kmer) {}
-		bool operator<(hashed_kmer_t& a) const { return this->hash < a.hash; }
-	};
-
-	mutable size_t kmersCount = 0;
-	mutable std::vector<kmer_t> kmers;
-	mutable heap<hashed_kmer_t> kmer_heap;
 };

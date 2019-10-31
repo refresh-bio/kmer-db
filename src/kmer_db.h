@@ -33,6 +33,8 @@ protected:
 
 	double fraction;
 
+	double startFraction;
+
 	std::vector<string> sampleNames;
 
 	std::vector<size_t> sampleKmersCount;
@@ -52,6 +54,8 @@ public:
 	uint32_t getKmerLength() const { return kmerLength; }
 
 	double getFraction() const { return fraction; }
+
+	double getStartFraction() const { return startFraction; }
 
 	size_t getSamplesCount() const { return sampleNames.size(); }
 

@@ -539,6 +539,9 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 	file.write(reinterpret_cast<const char*>(&kmerLength), sizeof(kmerLength)); // write size of block to facilitate deserialization
 
 	file.write(reinterpret_cast<const char*>(&fraction), sizeof(fraction)); // write size of block to facilitate deserialization
+
+	file.write(reinterpret_cast<const char*>(&startFraction), sizeof(startFraction));
+	
 }
 
 // *****************************************************************************************
@@ -662,8 +665,8 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 
 	// load kmer length and fraction
 	file.read(reinterpret_cast<char*>(&kmerLength), sizeof(kmerLength));
-
 	file.read(reinterpret_cast<char*>(&fraction), sizeof(fraction));
+	file.read(reinterpret_cast<char*>(&startFraction), sizeof(startFraction));
 
 	return true;
 }

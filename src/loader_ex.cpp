@@ -149,8 +149,8 @@ LoaderEx::~LoaderEx() {
 
 // *****************************************************************************************
 //
-int LoaderEx::configure(const std::string& multipleKmcSamples) {
-	std::ifstream ifs(multipleKmcSamples);
+int LoaderEx::configure(const std::string& multipleSamples) {
+	std::ifstream ifs(multipleSamples);
 
 	string fname;
 	
