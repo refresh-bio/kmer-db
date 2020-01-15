@@ -13,6 +13,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include <iostream> 
 #include <cstddef>
 #include <thread>
+#include <fstream>
 
 #include "log.h"
 
