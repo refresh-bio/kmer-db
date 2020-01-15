@@ -345,7 +345,8 @@ void SimilarityCalculator::operator()(PrefixKmerDb& db, LowerTriangularMatrix<ui
 				sample2pattern.begin() + currentIndex,
 				sample2pattern.end(),
 				*(sample2pattern.begin() + currentIndex - 1),
-				[](auto x, auto y) {return get<0>(x) < get<0>(y); });	// Necessary, because we are looking for end of sample data
+				[](const std::tuple<sample_id_t, uint32_t, uint32_t>& x, const std::tuple<sample_id_t, uint32_t, uint32_t>& y) -> bool { 
+					return get<0>(x) < get<0>(y); });	// Necessary, because we are looking for end of sample data
 
 			size_t range = it - sample2pattern.begin();
 			workerRanges[rid + 1] = range;
