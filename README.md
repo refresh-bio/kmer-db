@@ -20,7 +20,7 @@ Kmer-db is a fast and memory-efficient tool for estimating evolutionary distance
 Kmer-db comes with a set of [precompiled binaries](https://github.com/refresh-bio/kmer-db/releases) for Windows and Linux. 
 The software can be also built from the sources distributed as:
 
-* MAKE project (G++ 4.8 required) for Linux and OS X.
+* MAKE project (G++ 4.8.5 tested) for Linux and OS X.
 * Visual Studio 2015 solution for Windows,
 
 ## *zlib* linking

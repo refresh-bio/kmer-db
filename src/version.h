@@ -10,7 +10,7 @@ Version history
 
 1.7.2 (15.01.2020)
 - Added new distance measure `-mash-query` which is a mash distance calculated w.r.t. a query length (use if the query is much shorter than database sequences).
-- C++11 compatibility (should compile on G++ 4.8).  
+- C++11 compatibility (compiles with G++ 4.8.5).  
 
 1.7.1 (31.10.2019)
 - Possibility to specify low threshold of k-mer minhash filter (-f-start parameter).
