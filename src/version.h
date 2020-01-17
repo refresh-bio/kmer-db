@@ -1,12 +1,15 @@
 #pragma once
 
-#define VERSION "1.7.2"
-#define DATE "15.01.2020"
+#define VERSION "1.7.3"
+#define DATE "17.01.2020"
 
 
 /* 
 
 Version history
+
+1.7.3 (17.01.2020)
+- Fixed rare bug in hashtable when k-mer containing only T bases was treated as an empty entry. Now an empty item is indicated by a special value instead of a special key.
 
 1.7.2 (15.01.2020)
 - Added new distance measure `-mash-query` which is a mash distance calculated w.r.t. a query length (use if the query is much shorter than database sequences).

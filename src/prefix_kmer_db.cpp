@@ -157,7 +157,7 @@ void PrefixKmerDb::hashtableJob() {
 					auto& ht = hashtables[prefix];
 					auto* entry = ht.find_item(suffix);
 
-					if (entry->key == ht.empty_key) {
+					if (entry->val == ht.empty_value) {
 						ht.insert(suffix, 0, entry);
 						++to_add;
 					}
@@ -476,6 +476,7 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 
 			if (temp > 0) {
 				// write ht elements in portions
+				size_t accum = 0;
 				size_t bufpos = 0;
 				for (auto it = ht.cbegin(); it < ht.cend(); ++it) {
 					if (ht.is_free(*it)) {
@@ -486,6 +487,7 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 					if (bufpos == numHastableElements) {
 						file.write(reinterpret_cast<const char*>(&bufpos), sizeof(size_t));
 						file.write(buffer, bufpos * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
+						accum += bufpos;
 						bufpos = 0;
 					}
 				}
@@ -493,6 +495,11 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 				// write remaining ht elements
 				file.write(reinterpret_cast<const char*>(&bufpos), sizeof(size_t));
 				file.write(buffer, bufpos * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
+				accum += bufpos;
+				
+				if (accum != ht.get_size()) {
+					throw std::runtime_error("Assertion error : HT size does not match the number of elements");
+				}
 			}
 		}
 	}

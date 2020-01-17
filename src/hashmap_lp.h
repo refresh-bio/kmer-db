@@ -52,19 +52,18 @@ public:
 	} item_t;
 
 	static const size_t INITIAL_SIZE = 16;
-	static const Key empty_key = static_cast<Key>(-1);
+//	static const Key empty_key = static_cast<Key>(-1);
+	static const Value empty_value = std::numeric_limits<Value>::max();
 	
 
 private:
 	double max_fill_factor;
 
-	size_t size;
 	size_t filled;
 	item_t *data;
 	size_t allocated;
 	size_t size_when_restruct;
 	size_t allocated_mask;
-	size_t allocated_mask2;
 
 	size_t ht_memory;
 	size_t ht_total;
@@ -82,7 +81,6 @@ private:
 			allocated *= 2;
 
 		allocated_mask = allocated - 1ull;
-		allocated_mask2 = allocated_mask >> 1;
 		size_when_restruct = (size_t)(allocated * max_fill_factor);
 
 		data = new item_t[allocated];
@@ -110,7 +108,7 @@ public:
 	
 	size_t get_size(void) const { return filled; }
 	size_t get_capacity(void) const { return allocated; }
-	bool is_free(const item_t& item) const { return item.key == empty_key; }
+	bool is_free(const item_t& item) const { return item.val == empty_value; }
 	
 
 
@@ -124,9 +122,7 @@ public:
 
 		allocated = INITIAL_SIZE;
 		allocated_mask = allocated - 1;
-		allocated_mask2 = allocated_mask >> 1;
-
-		size = 0;
+	
 		filled = 0;
 		data = new item_t[allocated];
 		max_fill_factor = 0.8;
@@ -157,7 +153,6 @@ public:
 	//
 	void clear(void)
 	{
-		size = 0;
 		filled = 0;
 		for (size_t i = 0; i < allocated; ++i)
 		{
@@ -165,7 +160,7 @@ public:
 			{
 				LOG_DEBUG << "Clear: " << i << " from " << allocated << std::endl;
 			} */
-			data[i].key = empty_key;
+			data[i].val = empty_value;
 		}
 	}
 
@@ -173,7 +168,6 @@ public:
 	//
 	void parallel_clear(void)
 	{
-		size = 0;
 		filled = 0;
 
 		int n_threads = std::thread::hardware_concurrency();
@@ -191,7 +185,7 @@ public:
 				item_t * end = data + hi;
 
 				for (; p < end; ++p) {
-					p->key = empty_key;
+					p->val = empty_value;
 				}
 
 			});
@@ -207,21 +201,20 @@ public:
 	//
 	Value* insert(Key k, Value v)
 	{
-		if (size >= size_when_restruct)
-			restruct();
+		if (filled >= size_when_restruct) {
+			throw std::runtime_error("Assertion error : hashmap_lp::restruct() should never be invoked");
+			//restruct();
+		}
 
 		size_t h = my_hasher_lp<Key>(k) & allocated_mask;
 
-		if (data[h].key != empty_key)
+		if (data[h].val != empty_value)
 		{
 			do
 			{
 				h = (h + 1) & allocated_mask;
-			} while (data[h].key != empty_key);
+			} while (data[h].val != empty_value);
 		}
-
-		if (data[h].key == empty_key)
-			++size;
 
 		++filled;
 
@@ -238,7 +231,6 @@ public:
 		place->key = k;
 		place->val = v;
 		++filled;
-		++size;
 	}
 
 	// *****************************************************************************************
@@ -255,12 +247,12 @@ public:
 		if (data[h].key == k)
 			return &(data[h].val);
 
-		if (data[h].key == empty_key)
+		if (data[h].val == empty_value)
 			return nullptr;
 
 		h = (h + 1) & allocated_mask;
 
-		while (data[h].key != empty_key)
+		while (data[h].val != empty_value)
 		{
 			if (data[h].key == k)
 			{
@@ -282,7 +274,7 @@ public:
 	{
 		size_t h = my_hasher_lp<Key>(k) & allocated_mask;
 		
-		while (data[h].key != k && data[h].key != empty_key) {
+		while (data[h].key != k && data[h].val != empty_value) {
 			h = (h + 1) & allocated_mask;
 		} 
 		return &(data[h]);
@@ -318,7 +310,6 @@ public:
 	//	LOG_DEBUG << "reserve_for_additional - new_size: " << allocated << std::endl;
 
 		allocated_mask = allocated - 1ull;
-		allocated_mask2 = allocated_mask >> 1;
 		size_when_restruct = (size_t)(allocated * max_fill_factor);
 
 	//	LOG_NORMAL << "\n--- Realloc to: " << allocated << "..." << std::endl;
@@ -333,7 +324,7 @@ public:
 
 		for (size_t i = 0; i < old_allocated; ++i)
 		{
-			if (old_data[i].key != empty_key)
+			if (old_data[i].val != empty_value)
 				insert(old_data[i].key, old_data[i].val);
 		}
 
@@ -350,13 +341,11 @@ public:
 		
 		file.write(reinterpret_cast<const char*>(&max_fill_factor), sizeof(max_fill_factor));
 
-		file.write(reinterpret_cast<const char*>(&size), sizeof(size));
 		file.write(reinterpret_cast<const char*>(&filled), sizeof(filled));
 		file.write(reinterpret_cast<const char*>(&allocated), sizeof(allocated));
 		file.write(reinterpret_cast<const char*>(&size_when_restruct), sizeof(size_when_restruct));
 		file.write(reinterpret_cast<const char*>(&allocated_mask), sizeof(allocated_mask));
-		file.write(reinterpret_cast<const char*>(&allocated_mask2), sizeof(allocated_mask2));
-
+	
 		file.write(reinterpret_cast<const char*>(&ht_memory), sizeof(ht_memory));
 		file.write(reinterpret_cast<const char*>(&ht_total), sizeof(ht_total));
 		file.write(reinterpret_cast<const char*>(&ht_match), sizeof(ht_match));
@@ -376,13 +365,11 @@ public:
 
 		file.read(reinterpret_cast<char*>(&max_fill_factor), sizeof(max_fill_factor));
 
-		file.read(reinterpret_cast<char*>(&size), sizeof(size));
 		file.read(reinterpret_cast<char*>(&filled), sizeof(filled));
 		file.read(reinterpret_cast<char*>(&allocated), sizeof(allocated));
 		file.read(reinterpret_cast<char*>(&size_when_restruct), sizeof(size_when_restruct));
 		file.read(reinterpret_cast<char*>(&allocated_mask), sizeof(allocated_mask));
-		file.read(reinterpret_cast<char*>(&allocated_mask2), sizeof(allocated_mask2));
-
+		
 		file.read(reinterpret_cast<char*>(&ht_memory), sizeof(ht_memory));
 		file.read(reinterpret_cast<char*>(&ht_total), sizeof(ht_total));
 		file.read(reinterpret_cast<char*>(&ht_match), sizeof(ht_match));
