@@ -89,7 +89,7 @@ private:
 		ht_memory += allocated * sizeof(item_t);
 
 		for (size_t i = 0; i < old_allocated; ++i)
-			if (old_data[i].key != empty_key)
+			if (old_data[i].val != empty_value)
 				insert(old_data[i].key, old_data[i].val);
 
 		delete[] old_data;
