@@ -621,22 +621,15 @@ int Console::runDistanceCalculation(const std::string& similarityFilename, const
 		string queryName;
 		iss >> queryName >> queryKmersCount;
 	
-		std::copy(std::istream_iterator<size_t>(iss), std::istream_iterator<size_t>(), intersections.begin());
-		
+		auto newEnd = std::copy(std::istream_iterator<size_t>(iss), std::istream_iterator<size_t>(), intersections.begin());
+		size_t numVals = newEnd - intersections.begin();
+
 		for (int m = 0; m < metrics.size(); ++m) {
 			auto& metric = metrics[m];
 			
-			size_t numVals = usePhylip ? i : values.size();
-
-			if (usePhylip) {
-				std::transform(intersections.begin(), intersections.begin() + i, kmersCount.begin(), values.begin(),
-					[&metric, queryKmersCount, kmerLength](size_t intersection, size_t dbKmerCount)->double { return  metric(intersection, queryKmersCount, dbKmerCount, kmerLength); });
-
-			} else {
-				std::transform(intersections.begin(), intersections.end(), kmersCount.begin(), values.begin(),
-					[&metric, queryKmersCount, kmerLength](size_t intersection, size_t dbKmerCount)->double { return  metric(intersection, queryKmersCount, dbKmerCount, kmerLength); });
-			}
-
+			std::transform(intersections.begin(), newEnd, kmersCount.begin(), values.begin(),
+				[&metric, queryKmersCount, kmerLength](size_t intersection, size_t dbKmerCount)->double { return  metric(intersection, queryKmersCount, dbKmerCount, kmerLength); });
+			
 			char* ptr = outBuffer;
 			memcpy(ptr, queryName.c_str(), queryName.size());
 			ptr += queryName.size();
