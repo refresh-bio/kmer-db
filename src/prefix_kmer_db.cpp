@@ -184,10 +184,11 @@ void PrefixKmerDb::patternJob() {
 		PatternTask task;
 
 		if (this->queues.patternExtension.Pop(task)) {
-			LOG_DEBUG << "Pattern job " << task.block_id << " started" << endl;
-			
 			uint32_t lo = task.lo;
 			uint32_t hi = task.hi;
+			
+			LOG_DEBUG << "Pattern job " << task.block_id << " started (" << lo << "-" << hi << ")" << endl;
+			
 			sample_id_t sampleId = (sample_id_t)(task.sample_id);
 			
 			threadPatterns[task.block_id].clear();
@@ -267,7 +268,7 @@ sample_id_t PrefixKmerDb::addKmers(
 	
 	// prepare tasks
 	size_t num_blocks = num_threads * 8;
-	size_t block = n_kmers / num_blocks;
+	size_t block = std::max(n_kmers / num_blocks, (size_t)1);
 
 	// prepare tasks
 	std::vector<HashtableTask> hashtableTasks(num_blocks, HashtableTask{0, 0, n_kmers, kmers, n_kmers });
@@ -305,7 +306,7 @@ sample_id_t PrefixKmerDb::addKmers(
 
 	semaphore.inc(hashtableTasks.size());
 	for (int tid = 0; tid < hashtableTasks.size(); ++tid) {
-		LOG_DEBUG << "Hashtable job " << tid << " scheduled" << endl;
+		LOG_DEBUG << "Hashtable job " << tid << " scheduled (" << hashtableTasks[tid].lo << "-" << hashtableTasks[tid].hi << ")" << endl;
 		queues.hashtableAddition.Push(hashtableTasks[tid]);
 	}
 

@@ -118,7 +118,7 @@ int Console::parse(int argc, char** argv) {
 
 		findOption(params, Params::OPTION_READER_THREADS, numReaderThreads);	// number of threads
 		if (numReaderThreads <= 0) {
-			// more reader threads for smaller filters (from t/4 up to t)
+			// more reader threads for smaller filters (from t/8 up to t)
 			int invFraction = (int)(1.0 / fraction);
 			numReaderThreads = std::max(std::min(numThreads, (numThreads / 8) * invFraction), 1); 
 		}
