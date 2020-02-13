@@ -1,14 +1,14 @@
 #pragma once
 
 #define VERSION "1.7.5"
-#define DATE "10.02.2020"
+#define DATE "13.02.2020"
 
 
 /* 
 
 Version history
 
-1.7.5 (10.02.2020)
+1.7.5 (13.02.2020)
 - Fixed crash on samples with small k-mers count or very small filter values.
 
 1.7.4 (29.01.2020)

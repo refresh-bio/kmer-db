@@ -283,14 +283,13 @@ sample_id_t PrefixKmerDb::addKmers(
 		// set block id and low bound
 		hashtableTasks[tid].block_id = tid;
 		hashtableTasks[tid].lo = (tid == 0) ? 0 : hashtableTasks[tid - 1].hi;
-
+	
 		currentHi = hashtableTasks[tid].lo + block;
 
 		// check if it makes sense to search for upper bound
-		if (currentHi < n_kmers) {
-
-			auto it = std::upper_bound(kmers + currentHi, kmers + n_kmers,
-				*(kmers + currentHi - 1), prefix_comparer);
+		if (currentHi < n_kmers && tid < num_blocks - 1) {
+			kmer_t ref = *(kmers + currentHi - 1);
+			auto it = std::upper_bound(kmers + currentHi, kmers + n_kmers, ref, prefix_comparer);
 
 			hashtableTasks[tid].hi = it - kmers;
 		}	
