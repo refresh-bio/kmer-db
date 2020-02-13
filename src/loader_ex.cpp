@@ -41,8 +41,8 @@ LoaderEx::LoaderEx(
 	positionsCollections.resize(buffersCount);
 	bufferRefCounters.resize(buffersCount);
 	
-	for (int id = 0; id < kmersCollections.size(); ++id) {
-		queues.freeBuffers.Push(id);
+	for (size_t id = 0; id < kmersCollections.size(); ++id) {
+		queues.freeBuffers.Push((int)id);
 		kmersCollections[id].reserve(10000000);
 		if (storePositions) {
 			positionsCollections[id].reserve(10000000);
@@ -115,7 +115,7 @@ LoaderEx::LoaderEx(
 						
 						if (ok) {
 							++bufferRefCounters[bufferId];
-							queues.output.Push(sampleTask->fileId, sampleTask);
+							queues.output.Push((int)sampleTask->fileId, sampleTask);
 						}
 					}
 
@@ -158,12 +158,12 @@ int LoaderEx::configure(const std::string& multipleSamples) {
 		fileNames.push_back(fname);
 	}
 
-	for (int i = 0; i < fileNames.size(); ++i) {
+	for (size_t i = 0; i < fileNames.size(); ++i) {
 		queues.input.Push(std::make_shared<InputTask>(i, fileNames[i]));
 	}
 	
 	queues.input.MarkCompleted();
-	return fileNames.size();
+	return (int)fileNames.size();
 }
 
 

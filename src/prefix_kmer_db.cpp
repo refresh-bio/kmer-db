@@ -99,7 +99,7 @@ void PrefixKmerDb::hashtableJob() {
 
 				auto start = std::chrono::high_resolution_clock::now();
 				// generate histogram
-				size_t begin = lo;
+				uint32_t begin = lo;
 				kmer_t prevPrefix = lo_prefix;
 
 				for (uint32_t i = lo + 1; i < hi; ++i) {
@@ -267,18 +267,18 @@ sample_id_t PrefixKmerDb::addKmers(
 	stats.hashtableBytes = 0;
 	
 	// prepare tasks
-	size_t num_blocks = num_threads * 8;
-	size_t block = std::max(n_kmers / num_blocks, (size_t)1);
+	uint32_t num_blocks = (uint32_t)num_threads * 8;
+	uint32_t block = std::max(n_kmers / num_blocks, 1u);
 
 	// prepare tasks
 	std::vector<HashtableTask> hashtableTasks(num_blocks, HashtableTask{0, 0, n_kmers, kmers, n_kmers });
-	auto currentHi = 0;
+	uint32_t currentHi = 0;
 
 	auto prefix_comparer = [this](kmer_t a, kmer_t b)->bool {
 		return GET_PREFIX_SHIFTED(a) < GET_PREFIX_SHIFTED(b);
 	};
 
-	int tid = 0;
+	uint32_t tid = 0;
 	for (tid = 0; tid < num_blocks && currentHi < n_kmers; ++tid) {
 		// set block id and low bound
 		hashtableTasks[tid].block_id = tid;
@@ -291,7 +291,7 @@ sample_id_t PrefixKmerDb::addKmers(
 			kmer_t ref = *(kmers + currentHi - 1);
 			auto it = std::upper_bound(kmers + currentHi, kmers + n_kmers, ref, prefix_comparer);
 
-			hashtableTasks[tid].hi = it - kmers;
+			hashtableTasks[tid].hi = (uint32_t)(it - kmers); // this is always positive
 		}	
 	}
 
@@ -303,7 +303,7 @@ sample_id_t PrefixKmerDb::addKmers(
 
 	stats.hashtableJobsImbalance += (double)(hashtableTasks.front().hi - hashtableTasks.front().lo) * num_blocks / n_kmers;
 
-	semaphore.inc(hashtableTasks.size());
+	semaphore.inc((int)hashtableTasks.size());
 	for (int tid = 0; tid < hashtableTasks.size(); ++tid) {
 		LOG_DEBUG << "Hashtable job " << tid << " scheduled (" << hashtableTasks[tid].lo << "-" << hashtableTasks[tid].hi << ")" << endl;
 		queues.hashtableAddition.Push(hashtableTasks[tid]);
@@ -331,7 +331,7 @@ sample_id_t PrefixKmerDb::addKmers(
 	// exdtend patterns
 	LOG_DEBUG << "Extending patterns (parallel)..." << endl;
 	start = std::chrono::high_resolution_clock::now();
-	std::atomic<pattern_id_t> new_pid(patterns.size());
+	std::atomic<pattern_id_t> new_pid((pattern_id_t)patterns.size());
 
 	// prepare tasks
 	num_blocks = num_threads;
@@ -369,14 +369,14 @@ sample_id_t PrefixKmerDb::addKmers(
 	*/
 
 	auto currentIndex = block;
-	for (int tid = 0; tid < num_blocks - 1; ++tid) {
+	for (uint32_t tid = 0; tid < num_blocks - 1; ++tid) {
 		auto it = std::upper_bound(
 			samplePatterns.begin() + currentIndex,
 			samplePatterns.end(),
 			*(samplePatterns.begin() + currentIndex - 1),
 			pid_comparer);
 
-		size_t range = it - samplePatterns.begin();
+		uint32_t range = (uint32_t)(it - samplePatterns.begin());
 
 		patternTasks[tid + 1].lo = patternTasks[tid].hi = range;
 		patternTasks[tid + 1].block_id = tid + 1;
@@ -391,7 +391,7 @@ sample_id_t PrefixKmerDb::addKmers(
 		std::find_if(patternTasks.begin(), patternTasks.end(), [](const PatternTask& t)->bool { return t.hi == t.lo;  }),
 		patternTasks.end());
 
-	semaphore.inc(patternTasks.size());
+	semaphore.inc((int)patternTasks.size());
 	for (int tid = 0; tid < patternTasks.size(); ++tid) {
 		LOG_DEBUG << "Pattern job " << tid << " scheduled" << endl;
 		queues.patternExtension.Push(patternTasks[tid]);

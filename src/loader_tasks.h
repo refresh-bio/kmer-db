@@ -29,6 +29,6 @@ struct SampleTask {
 	int bufferId;
 
 	SampleTask(size_t fileId, const std::string& filePath, const std::string& sampleName, int bufferId) :
-		filePath(filePath), fileId(fileId), sampleName(sampleName), bufferId(bufferId) {}
+		fileId(fileId), filePath(filePath), sampleName(sampleName), bufferId(bufferId) {}
 
 };

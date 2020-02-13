@@ -33,7 +33,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 	FILE * in;
 	
 	// try to open without adding extension
-	if (in = fopen(filename.c_str(), "rb")) {
+	if ((in = fopen(filename.c_str(), "rb"))) {
 		isGzipped = filename.substr(filename.length() - 3) == ".gz";
 	}
 	else {
@@ -122,7 +122,7 @@ bool GenomeInputFile::load(
 			positionsBuffer.reserve(sum_sizes);
 		}
 
-		for (int i = 0; i < chromosomes.size(); ++i) {
+		for (size_t i = 0; i < chromosomes.size(); ++i) {
 			extractKmers(chromosomes[i], lengths[i], kmerLength, minhashFilter, kmersBuffer, positionsBuffer, storePositions);
 		}
 	
@@ -202,7 +202,7 @@ int GenomeInputFile::loadMultiple(
 		}
 
 		kmer_t* currentPos = kmersBuffer.data();
-		for (int i = 0; i < chromosomes.size(); ++i) {
+		for (size_t i = 0; i < chromosomes.size(); ++i) {
 			auto task = std::make_shared<SampleTask>(*reftask);
 			task->sampleName = headers[i];
 
@@ -309,7 +309,7 @@ bool GenomeInputFile::extractSubsequences(
 	char * header = nullptr;
 	char * ptr = data;
 	
-	while (header = strchr(ptr, '>')) { // find begining of header
+	while ((header = strchr(ptr, '>'))) { // find begining of header
 		*header = 0; // put 0 as separator (end of previous chromosome)
 		if (subsequences.size()) {
 			lengths.push_back(header - subsequences.back());

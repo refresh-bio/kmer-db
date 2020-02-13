@@ -40,7 +40,7 @@ void Analyzer::printStats(const PrefixKmerDb & db)
 	std::vector<size_t> kmersCounts(histo.size());
 
 	for (const auto& p : db.getPatterns()) {
-		for (int ih = 0; ih < histo.size(); ++ih) {
+		for (size_t ih = 0; ih < histo.size(); ++ih) {
 			if (p.get_num_samples() <= histo[ih]) {
 				counts[ih]++;
 				kmersCounts[ih] += p.get_num_kmers();
@@ -54,13 +54,13 @@ void Analyzer::printStats(const PrefixKmerDb & db)
 	string desc3 = "kmers count";
 
 	cout << desc1 << ": " << desc2 << ", " << desc3 << endl;
-	for (int ih = 0; ih < histo.size(); ++ih) {
+	for (size_t ih = 0; ih < histo.size(); ++ih) {
 		cout << setw(desc1.length()) << histo[ih] 
 			<< ": " << Log::formatLargeNumber(counts[ih], desc2.length()) 
 			<< ", " << Log::formatLargeNumber(kmersCounts[ih], desc3.length()) << endl;
 	}
 
-	size_t minSamplesCount = 10;
+	//size_t minSamplesCount = 10;
 
 	for (const auto& ht : db.getHashtables()) {
 		std::vector<size_t> kmerInstances(histo.size());
@@ -73,7 +73,7 @@ void Analyzer::printStats(const PrefixKmerDb & db)
 			pattern_id_t pid = it->val;
 			const pattern_t& p = db.getPatterns()[pid];
 
-			for (int ih = 0; ih < histo.size(); ++ih) {
+			for (size_t ih = 0; ih < histo.size(); ++ih) {
 				if (p.get_num_samples() <= histo[ih]) {
 					kmerInstances[ih] += p.get_num_samples();
 					//				if (db.getRepeatedKmers().cfind(it->key) == nullptr) {

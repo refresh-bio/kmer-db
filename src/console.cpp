@@ -367,7 +367,7 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 	std::copy(db->getSampleKmersCount().cbegin(), db->getSampleKmersCount().cend(), ostream_iterator<size_t>(ofs, ","));
 	ofs << endl;
 
-	for (int sid = 0; sid < db->getSamplesCount(); ++sid) {
+	for (size_t sid = 0; sid < db->getSamplesCount(); ++sid) {
 		ofs << db->getSampleNames()[sid] << ", " << db->getSampleKmersCount()[sid] << ", ";
 		matrix.saveRow(sid, ofs);
 		ofs << endl;
@@ -573,7 +573,7 @@ int Console::runDistanceCalculation(const std::string& similarityFilename, const
 	std::vector<std::ofstream> files(metricNames.size());
 //	std::vector<std::ofstream> histoFiles(metricNames.size());
 	
-	for (int i = 0; i < files.size(); ++i) {
+	for (size_t i = 0; i < files.size(); ++i) {
 		files[i].open(similarityFilename + "." + metricNames[i]);
 //		histoFiles[i].open(similarityFilename + "." + metricNames[i] + ".histo");
 	}
@@ -624,7 +624,7 @@ int Console::runDistanceCalculation(const std::string& similarityFilename, const
 		auto newEnd = std::copy(std::istream_iterator<size_t>(iss), std::istream_iterator<size_t>(), intersections.begin());
 		size_t numVals = newEnd - intersections.begin();
 
-		for (int m = 0; m < metrics.size(); ++m) {
+		for (size_t m = 0; m < metrics.size(); ++m) {
 			auto& metric = metrics[m];
 			
 			std::transform(intersections.begin(), newEnd, kmersCount.begin(), values.begin(),
@@ -636,7 +636,7 @@ int Console::runDistanceCalculation(const std::string& similarityFilename, const
 			*ptr = usePhylip ? ' ' : ',';
 			++ptr;
 
-			for (int j = 0; j < numVals; ++j) {
+			for (size_t j = 0; j < numVals; ++j) {
 				
 				if (values[j] == 0) {
 					*ptr = '0';
@@ -658,7 +658,7 @@ int Console::runDistanceCalculation(const std::string& similarityFilename, const
 		}
 	}
 
-	for (int m = 0; m < metrics.size(); ++m) {
+	for (size_t m = 0; m < metrics.size(); ++m) {
 //		std::copy(histograms[m].begin(), histograms[m].end(), std::ostream_iterator<size_t>(histoFiles[m], ","));
 	}
 

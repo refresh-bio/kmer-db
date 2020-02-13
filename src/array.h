@@ -173,7 +173,7 @@ public:
 		size_t offset = row * (row - 1) / 2;
 		T * ptr = data.data() + offset;
 
-		for (int j = 0; j < row; ++j) {
+		for (size_t j = 0; j < row; ++j) {
 			file << *ptr++ << ',';
 		}
 	}
@@ -182,7 +182,7 @@ public:
 		size_t offset = row * (row - 1) / 2;
 		T * ptr = data.data() + offset;
 
-		for (int j = 0; j < row; ++j) {
+		for (size_t j = 0; j < row; ++j) {
 			file << *ptr++ << ',';
 		}
 

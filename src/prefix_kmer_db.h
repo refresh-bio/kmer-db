@@ -5,7 +5,7 @@
 #include <numeric>
 
 struct HashtableTask {
-	int block_id;
+	uint32_t block_id;
 	uint32_t lo;
 	uint32_t hi;
 	const kmer_t* kmers;
