@@ -685,7 +685,7 @@ void PrefixKmerDb::savePatterns(std::ofstream& file) const {
 
 	std::vector<uint32_t> aux(getSamplesCount());
 
-	for (int i = 0; i < patterns.size(); ++i) {
+	for (size_t i = 0; i < patterns.size(); ++i) {
 		const auto& p = patterns[i];
 		file << i << ": " << p.get_parent_id() << " | ";
 		p.decodeSamples(aux.data());

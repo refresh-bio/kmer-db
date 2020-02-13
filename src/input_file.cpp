@@ -58,10 +58,10 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 		my_fseek(in, 0, SEEK_SET);
 
 		rawData = reinterpret_cast<char*>(malloc(rawSize + 1));
-		size_t bytesRead = fread(rawData, rawSize, 1, in);
+		size_t blocksRead = fread(rawData, rawSize, 1, in);
 		rawData[rawSize] = 0; // add null termination 
 		fclose(in);
-		status = (bytesRead == rawSize);
+		status = blocksRead;
 	}
 
 	return status;
