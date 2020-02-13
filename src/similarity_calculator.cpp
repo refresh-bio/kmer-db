@@ -188,8 +188,8 @@ void SimilarityCalculator::operator()(PrefixKmerDb& db, LowerTriangularMatrix<ui
 			{
 				if (tasks_matrix_queue.Pop(range_id))
 				{
-					for (int id = workerRanges[range_id]; id < workerRanges[range_id + 1]; ) {
-						int Si = get<0>(sample2pattern[id]);
+					for (size_t id = workerRanges[range_id]; id < workerRanges[range_id + 1]; ) {
+						sample_id_t Si = get<0>(sample2pattern[id]);
 						uint32_t *row = matrix[Si];
 						while (id < workerRanges[range_id + 1] && get<0>(sample2pattern[id]) == Si) {
 							int local_pid = get<1>(sample2pattern[id]);
@@ -262,8 +262,8 @@ void SimilarityCalculator::operator()(PrefixKmerDb& db, LowerTriangularMatrix<ui
 	double hist_time = 0;
 	double patterns_time = 0;
 
-	int pid_to_cout = 0;
-	for (int pid = 0; pid < patterns.size(); ) {
+	size_t pid_to_cout = 0;
+	for (size_t pid = 0; pid < patterns.size(); ) {
 		if (pid >= pid_to_cout)
 		{
 			std::cout << pid << " of " << patterns.size() << "\r";
@@ -276,8 +276,8 @@ void SimilarityCalculator::operator()(PrefixKmerDb& db, LowerTriangularMatrix<ui
 
 		auto t1 = std::chrono::high_resolution_clock::now();
 
-		int part_size = bufsize / no_hist_parts + 1;
-		int next_boundary = 0;
+		size_t part_size = bufsize / no_hist_parts + 1;
+		size_t next_boundary = 0;
 		int part_id = 0;
 
 		v_tmp.clear();
@@ -411,7 +411,7 @@ void  SimilarityCalculator::operator()(const PrefixKmerDb& db, const kmer_t* kme
 	auto start = std::chrono::high_resolution_clock::now();
 
 	// iterate over kmers in analyzed sample
-	for (int i = 0; i < kmersCount; ++i) {
+	for (size_t i = 0; i < kmersCount; ++i) {
 
 		if (i + PREFETCH_DIST < kmersCount) {
 			kmer_t prefetch_kmer = kmers[i + PREFETCH_DIST];
@@ -477,7 +477,7 @@ void  SimilarityCalculator::operator()(const PrefixKmerDb& db, const kmer_t* kme
 			size_t hi = range_boundaries[tid + 1];
 			auto &my_localSimilarities = localSimilarities[tid];
 
-			for (int id = lo; id < hi; ++id) {
+			for (size_t id = lo; id < hi; ++id) {
 				if (id + 1 < hi)
 					_mm_prefetch((const char*)(patterns.data() + patterns2countVector[id + 1].first), _MM_HINT_T0);
 

@@ -646,7 +646,7 @@ int Console::runDistanceCalculation(const std::string& similarityFilename, const
 					ptr += NumericConversions::Double2PChar(values[j], 6, ptr);
 				}
 					
-				int binId = (size_t)(values[j] * 100);
+//				int binId = (size_t)(values[j] * 100);
 //				++histograms[m][binId];
 				*ptr = usePhylip ? ' ' : ',';
 				++ptr;

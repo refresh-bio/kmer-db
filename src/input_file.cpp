@@ -58,10 +58,10 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 		my_fseek(in, 0, SEEK_SET);
 
 		rawData = reinterpret_cast<char*>(malloc(rawSize + 1));
-		fread(rawData, rawSize, 1, in);
+		size_t bytesRead = fread(rawData, rawSize, 1, in);
 		rawData[rawSize] = 0; // add null termination 
 		fclose(in);
-		status = true;
+		status = (bytesRead == rawSize);
 	}
 
 	return status;
@@ -331,7 +331,7 @@ bool GenomeInputFile::extractSubsequences(
 
 	// remove newline characters from chromosome
 	totalLen = 0;
-	for (int i = 0; i < subsequences.size(); ++i) {
+	for (size_t i = 0; i < subsequences.size(); ++i) {
 		// determine chromosome end
 		char* newend = std::remove_if(subsequences[i], subsequences[i] + lengths[i], [](char c) -> bool { return c == '\n' || c == '\r';  });
 		*newend = 0;
