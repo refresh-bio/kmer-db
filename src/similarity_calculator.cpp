@@ -18,7 +18,7 @@ SimilarityCalculator::SimilarityCalculator(int _num_threads, size_t cacheBufferM
 
 // *****************************************************************************************
 //
-void SimilarityCalculator::operator()(PrefixKmerDb& db, LowerTriangularMatrix<uint32_t>& matrix) const 
+void SimilarityCalculator::all2all(PrefixKmerDb& db, LowerTriangularMatrix<uint32_t>& matrix) const 
 {
 	// get stuff from database
 	auto& patterns = db.getPatterns();
@@ -394,7 +394,8 @@ void SimilarityCalculator::operator()(PrefixKmerDb& db, LowerTriangularMatrix<ui
 
 // *****************************************************************************************
 //
-void  SimilarityCalculator::operator()(const PrefixKmerDb& db, const kmer_t* kmers, size_t kmersCount, std::vector<uint32_t>& similarities) const {
+template <>
+void  SimilarityCalculator::one2all<true>(const PrefixKmerDb& db, const kmer_t* kmers, size_t kmersCount, std::vector<uint32_t>& similarities) const {
 	
 	// get stuff from database
 	const auto& patterns = db.getPatterns();
@@ -526,6 +527,121 @@ void  SimilarityCalculator::operator()(const PrefixKmerDb& db, const kmer_t* kme
 		std::transform(localSimilarities[tid].begin(), localSimilarities[tid].end(), similarities.begin(), similarities.begin(), [](uint32_t a, uint32_t b)->uint32_t {
 			return a + b;
 		});
+	}
+
+	dt = std::chrono::high_resolution_clock::now() - start;
+	LOG_VERBOSE << "Pattern unpacking time: " << dt.count() << endl;
+}
+
+// *****************************************************************************************
+//
+template <>
+void SimilarityCalculator::one2all<false>(const PrefixKmerDb& db, const kmer_t* kmers, size_t kmersCount, std::vector<uint32_t>& similarities) const
+{
+	// get stuff from database
+	const auto& patterns = db.getPatterns();
+	int samples_count = db.getSamplesCount();
+	const auto& hashtables = db.getHashtables();
+
+	similarities.resize(samples_count, 0);
+
+	std::unordered_map<pattern_id_t, int32_t> patterns2count;
+
+	std::chrono::duration<double> dt;
+	auto start = std::chrono::high_resolution_clock::now();
+
+	// iterate over kmers in analyzed sample
+	for (size_t i = 0; i < kmersCount; ++i) {
+
+		if (i + PREFETCH_DIST < kmersCount) {
+			kmer_t prefetch_kmer = kmers[i + PREFETCH_DIST];
+
+			kmer_t prefix = GET_PREFIX_SHIFTED(prefetch_kmer);
+			suffix_t suffix = GET_SUFFIX(prefetch_kmer);
+
+			hashtables[prefix].prefetch(suffix);
+		}
+
+		// check if kmer exists in a database
+		kmer_t kmer = kmers[i];
+		kmer_t prefix = GET_PREFIX_SHIFTED(kmer);
+		suffix_t suffix = GET_SUFFIX(kmer);
+
+		auto entry = hashtables[prefix].find(suffix);
+
+		if (entry != nullptr) {
+			auto pid = *entry;
+			const auto& pattern = patterns[pid];
+
+			if (pattern.get_num_kmers() == 0)
+				continue;
+
+			++patterns2count[pid];
+		}
+	}
+
+	std::vector<std::pair<pattern_id_t, int32_t>> patterns2countVector(patterns2count.size());
+	int i = 0;
+	
+	uint64_t sum_pattern_lengths = 0;
+	for (auto &entry : patterns2count)
+	{
+		sum_pattern_lengths += patterns[entry.first].get_num_samples();
+		patterns2countVector[i++] = entry;	
+	}
+	
+	patterns2count.clear();
+
+	dt = std::chrono::high_resolution_clock::now() - start;
+	LOG_VERBOSE << "Pattern listing time: " << dt.count() << endl;
+
+	start = std::chrono::high_resolution_clock::now();
+	
+	std::vector<uint32_t> samples(samples_count);
+
+	size_t lo = 0;
+	size_t hi = patterns2countVector.size();
+		
+	for (size_t id = lo; id < hi; ++id) {
+		if (id + 1 < hi)
+			_mm_prefetch((const char*)(patterns.data() + patterns2countVector[id + 1].first), _MM_HINT_T0);
+
+		auto pid = patterns2countVector[id].first;
+		const auto& pattern = patterns[pid];
+		int num_samples = pattern.get_num_samples();
+		int to_add = patterns2countVector[id].second;
+
+		uint32_t* out = samples.data() + pattern.get_num_samples(); // start from the end
+
+		int64_t current_id = pid;
+		while (current_id >= 0) {
+			const auto& cur = patterns[current_id];
+
+			out -= cur.get_num_local_samples();
+			cur.decodeSamples(out);
+
+			current_id = cur.get_parent_id();
+		}
+
+		auto *p = samples.data();
+
+		int i;
+		for (i = 0; i + 4 <= num_samples; i += 4)
+		{
+			similarities[*p++] += to_add;
+			similarities[*p++] += to_add;
+			similarities[*p++] += to_add;
+			similarities[*p++] += to_add;
+		}
+		num_samples -= i;
+
+		switch (num_samples)
+		{
+		case 3: similarities[*p++] += to_add;
+		case 2: similarities[*p++] += to_add;
+		case 1: similarities[*p++] += to_add;
+		}
+
 	}
 
 	dt = std::chrono::high_resolution_clock::now() - start;

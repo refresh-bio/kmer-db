@@ -1,12 +1,15 @@
 #pragma once
 
-#define VERSION "1.7.5"
-#define DATE "13.02.2020"
+#define VERSION "1.7.6"
+#define DATE "30.03.2020"
 
 
 /* 
 
 Version history
+
+1.7.6 (31.03.2020)
+- Fixed bug in distance mode when sequence id contained spaces.
 
 1.7.5 (13.02.2020)
 - Some compilation warnings removed.
