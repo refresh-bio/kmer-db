@@ -1,4 +1,5 @@
 # Kmer-db
+[![GitHub downloads](https://img.shields.io/github/downloads/refresh-bio/kmer-db/total.svg?style=flag&label=GitHub%20downloads)](https://github.com/refresh-bio/kmer-db/releases)
 
 Kmer-db is a fast and memory-efficient tool for estimating evolutionary distances.
 
