@@ -1,0 +1,52 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ master, v2, feature/tests ]
+  pull_request:
+    branches: [ master, v2, feature/tests ]
+
+jobs:
+  
+  linux-test:
+    name: Linux test
+    runs-on: ubuntu-latest
+    env: 
+      INPUT_DIR: ./test/virus
+ 
+    steps:
+    - uses: actions/checkout@v2
+    - name: make
+      run: make
+    
+    - name: build + all2all (default k)
+      run: |
+        ./kmer-db build -multisample-fasta ${INPUT_DIR}/sequences.list k18.db
+        ./kmer-db all2all k18.db k18.csv
+        cmp k18.csv ${INPUT_DIR}/k18.csv
+    
+    - name: build + all2all (k=24)
+      run: |
+        ./kmer-db build -k 24 -multisample-fasta ${INPUT_DIR}/sequences.list k24.db
+        ./kmer-db all2all k24.db k24.csv
+        cmp k24.csv ${INPUT_DIR}/k24.csv
+
+    - name: distance (default k)
+      run: | 
+        ./kmer-db distance jaccard min max cosine mash k18.csv
+        cmp k18.csv.jaccard ${INPUT_DIR}/k18.csv.jaccard
+        cmp k18.csv.min ${INPUT_DIR}/k18.csv.min
+        cmp k18.csv.max ${INPUT_DIR}/k18.csv.max
+        cmp k18.csv.cosine ${INPUT_DIR}/k18.csv.cosine
+        cmp k18.csv.mash ${INPUT_DIR}/k18.csv.mash
+      
+      
+  macos-build:
+    name: macOS test
+    runs-on: macOS-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: make
+      run: make
+
