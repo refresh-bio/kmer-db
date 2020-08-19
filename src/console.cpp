@@ -355,7 +355,7 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 	cout << "Calculating matrix of common k-mers...";
 	start = std::chrono::high_resolution_clock::now();
 	LowerTriangularMatrix<uint32_t> matrix;
-	calculator(*db, matrix);
+	calculator.all2all(*db, matrix);
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "OK (" << dt.count() << " seconds)" << endl;
 
@@ -446,7 +446,7 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 	cout << "Calculating similarity vector...";
 	start = std::chrono::high_resolution_clock::now();
 	std::vector<uint32_t> sims;
-	calculator(db, queryKmers, queryKmersCount, sims);
+	calculator.one2all(db, queryKmers, queryKmersCount, sims);
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "OK (" << dt.count() << " seconds)" << endl;
 
@@ -528,7 +528,7 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 			auto start = std::chrono::high_resolution_clock::now();
 
 			sims.clear();
-			calculator(db, task->kmers, task->kmersCount, sims);
+			calculator.one2all<true>(db, task->kmers, task->kmersCount, sims);
 			ofs << endl << task->sampleName << "," << task->kmersCount << ",";
 			std::copy(sims.begin(), sims.end(), ostream_iterator<uint32_t>(ofs, ","));
 
@@ -614,12 +614,16 @@ int Console::runDistanceCalculation(const std::string& similarityFilename, const
 		if ((i + 1) % 10 == 0) {
 			cout << "\r" << i + 1 << "/" << kmersCount.size() << "...";
 		}
+		// find first comma 
+		auto pos = in.find(',');
+		string queryName(in.begin(), in.begin() + pos);
 
 		std::replace(in.begin(), in.end(), ',', ' ');
 		istringstream iss(in);
+		iss.seekg(pos + 1); // move right after first comma separator
 		uint64_t queryKmersCount = 0;
-		string queryName;
-		iss >> queryName >> queryKmersCount;
+
+		iss >> queryKmersCount;
 	
 		auto newEnd = std::copy(std::istream_iterator<size_t>(iss), std::istream_iterator<size_t>(), intersections.begin());
 		size_t numVals = newEnd - intersections.begin();

@@ -5,9 +5,10 @@ class SimilarityCalculator {
 public:
 	SimilarityCalculator(int _num_threads, size_t cacheBufferMb);
 
-	virtual void operator()(PrefixKmerDb& db, LowerTriangularMatrix<uint32_t>& matrix) const;
+	void all2all(PrefixKmerDb& db, LowerTriangularMatrix<uint32_t>& matrix) const;
 
-	virtual void operator()(const PrefixKmerDb& db, const kmer_t* kmers, size_t kmersCount, std::vector<uint32_t>& vector) const;
+	template <bool parallel = true>
+	void one2all(const PrefixKmerDb& db, const kmer_t* kmers, size_t kmersCount, std::vector<uint32_t>& vector) const;
 
 
 protected:
