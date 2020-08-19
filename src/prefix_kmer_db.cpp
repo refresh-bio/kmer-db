@@ -2,12 +2,7 @@
 
 #include "log.h"
 
-#ifdef WIN32
-#include <ppl.h>
-#else
-#include <parallel/algorithm>
-#endif
-#include <omp.h>
+#include <algorithm>
 
 #include <numeric>
 #include <cassert>

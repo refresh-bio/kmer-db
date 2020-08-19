@@ -11,6 +11,8 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 
 #ifdef WIN32
 #include <ppl.h>
+#elif defined __APPLE__
+#include <algorithm>
 #else
 #include <parallel/algorithm>
 #endif
@@ -24,6 +26,8 @@ void ParallelSort(kmer_t *arr, size_t arr_size)
 #ifdef WIN32
 	concurrency::parallel_sort(arr, arr + arr_size);
 	//std::stable_sort(samplePatterns.begin(), samplePatterns.end(), pid_comparer);
+#elif defined __APPLE__
+	std:: stable_sort(arr, arr + arr_size);
 #else
 	__gnu_parallel::sort(arr, arr + arr_size);
 #endif
@@ -39,6 +43,8 @@ void ParallelSort(pair<pattern_id_t, pattern_id_t*> *arr, size_t arr_size, pair<
 #ifdef WIN32
 	concurrency::parallel_sort(arr, arr + arr_size, pid_comparer);
 	//std::stable_sort(samplePatterns.begin(), samplePatterns.end(), pid_comparer);
+#elif defined __APPLE__
+	std:: stable_sort(arr, arr + arr_size, pid_comparer);
 #else
 	__gnu_parallel::sort(arr, arr + arr_size, pid_comparer);
 #endif
@@ -55,6 +61,8 @@ void ParallelSort(pair<kmer_or_pattern_t, pattern_id_t*> *arr, size_t arr_size, 
 #ifdef WIN32
 	concurrency::parallel_sort(arr, arr + arr_size, pid_comparer);
 	//std::stable_sort(samplePatterns.begin(), samplePatterns.end(), pid_comparer);
+#elif defined __APPLE__
+	std:: stable_sort(arr, arr + arr_size, pid_comparer);
 #else
 	__gnu_parallel::sort(arr, arr + arr_size, pid_comparer);
 #endif
