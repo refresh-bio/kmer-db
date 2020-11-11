@@ -2,7 +2,24 @@ all: kmer-db
 
 ## USER'S OPTIONS
 INTERNAL_ZLIB = false
-NO_AVX2 = false
+
+####################
+
+ifdef MSVC     # Avoid the MingW/Cygwin sections
+    uname_S := Windows
+else                          # If uname not available => 'not'
+    uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
+endif
+
+ifeq ($(uname_S),Linux)   
+	# check if CPU supports AVX2
+	HAVE_AVX2=$(filter-out 0,$(shell grep avx2 /proc/cpuinfo | wc -l))
+endif
+ifeq ($(uname_S),Darwin)
+	 # check if CPU supports SSE4.2
+	HAVE_AVX2=$(filter-out 0,$(shell  sysctl machdep.cpu.features| grep AVX2 - | wc -l))
+endif
+
 
 ## ###################
 KMER_DB_ROOT_DIR = .
@@ -27,8 +44,9 @@ endif
 
 CC = g++
 LDFLAGS += 
-CFLAGS	+= -Wall -O3 -m64 -std=c++11 $(OMP_FLAGS) -pthread -mavx - -I $(KMER_DB_LIBS_DIR) -I $(EXTRA_LIBS_DIR)
-CFLAGS_AVX2	+= $(CFLAGS) -mavx2
+CFLAGS	+= -Wall -O3 -m64 -std=c++11 $(OMP_FLAGS) -pthread 
+CFLAGS_AVX2	+= $(CFLAGS) -mavx2 -I $(KMER_DB_LIBS_DIR) -I $(EXTRA_LIBS_DIR)
+CFLAGS += -mavx  -I $(KMER_DB_LIBS_DIR) -I $(EXTRA_LIBS_DIR)
 CLINK	= -lm -O3 -std=c++11 -lpthread $(OMP_FLAGS) -mavx $(ABI_FLAGS) -lz
 
 OBJS := $(KMER_DB_MAIN_DIR)/analyzer.o \
@@ -49,7 +67,7 @@ OBJS := $(KMER_DB_MAIN_DIR)/analyzer.o \
 $(KMER_DB_MAIN_DIR)/parallel_sorter.o: $(KMER_DB_MAIN_DIR)/parallel_sorter.cpp
 	$(CC) -O3 -mavx -m64 -std=c++11 -pthread $(OMP_FLAGS) -c $< -o $@
 
-ifeq ($(NO_AVX2),true)
+ifeq ($(HAVE_AVX2),)
 ## no avx2 support
 AVX_OBJS := $(KMER_DB_MAIN_DIR)/row_add_avx.o 
 $(KMER_DB_MAIN_DIR)/row_add_avx.o: $(KMER_DB_MAIN_DIR)/row_add_avx.cpp
