@@ -14,12 +14,15 @@ endif
 ifeq ($(uname_S),Linux)   
 	# check if CPU supports AVX2
 	HAVE_AVX2=$(filter-out 0,$(shell grep avx2 /proc/cpuinfo | wc -l))
+	OMP_FLAGS = -fopenmp
+	ABI_FLAGS = -fabi-version=6
 endif
 ifeq ($(uname_S),Darwin)
 	 # check if CPU supports SSE4.2
 	HAVE_AVX2=$(filter-out 0,$(shell  sysctl machdep.cpu.features| grep AVX2 - | wc -l))
+	OMP_FLAGS = -Xpreprocessor -fopenmp 
+	ABI_FLAGS = 
 endif
-
 
 ## ###################
 KMER_DB_ROOT_DIR = .
@@ -32,15 +35,6 @@ else
 	EXTRA_LIBS_DIR = ""
 endif
 
-OS_NAME := $(shell uname -s)
-ifeq ($(OS_NAME), Darwin)
-	OMP_FLAGS = -Xpreprocessor -fopenmp 
-	ABI_FLAGS = 
-else
-	OMP_FLAGS = -fopenmp
-	ABI_FLAGS = -fabi-version=6
-endif
-
 
 CC = g++
 LDFLAGS += 
@@ -48,6 +42,7 @@ CFLAGS	+= -Wall -O3 -m64 -std=c++11 $(OMP_FLAGS) -pthread
 CFLAGS_AVX2	+= $(CFLAGS) -mavx2 -I $(KMER_DB_LIBS_DIR) -I $(EXTRA_LIBS_DIR)
 CFLAGS += -mavx  -I $(KMER_DB_LIBS_DIR) -I $(EXTRA_LIBS_DIR)
 CLINK	= -lm -O3 -std=c++11 -lpthread $(OMP_FLAGS) -mavx $(ABI_FLAGS) -lz
+
 
 OBJS := $(KMER_DB_MAIN_DIR)/analyzer.o \
 	$(KMER_DB_MAIN_DIR)/console.o \
