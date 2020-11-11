@@ -27,9 +27,9 @@ endif
 
 CC = g++
 LDFLAGS += 
-CFLAGS	+= -Wall -O3 -m64 -std=c++11 $(OMP_FLAGS) -pthread -mavx -lz -I $(KMER_DB_LIBS_DIR) -I $(EXTRA_LIBS_DIR)
-CFLAGS_AVX2	+= $(CFLAGS) 
-CLINK	= -lm -O3 -std=c++11 -lpthread $(OMP_FLAGS) -mavx $(ABI_FLAGS) 
+CFLAGS	+= -Wall -O3 -m64 -std=c++11 $(OMP_FLAGS) -pthread -mavx - -I $(KMER_DB_LIBS_DIR) -I $(EXTRA_LIBS_DIR)
+CFLAGS_AVX2	+= $(CFLAGS) -mavx2
+CLINK	= -lm -O3 -std=c++11 -lpthread $(OMP_FLAGS) -mavx $(ABI_FLAGS) -lz
 
 OBJS := $(KMER_DB_MAIN_DIR)/analyzer.o \
 	$(KMER_DB_MAIN_DIR)/console.o \
