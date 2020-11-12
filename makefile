@@ -41,7 +41,7 @@ LDFLAGS +=
 CFLAGS	+= -Wall -O3 -m64 -std=c++11 $(OMP_FLAGS) -pthread 
 CFLAGS_AVX2	+= $(CFLAGS) -mavx2 -I $(KMER_DB_LIBS_DIR) -I $(EXTRA_LIBS_DIR)
 CFLAGS += -mavx  -I $(KMER_DB_LIBS_DIR) -I $(EXTRA_LIBS_DIR)
-CLINK	= -lm -O3 -std=c++11 -lpthread $(OMP_FLAGS) -mavx $(ABI_FLAGS) -lz
+CLINK	= -lm -O3 -std=c++11 -lpthread $(OMP_FLAGS) -mavx $(ABI_FLAGS) 
 
 
 OBJS := $(KMER_DB_MAIN_DIR)/analyzer.o \
@@ -88,7 +88,7 @@ kmer-db: $(OBJS) $(AVX_OBJS)
 	$(CC) $(CLINK) $(LDFLAGS) -o $(KMER_DB_ROOT_DIR)/$@ $(OBJS) $(AVX_OBJS) $(EXTRA_LIBS_DIR)/libz.a
 else
 kmer-db: $(OBJS) $(AVX_OBJS)
-	$(CC) $(CLINK) $(LDFLAGS) -o $(KMER_DB_ROOT_DIR)/$@ $(OBJS) $(AVX_OBJS) 
+	$(CC) $(CLINK) $(LDFLAGS) -o $(KMER_DB_ROOT_DIR)/$@ $(OBJS) $(AVX_OBJS) -lz 
 endif	
 
 clean:
