@@ -19,7 +19,7 @@ ifeq ($(uname_S),Linux)
 endif
 ifeq ($(uname_S),Darwin)
 	 # check if CPU supports SSE4.2
-	HAVE_AVX2=$(filter-out 0,$(shell  sysctl machdep.cpu.features| grep AVX2 - | wc -l))
+	HAVE_AVX2=$(filter-out 0,$(shell  sysctl -n machdep.cpu.features machdep.cpu.leaf7_features| grep AVX2 - | wc -l))
 	OMP_FLAGS = -Xpreprocessor -fopenmp 
 	ABI_FLAGS = 
 endif
