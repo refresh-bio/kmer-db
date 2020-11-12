@@ -2,7 +2,27 @@ all: kmer-db
 
 ## USER'S OPTIONS
 INTERNAL_ZLIB = false
-NO_AVX2 = false
+
+####################
+
+ifdef MSVC     # Avoid the MingW/Cygwin sections
+    uname_S := Windows
+else                          # If uname not available => 'not'
+    uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
+endif
+
+ifeq ($(uname_S),Linux)   
+	# check if CPU supports AVX2
+	HAVE_AVX2=$(filter-out 0,$(shell grep avx2 /proc/cpuinfo | wc -l))
+	OMP_FLAGS = -fopenmp
+	ABI_FLAGS = -fabi-version=6
+endif
+ifeq ($(uname_S),Darwin)
+	 # check if CPU supports SSE4.2
+	HAVE_AVX2=$(filter-out 0,$(shell  sysctl -n machdep.cpu.features machdep.cpu.leaf7_features| grep AVX2 - | wc -l))
+	OMP_FLAGS = -Xpreprocessor -fopenmp 
+	ABI_FLAGS = 
+endif
 
 ## ###################
 KMER_DB_ROOT_DIR = .
@@ -15,20 +35,14 @@ else
 	EXTRA_LIBS_DIR = ""
 endif
 
-OS_NAME := $(shell uname -s)
-ifeq ($(OS_NAME), Darwin)
-	OMP_FLAGS = -Xpreprocessor -fopenmp 
-	ABI_FLAGS = 
-else
-	OMP_FLAGS = -fopenmp
-	ABI_FLAGS = -fabi-version=6
-endif
-
 
 CC = g++
-CFLAGS	= -Wall -O3 -m64 -std=c++11 $(OMP_FLAGS) -pthread -mavx -I $(KMER_DB_LIBS_DIR) -I $(EXTRA_LIBS_DIR)
-CFLAGS_AVX2	= -Wall -O3 -m64 -std=c++11 $(OMP_FLAGS) -pthread -mavx2 -I $(KMER_DB_LIBS_DIR) -I $(EXTRA_LIBS_DIR)
+LDFLAGS += 
+CFLAGS	+= -Wall -O3 -m64 -std=c++11 $(OMP_FLAGS) -pthread 
+CFLAGS_AVX2	+= $(CFLAGS) -mavx2 -I $(KMER_DB_LIBS_DIR) -I $(EXTRA_LIBS_DIR)
+CFLAGS += -mavx  -I $(KMER_DB_LIBS_DIR) -I $(EXTRA_LIBS_DIR)
 CLINK	= -lm -O3 -std=c++11 -lpthread $(OMP_FLAGS) -mavx $(ABI_FLAGS) 
+
 
 OBJS := $(KMER_DB_MAIN_DIR)/analyzer.o \
 	$(KMER_DB_MAIN_DIR)/console.o \
@@ -48,7 +62,7 @@ OBJS := $(KMER_DB_MAIN_DIR)/analyzer.o \
 $(KMER_DB_MAIN_DIR)/parallel_sorter.o: $(KMER_DB_MAIN_DIR)/parallel_sorter.cpp
 	$(CC) -O3 -mavx -m64 -std=c++11 -pthread $(OMP_FLAGS) -c $< -o $@
 
-ifeq ($(NO_AVX2),true)
+ifeq ($(HAVE_AVX2),)
 ## no avx2 support
 AVX_OBJS := $(KMER_DB_MAIN_DIR)/row_add_avx.o 
 $(KMER_DB_MAIN_DIR)/row_add_avx.o: $(KMER_DB_MAIN_DIR)/row_add_avx.cpp
@@ -71,10 +85,10 @@ endif
 
 ifeq ($(INTERNAL_ZLIB),true)
 kmer-db: $(OBJS) $(AVX_OBJS)
-	$(CC) $(CLINK) -o $(KMER_DB_ROOT_DIR)/$@ $(OBJS) $(AVX_OBJS) $(EXTRA_LIBS_DIR)/libz.a
+	$(CC) $(CLINK) $(LDFLAGS) -o $(KMER_DB_ROOT_DIR)/$@ $(OBJS) $(AVX_OBJS) $(EXTRA_LIBS_DIR)/libz.a
 else
 kmer-db: $(OBJS) $(AVX_OBJS)
-	$(CC) $(CLINK) -o $(KMER_DB_ROOT_DIR)/$@ $(OBJS) $(AVX_OBJS) -lz
+	$(CC) $(CLINK) $(LDFLAGS) -o $(KMER_DB_ROOT_DIR)/$@ $(OBJS) $(AVX_OBJS) -lz 
 endif	
 
 clean:
