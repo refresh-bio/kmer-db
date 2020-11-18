@@ -30,7 +30,7 @@ Kmer-db uses *zlib* for handling gzipped inputs. Under Linux, the software is by
 
 ## AVX and AVX2 support
 
-Kmer-db by default takes advantage of AVX (required) and AVX2 (optional) CPU extensions. Pre-built binary detetermines supported instructions at runtime, thus it is multiplatform. However, one may encounter a problem when building Kmer-db a CPU without AVX2. To prevent from using AVX2, the program must be compiled with NO_AVX2 symbolic constant defined. When building under Linux or OS X, there is a NO_AVX2 switch at the top of the makefile which does the job.
+Kmer-db, by default, takes advantage of AVX (required) and AVX2 (optional) CPU extensions. The pre-built binary determines supported instructions at runtime, thus it is multiplatform. When compiling the sources under Linux and OS X, the support of AVX2 is also established automatically. Under Windows, the program is by default built with AVX2 instructions. To prevent this, Kmer-db must be compiled with NO_AVX2 symbolic constant defined.
 
 # 2. Usage
 
