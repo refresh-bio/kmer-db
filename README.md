@@ -1,5 +1,8 @@
 # Kmer-db
 [![GitHub downloads](https://img.shields.io/github/downloads/refresh-bio/kmer-db/total.svg?style=flag&label=GitHub%20downloads)](https://github.com/refresh-bio/kmer-db/releases)
+[![Bioconda downloads](https://img.shields.io/conda/dn/bioconda/kmer-db.svg?style=flag&label=Bioconda%20downloads)](https://anaconda.org/bioconda/kmer-db)
+[![C/C++ CI](https://github.com/refresh-bio/kmer-db/workflows/C/C++%20CI/badge.svg)](https://github.com/refresh-bio/kmer-db/actions)
+
 
 Kmer-db is a fast and memory-efficient tool for estimating evolutionary distances.
 
@@ -18,11 +21,18 @@ Kmer-db is a fast and memory-efficient tool for estimating evolutionary distance
 
 # 1. Installation
 
-Kmer-db comes with a set of [precompiled binaries](https://github.com/refresh-bio/kmer-db/releases) for Windows and Linux. 
-The software can be also built from the sources distributed as:
+Kmer-db comes with a set of [precompiled binaries](https://github.com/refresh-bio/kmer-db/releases) for Linux, OS X, and Windows. 
+The software is also available on [Bioconda](https://anaconda.org/bioconda/kmer-db):
+```
+conda install -c bioconda kmer-db
+```
+For detailed instructions how to set up Bioconda, please refer to the [Bioconda manual](https://bioconda.github.io/user/install.html#install-conda).
+Kmer-db can be also built from the sources distributed as:
 
-* MAKE project (G++ 4.8.5 tested) for Linux and OS X.
-* Visual Studio 2015 solution for Windows,
+* MAKE project (G++ 4.8.5 tested) for Linux and OS X,
+* Visual Studio 2015 solution for Windows.
+
+
 
 ## *zlib* linking
 
@@ -30,7 +40,7 @@ Kmer-db uses *zlib* for handling gzipped inputs. Under Linux, the software is by
 
 ## AVX and AVX2 support
 
-Kmer-db by default takes advantage of AVX (required) and AVX2 (optional) CPU extensions. Pre-built binary detetermines supported instructions at runtime, thus it is multiplatform. However, one may encounter a problem when building Kmer-db a CPU without AVX2. To prevent from using AVX2, the program must be compiled with NO_AVX2 symbolic constant defined. When building under Linux or OS X, there is a NO_AVX2 switch at the top of the makefile which does the job.
+Kmer-db, by default, takes advantage of AVX (required) and AVX2 (optional) CPU extensions. The pre-built binary determines supported instructions at runtime, thus it is multiplatform. When compiling the sources under Linux and OS X, the support of AVX2 is also established automatically. Under Windows, the program is by default built with AVX2 instructions. To prevent this, Kmer-db must be compiled with NO_AVX2 symbolic constant defined.
 
 # 2. Usage
 
