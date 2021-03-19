@@ -115,25 +115,32 @@ bool GenomeInputFile::load(
 			sum_sizes += e - kmerLength + 1; 
 
 		kmersBuffer.clear();
-		kmersBuffer.reserve(sum_sizes);
+		kmersBuffer.resize(sum_sizes);
+
+		kmersCount = 0;
+		kmer_t* currentKmers = kmersBuffer.data();
+		uint32_t* currentPositions = nullptr;
 
 		if (storePositions) {
 			positionsBuffer.clear();
-			positionsBuffer.reserve(sum_sizes);
+			positionsBuffer.resize(sum_sizes);
+			currentPositions = positionsBuffer.data();
 		}
 
 		for (size_t i = 0; i < chromosomes.size(); ++i) {
-			extractKmers(chromosomes[i], lengths[i], kmerLength, minhashFilter, kmersBuffer, positionsBuffer, storePositions);
+			size_t count = extractKmers(chromosomes[i], lengths[i], kmerLength, minhashFilter, currentKmers, currentPositions);
+			currentKmers += count;
+			currentPositions += storePositions ? count : 0;
+			kmersCount += count;
 		}
 	
-		ParallelSort(kmersBuffer.data(), kmersBuffer.size());
-		auto it = std::unique(kmersBuffer.begin(), kmersBuffer.end());
-		kmersBuffer.erase(it, kmersBuffer.end());
-
+		ParallelSort(kmersBuffer.data(), kmersCount);
+		auto it = std::unique(kmersBuffer.begin(), kmersBuffer.begin() + kmersCount);
+		
 		kmers = kmersBuffer.data();
-		kmersCount = kmersBuffer.size();
+		kmersCount = it - kmersBuffer.begin();
 
-		LOG_DEBUG << "Extraction: " << kmersBuffer.size() << " kmers, " << chromosomes.size() << " chromosomes, " << totalLen << " bases" << endl;
+		LOG_DEBUG << "Extraction: " << kmersCount << " kmers, " << chromosomes.size() << " chromosomes, " << totalLen << " bases" << endl;
 	}
 	
 	// free memory
@@ -194,28 +201,24 @@ int GenomeInputFile::loadMultiple(
 			sum_sizes += e - reftask->kmerLength + 1;
 
 		kmersBuffer.clear();
-		kmersBuffer.reserve(sum_sizes);
+		kmersBuffer.resize(sum_sizes);
 
-		if (storePositions) {
-			positionsBuffer.clear();
-			positionsBuffer.reserve(sum_sizes);
-		}
-
-		kmer_t* currentPos = kmersBuffer.data();
+		kmer_t* currentKmers = kmersBuffer.data();
+		
 		for (size_t i = 0; i < chromosomes.size(); ++i) {
 			auto task = std::make_shared<SampleTask>(*reftask);
 			task->sampleName = headers[i];
 
-			size_t count = extractKmers(chromosomes[i], lengths[i], task->kmerLength, minhashFilter, kmersBuffer, positionsBuffer, storePositions);
+			size_t count = extractKmers(chromosomes[i], lengths[i], task->kmerLength, minhashFilter, currentKmers, nullptr);
 
-			ParallelSort(currentPos, count);
-			auto it = std::unique(currentPos, currentPos + count);
+			ParallelSort(currentKmers, count);
+			auto it = std::unique(currentKmers, currentKmers + count);
 
-			task->kmers = currentPos;
-			task->kmersCount = it - currentPos;
+			task->kmers = currentKmers;
+			task->kmersCount = it - currentKmers;
 
 			outputQueue.Push(startingId + i, task);
-			currentPos = it;
+			currentKmers = it;
 		}
 	
 		return chromosomes.size();

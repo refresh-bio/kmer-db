@@ -15,3 +15,4 @@
 *.json
 *.suo
 /src/kmer_db.vcxproj.user
+/src/.vs

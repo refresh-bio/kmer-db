@@ -4,6 +4,17 @@
 #include <atomic>
 #include <numeric>
 
+// auxiliary templates for saving/loading single values in a binary file
+template <class T>
+void save(std::ostream &stream, const T& val) {
+	stream.write(reinterpret_cast<const char*>(&val), sizeof(T));
+}
+
+template <class T>
+void load(std::istream &stream, T& val) {
+	stream.read(reinterpret_cast<char*>(&val), sizeof(T));
+}
+
 struct HashtableTask {
 	uint32_t block_id;
 	uint32_t lo;
@@ -23,7 +34,6 @@ struct PatternTask {
 
 class PrefixKmerDb : public AbstractKmerDb {
 public:
-
 	size_t getKmersCount() const override { return kmersCount; }
 
 	size_t getPatternsCount() const override { return patterns.size(); }
@@ -172,4 +182,5 @@ protected:
 
 	void hashtableJob();
 	void patternJob();
+
 };

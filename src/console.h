@@ -30,7 +30,7 @@ public:
 	static const string SWITCH_MULTISAMPLE_FASTA;
 	static const string SWITCH_PHYLIP_OUT;
 
-	static const string COMPACT_DB;
+	static const string SWITCH_EXTEND_DB;
 	
 	static const string OPTION_FRACTION;
 	static const string OPTION_FRACTION_START;
@@ -58,16 +58,18 @@ protected:
 	int numReaderThreads;
 	int cacheBufferMb;
 	bool multisampleFasta;
+	double fraction; 
+	double fractionStart;
+	uint32_t kmerLength;
 
 	std::map<std::string, metric_fun_t> availableMetrics;
 
-	int runBuildDatabase(const std::string& multipleSamples, const std::string dbFilename, 
-		InputFile::Format inputFormat, double fraction, double fractionStart, uint32_t kmerLength);
+	int runBuildDatabase(const std::string& multipleSamples, const std::string dbFilename, InputFile::Format inputFormat, bool extendDb);
 	int runAllVsAll(const std::string& dbFilename, const std::string& similarityFile);
 	int runNewVsAll(const std::string& dbFilename, const std::string& multipleSamples, const std::string& similarityFilename, InputFile::Format inputFormat);
 	int runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFilename, InputFile::Format inputFormat);
 
-	int runMinHash(const std::string& multipleKmcSamples, InputFile::Format inputFormat, double fraction, uint32_t kmerLength);
+	int runMinHash(const std::string& multipleKmcSamples, InputFile::Format inputFormat);
 	int runDistanceCalculation(const std::string& similarityFilename, const std::vector<string>& metricNames, bool usePhylip);
 	int runDistanceCalculationPhylip(const std::string& similarityFilename, const std::vector<string>& metricNames);
 

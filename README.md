@@ -65,14 +65,14 @@ The meaning of other options and positional arguments depends on the selected mo
 Construction of k-mers database is an obligatory step for further analyses. The procedure accepts several input types:
 * compressed or uncompressed genomes:
 
-    ```kmer-db build [-k <kmer-length>] [-f <fraction>] [-multisample-fasta] <sample_list> <database>```
+    ```kmer-db build [-k <kmer-length>] [-f <fraction>] [-multisample-fasta] [-extend] <sample_list> <database>```
 * [KMC-generated](https://github.com/refresh-bio/KMC) k-mers: 
 
-    ```kmer-db build -from-kmers [-f <fraction>] <sample_list> <database>```
+    ```kmer-db build -from-kmers [-f <fraction>] [-extend] <sample_list> <database>```
   
 * [minhashed k-mers](#24-storing-minhashed-k-mers) produced by `minhash` mode:
 
-    ```kmer-db build -from-minhash <sample_list> <database>```
+    ```kmer-db build -from-minhash [-extend] <sample_list> <database>```
 
 Parameters:
 * `sample_list` (input) - file containing list of samples in the following format:
@@ -86,7 +86,8 @@ Parameters:
 * `database` (output) - file with generated k-mer database. 
 * `-k <kmer-length>` - length of k-mers (default: 18); ignored when `-from-kmers` or `-from-minhash` switch is specified.
 * `-f <fraction>` - fraction of all k-mers to be accepted by the minhash filter during database construction (default: 1); ignored when `-from-minhash` switch is present.
-* `-multisample-fasta` - each sequence in a genome FASTA file is treated as a separate sample.
+* `-multisample-fasta` - each sequence in a genome FASTA file is treated as a separate sample,
+* `-extend` - extend the existing database with new samples.
 
 ## 2.2. Counting common k-mers 
 

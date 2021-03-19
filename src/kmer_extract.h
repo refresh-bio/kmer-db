@@ -8,9 +8,8 @@ size_t extractKmers(
 	size_t sequenceLength,
 	uint32_t kmerLength,
 	std::shared_ptr<Filter> filter,
-	std::vector<kmer_t>& kmers,
-	std::vector<uint32_t>& positions,
-	bool storePositions) {
+	kmer_t* kmers,
+	uint32_t* positions) {
 
 	
 	static char* map = []() {
@@ -88,12 +87,12 @@ size_t extractKmers(
 
 	//	filter->add(kmer_can);	
 		if ((*filter)(kmer_can)) {
-			kmers.push_back(kmer_can);
-			++counter;
-
-			if (storePositions) {
-				positions.push_back(i);
+			
+			if (positions != nullptr) {
+				positions[counter] = i;
 			}
+			
+			kmers[counter++] = kmer_can;
 		}
 		
 	}

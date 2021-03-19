@@ -18,16 +18,43 @@ jobs:
     - uses: actions/checkout@v2
     - name: make
       run: make
-    
+      
     - name: build + all2all (default k)
       run: |
-        ./kmer-db build -multisample-fasta ${INPUT_DIR}/sequences.list k18.db
+        ./kmer-db build ${INPUT_DIR}/sequences.list k18.db
         ./kmer-db all2all k18.db k18.csv
         cmp k18.csv ${INPUT_DIR}/k18.csv
     
+    - name: build + all2all (default k, multifasta)
+      run: |
+        ./kmer-db build -multisample-fasta ${INPUT_DIR}/multi.list k18.multi.db
+        ./kmer-db all2all k18.multi.db k18.multi.csv
+        cmp k18.multi.csv ${INPUT_DIR}/k18.csv
+        
+    - name: build + all2all (default k, extend)
+      run: |
+        ./kmer-db build ${INPUT_DIR}/sequences.part1 k18.parts.db
+        ./kmer-db build -extend -k 25 ${INPUT_DIR}/sequences.part2 k18.parts.db
+        ./kmer-db all2all k18.parts.db k18.parts.csv
+        cmp k18.parts.csv ${INPUT_DIR}/k18.csv
+        
+    - name: build + all2all (default k, fraction 0.1)
+      run: |    
+        ./kmer-db build -f 0.1 ${INPUT_DIR}/sequences.list k18.frac.db
+        ./kmer-db all2all k18.frac.db k18.frac.csv
+        cmp k18.frac.csv ${INPUT_DIR}/k18.frac.csv
+
+    - name: minhash + build + all2all (default k, fraction 0.1)
+      run: |
+        ./kmer-db minhash 0.1 ${INPUT_DIR}/sequences.list
+        ./kmer-db build -from-minhash -k 25 ${INPUT_DIR}/sequences.list k18.minhash.db
+        ./kmer-db all2all k18.minhash.db k18.minhash.csv
+        cmp k18.minhash.csv ${INPUT_DIR}/k18.frac.csv
+        
+        
     - name: build + all2all (k=24)
       run: |
-        ./kmer-db build -k 24 -multisample-fasta ${INPUT_DIR}/sequences.list k24.db
+        ./kmer-db build -k 24 ${INPUT_DIR}/sequences.list k24.db
         ./kmer-db all2all k24.db k24.csv
         cmp k24.csv ${INPUT_DIR}/k24.csv
 
