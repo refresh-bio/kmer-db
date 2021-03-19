@@ -42,7 +42,7 @@ const string Params::SWITCH_KMC_SAMPLES = "-from-kmers";
 const string Params::SWITCH_MINHASH_SAMPLES = "-from-minhash";
 const string Params::SWITCH_MULTISAMPLE_FASTA = "-multisample-fasta";
 const string Params::SWITCH_PHYLIP_OUT = "-phylip-out";
-const string Params::COMPACT_DB = "-compact-db";
+const string Params::SWITCH_EXTEND_DB = "-extend";
 
 const string Params::OPTION_FRACTION = "-f";
 const string Params::OPTION_FRACTION_START = "-f-start";
@@ -80,11 +80,18 @@ int Console::parse(int argc, char** argv) {
 	cout << "Kmer-db version " << VERSION << " (" << DATE << ")" << endl 
 		<< "S. Deorowicz, A. Gudys, M. Dlugosz, M. Kokot, and A. Danek (c) 2018" << endl << endl;
 	
+	// set initial values of parameters
 	numThreads = 0;
 	numReaderThreads = 0;
 	cacheBufferMb = 8;
 	multisampleFasta = false;
+	fraction = 1.0;
+	fractionStart = 0.0;
+	kmerLength = 18;
 
+	InputFile::Format inputFormat = InputFile::GENOME;
+	bool extendDb = false;
+	
 	std::vector<string> params(argc - 1);
 	std::transform(argv + 1, argv + argc, params.begin(), [](char* c)->string { return c; });
 
@@ -101,12 +108,7 @@ int Console::parse(int argc, char** argv) {
 		}
 
 		multisampleFasta = findSwitch(params, Params::SWITCH_MULTISAMPLE_FASTA);
-
-		double fraction = 1.0;
-		double fractionStart = 0.0;
-		uint32_t kmerLength = 18;
-		InputFile::Format inputFormat = InputFile::GENOME;
-
+	
 		findOption(params, Params::OPTION_FRACTION, fraction);				// minhash fraction
 		findOption(params, Params::OPTION_FRACTION_START, fractionStart);	// minhash fraction start value
 		findOption(params, Params::OPTION_LENGTH, kmerLength);				// kmer length
@@ -128,7 +130,6 @@ int Console::parse(int argc, char** argv) {
 			cacheBufferMb = 8;
 		}
 
-
 		if (findSwitch(params, Params::SWITCH_KMC_SAMPLES)) {
 			inputFormat = InputFile::KMC;
 			kmerLength = 0;
@@ -144,6 +145,8 @@ int Console::parse(int argc, char** argv) {
 			kmerLength = 0;
 		}
 
+		extendDb = findSwitch(params, Params::SWITCH_EXTEND_DB);
+		
 		// all modes need at least 2 parameters
 		if (params.size() >= 2) {
 			const string& mode = params[0];
@@ -157,7 +160,7 @@ int Console::parse(int argc, char** argv) {
 			// main modes
 			if (params.size() == 3 && mode == Params::MODE_BUILD) {
 				cout << "Database building mode (from " << InputFile::format2string(inputFormat) << ")" << endl;
-				return runBuildDatabase(params[1], params[2], inputFormat, fraction, fractionStart, kmerLength);
+				return runBuildDatabase(params[1], params[2], inputFormat, extendDb);
 			}
 			else if (params.size() == 3 && mode == Params::MODE_ALL_2_ALL) {
 				cout << "All versus all comparison" << endl;
@@ -172,10 +175,10 @@ int Console::parse(int argc, char** argv) {
 				return runOneVsAll(params[1], params[2], params[3], inputFormat);
 			}
 			else if (params.size() == 3 && mode == Params::MODE_MINHASH) {
-				double filter = std::atof(params[1].c_str());
-				if (filter > 0) {
+				fraction = std::atof(params[1].c_str());
+				if (fraction > 0) {
 					cout << "Minhashing k-mers" << endl;
-					return runMinHash(params[2], inputFormat, filter, kmerLength);
+					return runMinHash(params[2], inputFormat);
 				}
 			}
 			else if (params.size() >= 2 && mode == Params::MODE_DISTANCE) {
@@ -216,14 +219,14 @@ int Console::parse(int argc, char** argv) {
 
 // *****************************************************************************************
 //
-int Console::runMinHash(const std::string& multipleKmcSamples, InputFile::Format inputFormat, double filterValue, uint32_t kmerLength) {
+int Console::runMinHash(const std::string& multipleKmcSamples, InputFile::Format inputFormat) {
 	cout << "Minhashing samples..." << endl;
 
 	std::chrono::duration<double> loadingTime, processingTime;
 
 	LOG_DEBUG << "Creating Loader object..." << endl;
 
-	auto filter = std::make_shared<MinHashFilter>(filterValue, 0, kmerLength);
+	auto filter = std::make_shared<MinHashFilter>(fraction, 0, kmerLength);
 
 	LoaderEx loader(filter, inputFormat, numReaderThreads, multisampleFasta);
 	loader.configure(multipleKmcSamples);
@@ -240,7 +243,7 @@ int Console::runMinHash(const std::string& multipleKmcSamples, InputFile::Format
 			auto start = std::chrono::high_resolution_clock::now();
 
 			MihashedInputFile file(nullptr);
-			file.store(task->filePath, task->kmers, task->kmersCount, task->kmerLength, filterValue);
+			file.store(task->filePath, task->kmers, task->kmersCount, task->kmerLength, fraction);
 
 			processingTime += std::chrono::high_resolution_clock::now() - start;
 			loader.releaseTask(*task);
@@ -255,28 +258,39 @@ int Console::runMinHash(const std::string& multipleKmcSamples, InputFile::Format
 int Console::runBuildDatabase(
 	const std::string& multipleSamples, 
 	const std::string dbFilename, 
-	InputFile::Format inputFormat, 
-	double fraction,
-	double fractionStart,
-	uint32_t kmerLength){
+	InputFile::Format inputFormat,
+	bool extendDb){
 
 	time_t rawtime;
 	struct tm * timeinfo;
-
+	
 	time(&rawtime);
 	timeinfo = localtime(&rawtime);
 	
 	cout << "Analysis started at " << asctime(timeinfo) << endl;
-	cout << "Processing samples..." << endl;
-	
-	LOG_DEBUG << "Creating FastKmerDb object" << endl;
+
+	LOG_DEBUG << "Creating PrefixKmerDb object" << endl;
 	AbstractKmerDb* db = new PrefixKmerDb(numThreads);
+	std::shared_ptr<MinHashFilter> filter;
+
+	if (extendDb) {
+		std::ifstream ifs;
+		cout << "Loading k-mer database " << dbFilename << "..." ;
+		ifs.open(dbFilename, std::ios::binary);
+		if (!ifs || !db->deserialize(ifs)) {
+			cout << "FAILED!" << endl;
+			return -1;
+		}
+		filter = std::make_shared<MinHashFilter>(db->getFraction(), db->getStartFraction(), db->getKmerLength());
+	}
+	else {
+		filter = std::make_shared<MinHashFilter>(fraction, fractionStart, kmerLength);
+	}
 
 	std::chrono::duration<double> processingTime;
 	
+	cout << "Processing samples..." << endl;
 	LOG_DEBUG << "Creating Loader object..." << endl;
-
-	auto filter = std::make_shared<MinHashFilter>(fraction, fractionStart, kmerLength);
 
 	LoaderEx loader(filter, inputFormat, numReaderThreads, multisampleFasta);
 	loader.configure(multipleSamples);
@@ -317,7 +331,7 @@ int Console::runBuildDatabase(
 	auto start = std::chrono::high_resolution_clock::now();
 	std::ofstream ofs;
 	ofs.open(dbFilename, std::ios::binary);
-	db->serialize(ofs, false);
+	db->serialize(ofs, true);
 	ofs.close();
 
 	dt = std::chrono::high_resolution_clock::now() - start;
@@ -753,15 +767,17 @@ void Console::showInstructions() {
 		<< "The meaning of other options and positional arguments depends on the selected mode." << endl << endl
 
 		<< "Building a database:" << endl
-		<< "  kmer-db " << Params::MODE_BUILD << " [" << Params::OPTION_LENGTH << " <kmer-length>] [" << Params::OPTION_FRACTION << " <fraction>] [" << Params::SWITCH_MULTISAMPLE_FASTA << "] <sample_list> <database>" << endl
-		<< "  kmer-db " << Params::MODE_BUILD << " " << Params::SWITCH_KMC_SAMPLES << " [" << Params::OPTION_FRACTION << " <fraction>] <sample_list> <database>" << endl
-		<< "  kmer-db " << Params::MODE_BUILD << " " << Params::SWITCH_MINHASH_SAMPLES << " <sample_list> <database>" << endl
+		<< "  kmer-db " << Params::MODE_BUILD << " [" << Params::OPTION_LENGTH << " <kmer-length>] [" << Params::OPTION_FRACTION << " <fraction>] [" 
+			<< Params::SWITCH_MULTISAMPLE_FASTA << "] [" << Params::SWITCH_EXTEND_DB << "] <sample_list> <database>" << endl
+		<< "  kmer-db " << Params::MODE_BUILD << " " << Params::SWITCH_KMC_SAMPLES << " [" << Params::OPTION_FRACTION << " <fraction>] [" << Params::SWITCH_EXTEND_DB << "] <sample_list> <database>" << endl
+		<< "  kmer-db " << Params::MODE_BUILD << " " << Params::SWITCH_MINHASH_SAMPLES << " [" << Params::SWITCH_EXTEND_DB << "] <sample_list> <database>" << endl
 		<< "    sample_list (input) - file containing list of samples in one of the following formats:" << endl
 		<< "                          fasta genomes or reads (default), KMC k-mers (" << Params::SWITCH_KMC_SAMPLES << "), or minhashed k-mers (" << Params::SWITCH_MINHASH_SAMPLES << ")," << endl
 		<< "    database (output) - file with generated k-mer database," << endl
 		<< "    " << Params::OPTION_LENGTH << " <kmer_length> - length of k-mers (default: 18)," << endl
 		<< "    " << Params::OPTION_FRACTION << " <fraction> - fraction of all k-mers to be accepted by the minhash filter (default: 1)," << endl
-		<< "    " << Params::SWITCH_MULTISAMPLE_FASTA << " - each sequence in a genome FASTA file is treated as a separate sample." << endl << endl
+		<< "    " << Params::SWITCH_MULTISAMPLE_FASTA << " - each sequence in a genome FASTA file is treated as a separate sample," << endl
+		<< "	" << Params::SWITCH_EXTEND_DB << " - extend the existing database with new samples." << endl <<endl
 
 		<< "Counting common k-mers for all the samples in the database:" << endl
 		<< "  kmer-db " << Params::MODE_ALL_2_ALL << " [" << Params::OPTION_BUFFER << " <size_mb>] <database> <common_table>" << endl

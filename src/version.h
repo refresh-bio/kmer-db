@@ -1,12 +1,17 @@
 #pragma once
 
-#define VERSION "1.7.6"
-#define DATE "30.03.2020"
+#define VERSION "1.8.0"
+#define DATE "19.03.2021"
 
 
 /* 
 
 Version history
+
+1.8.0 (19.03.2021)
+- Added -extend switch which allows extending existing kmer database.
+- Serialization/deserialization works much faster now.
+- Fixed serious bug in -multifasta-mode which caused incorrect kmers counting.
 
 1.7.6 (31.03.2020)
 - Fixed bug in distance mode when sequence id contained spaces.

@@ -53,8 +53,7 @@ public:
 
 	static const size_t INITIAL_SIZE = 16;
 //	static const Key empty_key = static_cast<Key>(-1);
-	static const Value empty_value = std::numeric_limits<Value>::max();
-	
+	static const Value empty_value = std::numeric_limits<Value>::max();	
 
 private:
 	double max_fill_factor;
@@ -160,6 +159,7 @@ public:
 			{
 				LOG_DEBUG << "Clear: " << i << " from " << allocated << std::endl;
 			} */
+			data[i].key = Key{};
 			data[i].val = empty_value;
 		}
 	}
@@ -185,6 +185,7 @@ public:
 				item_t * end = data + hi;
 
 				for (; p < end; ++p) {
+					p->key = Key{};
 					p->val = empty_value;
 				}
 
@@ -244,11 +245,12 @@ public:
 	Value* find(Key k) const
 	{
 		size_t h = my_hasher_lp<Key>(k) & allocated_mask;
-		if (data[h].key == k)
-			return &(data[h].val);
 
 		if (data[h].val == empty_value)
 			return nullptr;
+
+		if (data[h].key == k)
+			return &(data[h].val);
 
 		h = (h + 1) & allocated_mask;
 
@@ -274,7 +276,8 @@ public:
 	{
 		size_t h = my_hasher_lp<Key>(k) & allocated_mask;
 		
-		while (data[h].key != k && data[h].val != empty_value) {
+//		while (data[h].key != k && data[h].val != empty_value) {
+		while (data[h].val != empty_value && data[h].key != k) {
 			h = (h + 1) & allocated_mask;
 		} 
 		return &(data[h]);
@@ -334,10 +337,22 @@ public:
 		return true;
 	}
 
-
 	// *****************************************************************************************
 	//
 	void serialize(std::ofstream& file) const {
+		
+		size_t buf_size = (1 << 25) / sizeof(item_t);
+		item_t* buffer = new item_t[buf_size];
+		
+		serialize(file, buffer, buf_size);
+
+		delete [] buffer;
+	}
+
+
+	// *****************************************************************************************
+	//
+	void serialize(std::ofstream& file, item_t* buffer, size_t buf_size) const {
 		
 		file.write(reinterpret_cast<const char*>(&max_fill_factor), sizeof(max_fill_factor));
 
@@ -350,18 +365,59 @@ public:
 		file.write(reinterpret_cast<const char*>(&ht_total), sizeof(ht_total));
 		file.write(reinterpret_cast<const char*>(&ht_match), sizeof(ht_match));
 
-		// 1GB portion
-		const size_t portionSize = (2 << 30) / sizeof(item_t);
+		// write bit vectors of filled slots
+		size_t bv_size = (allocated + 63) / 64;
+		uint64_t* bv = new uint64_t[bv_size];	
+		std::fill_n(bv, bv_size, 0);
 
-		for (size_t offset = 0; offset < allocated; offset += portionSize) {
-			size_t toWrite = std::min(portionSize, allocated - offset);
-			file.write(reinterpret_cast<const char*>(data + offset), sizeof(item_t) * toWrite);
+		for (uint64_t i = 0; i < allocated; ++i) {
+			if (data[i].val != empty_value) {
+				uint64_t word = i >> 6;
+				uint64_t offset = i & 63;
+
+				bv[word] |= 1ull << offset;
+			}
 		}
+		file.write(reinterpret_cast<const char*>(bv), sizeof(uint64_t) * bv_size);
+
+		// write HT filled slots in blocks
+		size_t out_id = 0;
+
+		for (uint64_t i = 0; i < allocated; ++i) {
+			if (data[i].val != empty_value) {
+				buffer[out_id++] = data[i];
+			}
+
+			// if buffer full
+			if (out_id == buf_size) {
+				file.write(reinterpret_cast<const char*>(buffer), sizeof(item_t) * buf_size);
+				out_id = 0;
+			}	
+		}
+
+		// write rest of the buffer
+		file.write(reinterpret_cast<const char*>(buffer), sizeof(item_t) * out_id);
+		
+		delete[] bv;
 	}
 
 	// *****************************************************************************************
 	//
 	bool deserialize(std::ifstream& file) {
+
+		size_t buf_size = (1 << 25) / sizeof(item_t);
+		item_t* buffer = new item_t[buf_size];
+
+		bool ok = deserialize(file, buffer, buf_size);
+
+		delete[] buffer;
+
+		return ok;
+	}
+
+	// *****************************************************************************************
+	//
+	bool deserialize(std::ifstream& file, item_t* buffer, size_t buf_size) {
 
 		file.read(reinterpret_cast<char*>(&max_fill_factor), sizeof(max_fill_factor));
 
@@ -375,14 +431,39 @@ public:
 		file.read(reinterpret_cast<char*>(&ht_match), sizeof(ht_match));
 
 		data = new item_t[allocated];
-		
-		// 1GB portion
-		const size_t portionSize = (2 << 30) / sizeof(item_t);
 
-		for (size_t offset = 0; offset < allocated; offset += portionSize) {
-			size_t toRead = std::min(portionSize, allocated - offset);
-			file.read(reinterpret_cast<char*>(data + offset), sizeof(item_t) * toRead);
+		// load bit vectors of filled slots
+		size_t bv_size = (allocated + 63) / 64;
+		uint64_t* bv = new uint64_t[bv_size];
+		file.read(reinterpret_cast<char*>(bv), sizeof(uint64_t) * bv_size);
+
+		// 32MB portion
+		size_t loaded = 0;
+		size_t buf_id = 0;
+		size_t remaining = filled;
+	
+		for (uint64_t i = 0; i < allocated; ++i) {
+			// load data 
+			if (buf_id == 0 || buf_id == buf_size) {
+				file.read(reinterpret_cast<char*>(buffer), sizeof(uint64_t) * std::min(buf_size, remaining));
+				buf_id = 0;
+				remaining -= std::min(buf_size, remaining);
+			}
+			
+			uint64_t word = i >> 6;
+			uint64_t offset = i & 63;
+		
+			// if slot is filled
+			if (bv[word] & (1ull << offset)) {
+				data[i] = buffer[buf_id++];
+			}
+			else {
+				data[i].key = Key{};
+				data[i].val = empty_value;
+			}
 		}
+
+		delete[] bv;
 
 		return file.good();
 	}
