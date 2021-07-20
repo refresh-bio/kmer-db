@@ -47,7 +47,7 @@ public:
 	//
 	template <class T>
 	Log& operator<<(T v) {
-		if (enabled) { *out << v; }
+		if (enabled) { *this->out << v; }
 		return *this;
 	}
 

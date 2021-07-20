@@ -47,7 +47,7 @@ protected:
 
 public:
 
-	AbstractKmerDb() : kmerLength(0), startFraction(0), fraction(0), isInitialized(false) {}
+	AbstractKmerDb() : kmerLength(0), isInitialized(false), fraction(0), startFraction(0)  {}
 
 	virtual ~AbstractKmerDb() {}
 

@@ -78,12 +78,17 @@ public:
 		uint32_t& kmerLength,
 		double& filterValue) override;
 
-	int loadMultiple(
+	bool initMultiFasta();
+	
+	bool loadNext(
 		std::vector<kmer_t>& kmersBuffer,
 		std::vector<uint32_t>& positionsBuffer,
-		std::shared_ptr<SampleTask> reftask,
-		std::atomic<sample_id_t> &multisampleCounter,
-		SynchronizedPriorityQueue<std::shared_ptr<SampleTask>>& outputQueue);
+		kmer_t*& kmers,
+		size_t& kmersCount,
+		uint32_t& kmerLength,
+		double& filterValue,
+		std::string& sampleName
+	);
 
 	
 protected:
@@ -93,6 +98,13 @@ protected:
 	bool status;
 	bool isGzipped;
 	bool storePositions;
+
+	// multifasta fields
+	std::vector<char*> chromosomes;
+	std::vector<size_t> lengths;
+	std::vector<char*> headers;
+
+	size_t multifastaIndex;
 	
 	bool unzip(char* compressedData, size_t compressedSize, char*&outData, size_t &outSize);
 	bool extractSubsequences(

@@ -228,7 +228,7 @@ int Console::runMinHash(const std::string& multipleKmcSamples, InputFile::Format
 
 	auto filter = std::make_shared<MinHashFilter>(fraction, 0, kmerLength);
 
-	LoaderEx loader(filter, inputFormat, numReaderThreads, multisampleFasta);
+	LoaderEx loader(filter, inputFormat, numReaderThreads, numThreads, multisampleFasta);
 	loader.configure(multipleKmcSamples);
 
 	LOG_DEBUG << "Starting loop..." << endl;
@@ -292,18 +292,29 @@ int Console::runBuildDatabase(
 	cout << "Processing samples..." << endl;
 	LOG_DEBUG << "Creating Loader object..." << endl;
 
-	LoaderEx loader(filter, inputFormat, numReaderThreads, multisampleFasta);
+	LoaderEx loader(filter, inputFormat, numReaderThreads, numThreads, multisampleFasta);
 	loader.configure(multipleSamples);
 
 	LOG_DEBUG << "Starting loop..." << endl;
 	auto totalStart = std::chrono::high_resolution_clock::now();
-	for (int i = 0; !loader.isCompleted(); ++i) {
+	int sample_id = 0;
+	for (; !loader.isCompleted(); ++sample_id) {
 		auto partialTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
 		LOG_VERBOSE << "Processing time: " << partialTime.count() <<  ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl;
 		
-		auto task = loader.popTask(i);
+		auto task = loader.popTask(sample_id);
 
 		if (task) {
+			if ((sample_id + 1) % 10 == 0) {
+				size_t cnt = loader.getSamplesCount();
+				if (cnt > 0) {
+					cout << "\r" << sample_id + 1 << "/" << cnt << "..." << std::flush;
+				}
+				else {
+					cout << "\r" << sample_id + 1 << "..." << std::flush;
+				}
+			}
+
 			auto start = std::chrono::high_resolution_clock::now();
 			db->addKmers(task->sampleName, task->kmers, task->kmersCount, task->kmerLength, task->fraction);
 			processingTime += std::chrono::high_resolution_clock::now() - start;
@@ -311,6 +322,8 @@ int Console::runBuildDatabase(
 			LOG_VERBOSE << db->printProgress() << endl;
 		}
 	}
+
+	cout << "\r" << sample_id << "/" << sample_id << "                      " << endl << std::flush;
 
 	auto totalTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
 
@@ -516,7 +529,7 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 	LOG_DEBUG << "Creating Loader object..." << endl;
 	shared_ptr<MinHashFilter> filter = shared_ptr<MinHashFilter>(new MinHashFilter(db.getFraction(), db.getStartFraction(), db.getKmerLength()));
 
-	LoaderEx loader(filter, inputFormat, numReaderThreads, multisampleFasta);
+	LoaderEx loader(filter, inputFormat, numReaderThreads, numThreads, multisampleFasta);
 	loader.configure(multipleSamples);
 	cout << endl;
 
@@ -524,39 +537,66 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 	
 	cout << "Processing queries..." << endl;
 	auto totalStart = std::chrono::high_resolution_clock::now();
-	for (int i = 0; !loader.isCompleted(); ++i) {
-		auto partialTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
-		LOG_VERBOSE << "Processing time: " << partialTime.count() << ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl;
-		
-		auto task = loader.popTask(i);
-		if (task) {
-			if ((i + 1) % 10 == 0) {
-				cout << "\r" << i + 1 << "...                      " << std::flush;
-			}
 
-			if (task->kmerLength != db.getKmerLength()) {
-				cout << "Error: sample and database k-mer length differ." << endl;
-				return -1;
-			}
-
-			auto start = std::chrono::high_resolution_clock::now();
-
-			sims.clear();
-			calculator.one2all<true>(db, task->kmers, task->kmersCount, sims);
-			ofs << endl << task->sampleName << "," << task->kmersCount << ",";
-			std::copy(sims.begin(), sims.end(), ostream_iterator<uint32_t>(ofs, ","));
-
-			processingTime += std::chrono::high_resolution_clock::now() - start;
-			loader.releaseTask(*task);
-		}
+	// create set of buffers for storing similarities
+	std::vector<std::vector<uint32_t>> buffers(loader.getOutputBuffersCount());
+	RegisteringQueue<int> freeBuffersQueue(1);
+	for (size_t i = 0; i < buffers.size(); ++i) {
+		freeBuffersQueue.Push(i);
 	}
 
-	auto totalTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
+	SynchronizedPriorityQueue<std::shared_ptr<SampleTask>> similarityQueue(numThreads);
+	std::vector<thread> workers(numThreads);
+	std::atomic<int> sample_id{ 0 };
+
+	for (int tid = 0; tid < numThreads; ++tid) {
+		workers[tid] = thread([&db, &loader, &freeBuffersQueue, &similarityQueue, &buffers, &calculator, &sample_id, tid]() {
+			while (!loader.isCompleted()) {
+				int task_id = sample_id.fetch_add(1);
+				auto task = loader.popTask(task_id);
+				
+				if (task) {
+					task->bufferId2 = -1;
+					freeBuffersQueue.Pop(task->bufferId2);
+					buffers[task->bufferId2].clear();
+					calculator.one2all<false>(db, task->kmers, task->kmersCount, buffers[task->bufferId2]);
+					similarityQueue.Push(task_id, task);
+				
+					LOG_DEBUG << "(" << task_id + 1 << ") -> similarity queue, tid:"  << tid << ", buf:" << task->bufferId2 << endl;
+				}
+			}
+
+			similarityQueue.MarkCompleted();
+			LOG_DEBUG << "processing finished, tid: " << tid << endl;
+		});
+	}
+
+	// gather results in one thread
+	for (int task_id = 0; !similarityQueue.IsCompleted(); ++task_id) {
+		
+		if ((task_id + 1) % 10 == 0) {
+			cout << "\r" << task_id + 1 << "...                      " << std::flush;
+		}
+		
+		std::shared_ptr<SampleTask> task;
+		similarityQueue.Pop(task_id, task);
+		LOG_DEBUG << "similarity queue -> (" << task_id + 1 << ", " << task->sampleName << "), buf:" << task->bufferId2 << endl;
+		const auto& row = buffers[task->bufferId2];
+		ofs << endl << task->sampleName << "," << task->kmersCount << ",";
+		std::copy(row.begin(), row.end(), ostream_iterator<uint32_t>(ofs, ","));
+		freeBuffersQueue.Push(task->bufferId2);
+		loader.releaseTask(*task);
+	}
+
+	// make sure all threads have finished
+	for (auto &w : workers) {
+		w.join();
+	}
+
+ 	auto totalTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
 
 	cout << endl << endl << "EXECUTION TIMES" << endl
-		<< "Total: " << totalTime.count() << endl
-		<< "Loading k-mers: " << loadingTime.count() << endl
-		<< "Processing time: " << processingTime.count() << endl;
+		<< "Total: " << totalTime.count() << endl;
 
 
 	return 0;
@@ -710,7 +750,7 @@ int Console::runAnalyzeDatabase(const std::string & multipleKmcSamples, const st
 
 	std::shared_ptr<AbstractFilter> filter = analyzer.selectSeedKmers(db, std::max((size_t)1, db.getSamplesCount() / 100));
 	return 0;
-	LoaderEx loader(filter, InputFile::GENOME, numReaderThreads, true);
+	LoaderEx loader(filter, InputFile::GENOME, numReaderThreads, numThreads, true);
 	int numSamples = loader.configure(multipleKmcSamples);
 
 	LOG_DEBUG << "Starting loop..." << endl;

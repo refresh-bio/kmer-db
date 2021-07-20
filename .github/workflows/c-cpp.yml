@@ -31,6 +31,12 @@ jobs:
         ./kmer-db all2all k18.multi.db k18.multi.csv
         cmp k18.multi.csv ${INPUT_DIR}/k18.csv
         
+    - name: build + all2all (default k, 2 x multifasta)
+      run: |
+        ./kmer-db build -multisample-fasta ${INPUT_DIR}/multi.split.list k18.multi.split.db
+        ./kmer-db all2all k18.multi.split.db k18.multi.split.csv
+        cmp k18.multi.split.csv ${INPUT_DIR}/k18.csv
+        
     - name: build + all2all (default k, extend)
       run: |
         ./kmer-db build ${INPUT_DIR}/sequences.part1 k18.parts.db

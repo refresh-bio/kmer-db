@@ -14,26 +14,27 @@ CEliasGamma pattern_t::elias;
 //
 char* pattern_t::pack(char* buffer) const {
 	// store members
-	*reinterpret_cast<decltype(num_kmers)*>(buffer) = num_kmers;
-	buffer += sizeof(decltype(num_kmers));
+	memcpy(buffer, &num_kmers, sizeof(int64_t));
+	buffer += sizeof(int64_t);
 
-	*reinterpret_cast<decltype(parent_id)*>(buffer) = parent_id;
-	buffer += sizeof(decltype(parent_id));
+	memcpy(buffer, &parent_id, sizeof(int64_t));
+	buffer += sizeof(int64_t);
 
-	*reinterpret_cast<decltype(is_parent)*>(buffer) = is_parent;
-	buffer += sizeof(decltype(is_parent));
+	memcpy(buffer, &num_samples, sizeof(sample_id_t));
+	buffer += sizeof(sample_id_t);
 
-	*reinterpret_cast<decltype(num_samples)*>(buffer) = num_samples;
-	buffer += sizeof(decltype(num_samples));
+	memcpy(buffer, &num_local_samples, sizeof(sample_id_t));
+	buffer += sizeof(sample_id_t);
 
-	*reinterpret_cast<decltype(num_local_samples)*>(buffer) = num_local_samples;
-	buffer += sizeof(decltype(num_local_samples));
+	memcpy(buffer, &last_sample_id, sizeof(sample_id_t));
+	buffer += sizeof(sample_id_t);
+	
+	memcpy(buffer, &num_bits, sizeof(uint32_t));
+	buffer += sizeof(uint32_t);
 
-	*reinterpret_cast<decltype(num_bits)*>(buffer) = num_bits;
-	buffer += sizeof(decltype(num_bits));
-
-	*reinterpret_cast<decltype(last_sample_id)*>(buffer) = last_sample_id;
-	buffer += sizeof(decltype(last_sample_id));
+	uint64_t tmp = (uint64_t)is_parent;
+	memcpy(buffer, &tmp, sizeof(uint32_t));
+	buffer += sizeof(uint64_t);
 
 	size_t data_bytes = get_data_bytes();
 	if (data_bytes) {
@@ -48,35 +49,44 @@ char* pattern_t::pack(char* buffer) const {
 //
 char * pattern_t::unpack(char* buffer) {
 	if (num_local_samples) {
+#ifdef USE_MALLOC
+		free(data);
+#else
 		delete[] data;
+#endif
 	}
 
-	num_kmers = *reinterpret_cast<decltype(num_kmers)*>(buffer);
-	buffer += sizeof(decltype(num_kmers));
+	memcpy(&num_kmers, buffer, sizeof(int64_t));
+	buffer += sizeof(int64_t);
 
-	parent_id = *reinterpret_cast<decltype(parent_id)*>(buffer);
-	buffer += sizeof(decltype(parent_id));
+	memcpy(&parent_id, buffer, sizeof(int64_t));
+	buffer += sizeof(int64_t);
 
-	is_parent = *reinterpret_cast<decltype(is_parent)*>(buffer);
-	buffer += sizeof(decltype(is_parent));
+	memcpy(&num_samples, buffer, sizeof(sample_id_t));
+	buffer += sizeof(sample_id_t);
 
-	num_samples = *reinterpret_cast<decltype(num_samples)*>(buffer);
-	buffer += sizeof(decltype(num_samples));
+	memcpy(&num_local_samples, buffer, sizeof(sample_id_t));
+	buffer += sizeof(sample_id_t);
 
-	num_local_samples = *reinterpret_cast<decltype(num_local_samples)*>(buffer);
-	buffer += sizeof(decltype(num_local_samples));
+	memcpy(&last_sample_id, buffer, sizeof(sample_id_t));
+	buffer += sizeof(sample_id_t);
 
-	num_bits = *reinterpret_cast<decltype(num_bits)*>(buffer);
-	buffer += sizeof(decltype(num_bits));
+	memcpy(&num_bits, buffer, sizeof(uint32_t));
+	buffer += sizeof(uint32_t);
 
-	last_sample_id = *reinterpret_cast<decltype(last_sample_id)*>(buffer);
-	buffer += sizeof(decltype(last_sample_id));
-
+	uint64_t tmp;
+	memcpy(&tmp, buffer, sizeof(uint32_t));
+	is_parent = tmp;
+	buffer += sizeof(uint64_t);
 
 	size_t num_bytes = get_data_bytes();
 
 	if (num_bytes) {
+#ifdef USE_MALLOC
+		data = (uint64_t*)malloc(num_bytes);
+#else
 		data = new uint64_t[num_bytes / sizeof(uint64_t)];
+#endif
 		std::memcpy(reinterpret_cast<char*>(data), buffer, num_bytes);
 		buffer += num_bytes;
 	}

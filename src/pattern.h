@@ -43,15 +43,14 @@ class pattern_t {
 private:
 	int64_t num_kmers;			// number of kmers with this pattern
 	int64_t parent_id;			// parrent pattern id
-
-	uint64_t* data;				// array of samples id (Elias-Gamma encoded)
-	
 	sample_id_t num_samples;			// number of samples in current node and its parents (cannot be larger than sample id)	
 	sample_id_t num_local_samples;		// number of samples in current node (cannot be larger than sample id)	
 	sample_id_t last_sample_id;
 	uint32_t num_bits;
 	
 	bool is_parent;			// tells whether the node is parent of some other
+
+	uint64_t* data;				// array of samples id (Elias-Gamma encoded)
 
 	static CEliasGamma elias;
 
@@ -88,16 +87,16 @@ public:
 	// *****************************************************************************************
 	//
 	pattern_t() :
-		num_kmers(0), parent_id(-1), data(nullptr), num_samples(0), num_local_samples(0), 
-		last_sample_id(0), num_bits(0), is_parent(false)
+		num_kmers(0), parent_id(-1), num_samples(0), num_local_samples(0), 
+		last_sample_id(0), num_bits(0), is_parent(false), data(nullptr)
 	{
 	}
 
 	// *****************************************************************************************
 	//
 	pattern_t(sample_id_t x, uint64_t num_kmers) :
-		num_kmers(num_kmers), parent_id(-1), data(nullptr), num_samples(1), num_local_samples(1), 
-		last_sample_id(x), num_bits(0), is_parent(false)
+		num_kmers(num_kmers), parent_id(-1), num_samples(1), num_local_samples(1), 
+		last_sample_id(x), num_bits(0), is_parent(false), data(nullptr)
 		
 	{
 	}
@@ -105,8 +104,8 @@ public:
 	// *****************************************************************************************
 	//
 	pattern_t(pattern_t &v, int64_t parent_id, sample_id_t x, uint64_t num_kmers) :
-		num_kmers(num_kmers), parent_id(-1), data(nullptr), num_samples(v.num_samples + 1), 
-		num_local_samples(1), last_sample_id(x), num_bits(0), is_parent(false)	
+		num_kmers(num_kmers), parent_id(-1), num_samples(v.num_samples + 1), 
+		num_local_samples(1), last_sample_id(x), num_bits(0), is_parent(false), data(nullptr)
 	{
 		if (v.num_samples > 0)  {
 			v.is_parent = true;
@@ -177,22 +176,6 @@ public:
 		return *this;
 	}
 	
-	// *****************************************************************************************
-	//
-	bool operator==(const pattern_t &v)
-	{
-		if (v.num_samples != num_samples)
-			return false;
-		if (v.parent_id != parent_id)
-			return false;
-
-		for (size_t i = 0; i < num_local_samples; ++i)
-			if (data[i] != v.data[i])
-				return false;
-
-		return true;
-	}
-
 	// *****************************************************************************************
 	//
 	void release() {

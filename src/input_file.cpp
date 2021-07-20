@@ -154,12 +154,9 @@ bool GenomeInputFile::load(
 
 // *****************************************************************************************
 //
-int GenomeInputFile::loadMultiple(
-	std::vector<kmer_t>& kmersBuffer,
-	std::vector<uint32_t>& positionsBuffer,
-	std::shared_ptr<SampleTask> reftask,
-	std::atomic<sample_id_t> &multisampleCounter,
-	SynchronizedPriorityQueue<std::shared_ptr<SampleTask>>& outputQueue) {
+bool GenomeInputFile::initMultiFasta() {
+
+	multifastaIndex = 0;
 
 	if (!status) {
 		return 0;
@@ -177,54 +174,60 @@ int GenomeInputFile::loadMultiple(
 	}
 
 	if (status) {
-		std::vector<char*> chromosomes;
-		std::vector<size_t> lengths;
-		std::vector<char*> headers;
-
 		size_t totalLen = total;
 		extractSubsequences(data, totalLen, chromosomes, lengths, headers);
-
-		sample_id_t startingId = multisampleCounter.fetch_add(chromosomes.size());
-
-		std::shared_ptr<MinHashFilter> minhashFilter = dynamic_pointer_cast<MinHashFilter>(filter);
-
-		if (!minhashFilter) {
-			throw std::runtime_error("unsupported filter type!");
-		}
-
-		reftask->kmerLength = minhashFilter->getLength();
-		reftask->fraction = minhashFilter->getFraction();
-
-		// determine max k-mers count
-		size_t sum_sizes = 0;
-		for (auto e : lengths)
-			sum_sizes += e - reftask->kmerLength + 1;
-
-		kmersBuffer.clear();
-		kmersBuffer.resize(sum_sizes);
-
-		kmer_t* currentKmers = kmersBuffer.data();
-		
-		for (size_t i = 0; i < chromosomes.size(); ++i) {
-			auto task = std::make_shared<SampleTask>(*reftask);
-			task->sampleName = headers[i];
-
-			size_t count = extractKmers(chromosomes[i], lengths[i], task->kmerLength, minhashFilter, currentKmers, nullptr);
-
-			ParallelSort(currentKmers, count);
-			auto it = std::unique(currentKmers, currentKmers + count);
-
-			task->kmers = currentKmers;
-			task->kmersCount = it - currentKmers;
-
-			outputQueue.Push(startingId + i, task);
-			currentKmers = it;
-		}
-	
-		return chromosomes.size();
 	}
+
+	return status;
+}
+
+// *****************************************************************************************
+//
+bool GenomeInputFile::loadNext(
+	std::vector<kmer_t>& kmersBuffer,
+	std::vector<uint32_t>& positionsBuffer,
+	kmer_t*& kmers,
+	size_t& kmersCount,
+	uint32_t& kmerLength,
+	double& filterValue,
+	std::string& sampleName
+) {
 	
-	return 0;
+	// no more sequences in multifasta
+	if (multifastaIndex == chromosomes.size()) {
+		return false;
+	}
+
+	std::shared_ptr<MinHashFilter> minhashFilter = dynamic_pointer_cast<MinHashFilter>(filter);
+
+	if (!minhashFilter) {
+		throw std::runtime_error("unsupported filter type!");
+	}
+
+	filterValue = minhashFilter->getFraction();
+	kmerLength = minhashFilter->getLength();
+	sampleName = headers[multifastaIndex];
+
+	kmersBuffer.clear();
+	kmersBuffer.resize(lengths[multifastaIndex]);
+
+	kmersCount = extractKmers(
+		chromosomes[multifastaIndex], 
+		lengths[multifastaIndex], 
+		kmerLength, 
+		minhashFilter, 
+		kmersBuffer.data(), 
+		nullptr);
+
+	ParallelSort(kmersBuffer.data(), kmersCount);
+	auto it = std::unique(kmersBuffer.begin(), kmersBuffer.begin() + kmersCount);
+
+	kmers = kmersBuffer.data();
+	kmersCount = it - kmersBuffer.begin();
+		
+	++multifastaIndex;
+
+	return true;
 }
 
 

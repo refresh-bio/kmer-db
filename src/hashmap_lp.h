@@ -438,7 +438,6 @@ public:
 		file.read(reinterpret_cast<char*>(bv), sizeof(uint64_t) * bv_size);
 
 		// 32MB portion
-		size_t loaded = 0;
 		size_t buf_id = 0;
 		size_t remaining = filled;
 	

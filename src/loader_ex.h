@@ -28,7 +28,8 @@ public:
 	LoaderEx(
 		std::shared_ptr<AbstractFilter> filter, 
 		InputFile::Format inputFormat, 
-		int numThreads,
+		int suggestedNumThreads,
+		int outputBuffersCount,
 		bool multisampleFasta,
 		bool storePositions = false);
 
@@ -39,14 +40,14 @@ public:
 	std::shared_ptr<SampleTask> popTask(int fileId) {
 		std::shared_ptr<SampleTask> task;
 		queues.output.Pop(fileId, task);
-		LOG_DEBUG << "output queue -> (" << fileId + 1 << ")" << std::endl << std::flush;
+		LOG_DEBUG << "output queue -> (sample " << fileId + 1 << ")" << std::endl << std::flush;
 		return task;
 	}
 
 	void releaseTask(SampleTask& t) {
 		if (--bufferRefCounters[t.bufferId] == 0) {
 			queues.freeBuffers.Push(t.bufferId);
-			LOG_DEBUG << "Released readers buffer: " << t.fileId + 1 << std::endl << std::flush;
+			LOG_DEBUG << "sample " << t.id + 1 << ": release buffer " << t.bufferId << std::endl << std::flush;
 		}
 	}
 	
@@ -61,6 +62,14 @@ public:
 
 	bool isCompleted() {
 		return queues.output.IsCompleted();
+	}
+
+	size_t getSamplesCount() const {
+		return multisampleFasta ? 0 : fileNames.size();
+	}
+
+	int getOutputBuffersCount() {
+		return kmersCollections.size();
 	}
 
 private:
@@ -87,7 +96,6 @@ private:
 
 	std::vector<int> bufferRefCounters;
 
-	std::atomic<sample_id_t> multisampleCounter{ 0 };
 
 	struct {
 		RegisteringQueue<std::shared_ptr<InputTask>> input{ 1 };
@@ -99,4 +107,10 @@ private:
 		SynchronizedPriorityQueue<std::shared_ptr<SampleTask>> output{ 1 };
 	} queues;
 
+
+	void prefetcherJob(std::shared_ptr<AbstractFilter> filter);
+
+	void readerJob(int tid);
+
+	void multifastaReaderJob();
 };

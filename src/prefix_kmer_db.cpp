@@ -124,7 +124,7 @@ void PrefixKmerDb::hashtableJob() {
 
 				times.hashtableResize_worker += std::chrono::high_resolution_clock::now() - start;
 
-				LOG_DEBUG << "Block: " << task.block_id << ", lo_prefix: " << lo_prefix << ", hi_prefix: " << hi_prefix << endl << flush;
+			//	LOG_DEBUG << "Block: " << task.block_id << ", lo_prefix: " << lo_prefix << ", hi_prefix: " << hi_prefix << endl << flush;
 
 				start = std::chrono::high_resolution_clock::now();
 
@@ -182,7 +182,7 @@ void PrefixKmerDb::patternJob() {
 			uint32_t lo = task.lo;
 			uint32_t hi = task.hi;
 			
-			LOG_DEBUG << "Pattern job " << task.block_id << " started (" << lo << "-" << hi << ")" << endl;
+		//	LOG_DEBUG << "Pattern job " << task.block_id << " started (" << lo << "-" << hi << ")" << endl;
 			
 			sample_id_t sampleId = (sample_id_t)(task.sample_id);
 			
@@ -230,7 +230,7 @@ void PrefixKmerDb::patternJob() {
 			// update memory statistics (atomic - no sync needed)
 			stats.patternBytes += deltaSize;
 
-			LOG_DEBUG << "Pattern job " << task.block_id << " finished" << endl;
+		//	LOG_DEBUG << "Pattern job " << task.block_id << " finished" << endl;
 			this->semaphore.dec();
 		}
 	}
@@ -300,7 +300,7 @@ sample_id_t PrefixKmerDb::addKmers(
 
 	semaphore.inc((int)hashtableTasks.size());
 	for (size_t tid = 0; tid < hashtableTasks.size(); ++tid) {
-		LOG_DEBUG << "Hashtable job " << tid << " scheduled (" << hashtableTasks[tid].lo << "-" << hashtableTasks[tid].hi << ")" << endl;
+		// LOG_DEBUG << "Hashtable job " << tid << " scheduled (" << hashtableTasks[tid].lo << "-" << hashtableTasks[tid].hi << ")" << endl;
 		queues.hashtableAddition.Push(hashtableTasks[tid]);
 	}
 
@@ -388,7 +388,7 @@ sample_id_t PrefixKmerDb::addKmers(
 
 	semaphore.inc((int)patternTasks.size());
 	for (size_t tid = 0; tid < patternTasks.size(); ++tid) {
-		LOG_DEBUG << "Pattern job " << tid << " scheduled" << endl;
+		// LOG_DEBUG << "Pattern job " << tid << " scheduled" << endl;
 		queues.patternExtension.Push(patternTasks[tid]);
 	}
 
@@ -454,12 +454,17 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 
 	temp = hashtables.size();
 	save(file, temp);
-	
+
+	size_t percent = 0;
+
 	// store all hashmaps
 	for (size_t i = 0; i < hashtables.size(); ++i) {
-		if ((i + 1) % 10 == 0) {
-			cout << "\r" << i + 1 << "/" << hashtables.size() << "...                      " << std::flush;
+		
+		if (i * 100 / hashtables.size() > percent) {
+			cout << "\r" << percent << "%" << std::flush;
+			++percent;
 		}
+
 		auto& ht = hashtables[i];
 
 		if (rawHashtables) {
@@ -511,10 +516,14 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 	save(file, temp);
 
 	char * currentPtr = buffer;
+
+	percent = 0;
+
 	for (size_t pid = 0; pid < patterns.size(); ++pid) {
 		
-		if ((pid + 1) % 1000 == 0) {
-			cout << "\r" << pid + 1 << "/" << patterns.size() << "...                      " << std::flush;
+		if (pid * 100 / patterns.size() > percent) {
+			cout << "\r" << percent << "%" << std::flush;
+			++percent;
 		}
 		
 		if (currentPtr + patterns[pid].get_bytes() > buffer + IO_BUFFER_BYTES) {
@@ -599,11 +608,16 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 	load(file, temp);
 	hashtables.resize(temp);
 
+	size_t percent = 0;
+
 	// load all hashtables
-	for (int i = 0; i < hashtables.size(); ++i) {
-		if ((i + 1) % 10 == 0) {
-			cout << "\r" << i + 1 << "/" << hashtables.size() << "...                      " << std::flush;
+	for (size_t i = 0; i < hashtables.size(); ++i) {
+		
+		if (i * 100 / hashtables.size() > percent) {
+			cout << "\r" << percent << "%" << std::flush;
+			++percent;
 		}
+
 		auto& ht = hashtables[i];
 
 		if (rawHashtables) {
@@ -650,6 +664,8 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 	patterns.clear();
 	patterns.resize(temp);
 
+	percent = 0;
+
 	size_t pid = 0;
 	while (pid < patterns.size()) {
 		size_t blockSize;
@@ -659,8 +675,9 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 		char * currentPtr = buffer;
 		while (currentPtr < buffer + blockSize) {
 
-			if ((pid + 1) % 1000 == 0) {
-				cout << "\r" << pid + 1 << "/" << patterns.size() << "...                      " << std::flush;
+			if (pid * 100 / patterns.size() > percent) {
+				cout << "\r" << percent << "%" << std::flush;
+				++percent;
 			}
 
 			currentPtr = patterns[pid].unpack(currentPtr);

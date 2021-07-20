@@ -85,7 +85,7 @@ template<typename T> class RegisteringQueue
 	queue_t q;
 	bool is_completed;
 	int n_producers;
-	uint32_t n_elements;
+	int n_elements;
 	int size;
 
 	mutable mutex mtx;								// The mutex to synchronise on
@@ -223,7 +223,7 @@ class SynchronizedPriorityQueue
 	
 	bool is_completed;
 	int n_producers;
-	uint32_t n_elements;
+	int n_elements;
 
 	mutable mutex mtx;								// The mutex to synchronise on
 	condition_variable cv_queue_empty;

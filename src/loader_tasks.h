@@ -19,7 +19,7 @@ struct InputTask {
 // *****************************************************************************************
 //
 struct SampleTask {
-	size_t fileId;
+	size_t id;
 	const std::string& filePath;
 	std::string sampleName;
 	kmer_t *kmers;
@@ -27,8 +27,9 @@ struct SampleTask {
 	uint32_t kmerLength;
 	double fraction;
 	int bufferId;
+	int bufferId2;
 
-	SampleTask(size_t fileId, const std::string& filePath, const std::string& sampleName, int bufferId) :
-		fileId(fileId), filePath(filePath), sampleName(sampleName), bufferId(bufferId) {}
+	SampleTask(size_t id, const std::string& filePath, const std::string& sampleName, int bufferId) :
+		id(id), filePath(filePath), sampleName(sampleName), bufferId(bufferId) {}
 
 };

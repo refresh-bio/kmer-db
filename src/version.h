@@ -1,12 +1,17 @@
 #pragma once
 
-#define VERSION "1.8.0"
-#define DATE "19.03.2021"
+#define VERSION "1.9.0"
+#define DATE "09.08.2021"
 
 
 /* 
 
 Version history
+
+1.9.0 (09.08.2021)
+- improved parallelization scheme in new2all mode (few-fold speed improvement).
+- improved -multifasta-mode (memory footprint independent of FASTA size).
+- more than one input FASTA files supported in -multifasta-mode.
 
 1.8.0 (19.03.2021)
 - Added -extend switch which allows extending existing kmer database.
