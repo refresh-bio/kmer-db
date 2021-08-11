@@ -8,11 +8,13 @@
 Version history
 
 1.9.1 (11.08.2021)
+- Output matrices can be stored in sparse format (-sparse switch).
+- Better workload balancing.
+
+1.9.0 (09.08.2021)
 - Improved parallelization scheme in new2all mode (few-fold speed improvement).
 - Reduced memory footprint of -multisample-fasta mode.
 - More than one input FASTA files supported in -multisample-fasta mode.
-- Output matrices can be stored in sparse format (-sparse switch).
-- Better workload balancing.
 
 1.8.0 (19.03.2021)
 - Added -extend switch which allows extending existing kmer database.

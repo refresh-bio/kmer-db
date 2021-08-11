@@ -5,6 +5,7 @@ on:
     branches: [ master, v2, feature/tests ]
   pull_request:
     branches: [ master, v2, feature/tests ]
+  workflow_dispatch:
 
 jobs:
   
@@ -18,53 +19,36 @@ jobs:
     - uses: actions/checkout@v2
     - name: make
       run: make
-      
-    - name: build + all2all (default k)
-      run: |
-        ./kmer-db build ${INPUT_DIR}/sequences.list k18.db
-        ./kmer-db all2all k18.db k18.csv
-        cmp k18.csv ${INPUT_DIR}/k18.csv
     
-    - name: build + all2all (default k, multifasta)
+    - name: build 
       run: |
-        ./kmer-db build -multisample-fasta ${INPUT_DIR}/multi.list k18.multi.db
-        ./kmer-db all2all k18.multi.db k18.multi.csv
-        cmp k18.multi.csv ${INPUT_DIR}/k18.csv
-        
-    - name: build + all2all (default k, 2 x multifasta)
+        ./kmer-db build ${INPUT_DIR}/seqs.part1.list k18.parts.db
+    
+    - name: new2all 
       run: |
-        ./kmer-db build -multisample-fasta ${INPUT_DIR}/multi.split.list k18.multi.split.db
-        ./kmer-db all2all k18.multi.split.db k18.multi.split.csv
-        cmp k18.multi.split.csv ${INPUT_DIR}/k18.csv
+        ./kmer-db new2all k18.parts.db ${INPUT_DIR}/seqs.part2.list k18.n2a.csv
+        cmp k18.n2a.csv ${INPUT_DIR}/k18.n2a.csv
         
-    - name: build + all2all (default k, extend)
+    - name: new2all (sparse)
       run: |
-        ./kmer-db build ${INPUT_DIR}/sequences.part1 k18.parts.db
-        ./kmer-db build -extend -k 25 ${INPUT_DIR}/sequences.part2 k18.parts.db
-        ./kmer-db all2all k18.parts.db k18.parts.csv
-        cmp k18.parts.csv ${INPUT_DIR}/k18.csv
+        ./kmer-db new2all -sparse k18.parts.db ${INPUT_DIR}/seqs.part2.list k18.n2a.sparse.csv
+        cmp k18.n2a.sparse.csv ${INPUT_DIR}/k18.n2a.sparse.csv
+    
+    - name: extend  
+      run: |     
+        ./kmer-db build -extend -k 25 ${INPUT_DIR}/seqs.part2.list k18.parts.db
         
-    - name: build + all2all (default k, fraction 0.1)
-      run: |    
-        ./kmer-db build -f 0.1 ${INPUT_DIR}/sequences.list k18.frac.db
-        ./kmer-db all2all k18.frac.db k18.frac.csv
-        cmp k18.frac.csv ${INPUT_DIR}/k18.frac.csv
+    - name: all2all  
+      run: |     
+        ./kmer-db all2all k18.parts.db k18.csv
+        cmp k18.csv ${INPUT_DIR}/k18.csv
+        
+    - name: all2all (sparse)
+      run: |     
+        ./kmer-db all2all -sparse k18.parts.db k18.sparse.csv
+        cmp k18.sparse.csv ${INPUT_DIR}/k18.sparse.csv
 
-    - name: minhash + build + all2all (default k, fraction 0.1)
-      run: |
-        ./kmer-db minhash 0.1 ${INPUT_DIR}/sequences.list
-        ./kmer-db build -from-minhash -k 25 ${INPUT_DIR}/sequences.list k18.minhash.db
-        ./kmer-db all2all k18.minhash.db k18.minhash.csv
-        cmp k18.minhash.csv ${INPUT_DIR}/k18.frac.csv
-        
-        
-    - name: build + all2all (k=24)
-      run: |
-        ./kmer-db build -k 24 ${INPUT_DIR}/sequences.list k24.db
-        ./kmer-db all2all k24.db k24.csv
-        cmp k24.csv ${INPUT_DIR}/k24.csv
-
-    - name: distance (default k)
+    - name: distance
       run: | 
         ./kmer-db distance jaccard min max cosine mash k18.csv
         cmp k18.csv.jaccard ${INPUT_DIR}/k18.csv.jaccard
@@ -72,8 +56,58 @@ jobs:
         cmp k18.csv.max ${INPUT_DIR}/k18.csv.max
         cmp k18.csv.cosine ${INPUT_DIR}/k18.csv.cosine
         cmp k18.csv.mash ${INPUT_DIR}/k18.csv.mash
-      
-      
+        
+    - name: build (default k) + all2all 
+      run: |
+        ./kmer-db build ${INPUT_DIR}/seqs.list k18.db
+        ./kmer-db all2all k18.db k18.csv
+        cmp k18.csv ${INPUT_DIR}/k18.csv
+        
+    - name: build (default k, multifasta) + all2all 
+      run: |
+        ./kmer-db build -multisample-fasta ${INPUT_DIR}/multi.list k18.multi.db
+        ./kmer-db all2all k18.multi.db k18.multi.csv
+        cmp k18.multi.csv ${INPUT_DIR}/k18.csv
+
+    - name: build (default k, 2 x multifasta) + all2all 
+      run: |
+        ./kmer-db build -multisample-fasta ${INPUT_DIR}/multi.split.list k18.multi.split.db
+        ./kmer-db all2all k18.multi.split.db k18.multi.split.csv
+        cmp k18.multi.split.csv ${INPUT_DIR}/k18.csv
+    
+    - name: build (default k) + extend + all2all 
+      run: |
+        ./kmer-db build ${INPUT_DIR}/seqs.part1.list k18.parts.db
+        ./kmer-db build -extend -k 25 ${INPUT_DIR}/seqs.part2.list k18.parts.db
+        ./kmer-db all2all k18.parts.db k18.parts.csv
+        cmp k18.parts.csv ${INPUT_DIR}/k18.csv
+        
+    - name: build (default k, fraction 0.1) + all2all 
+      run: |    
+        ./kmer-db build -f 0.1 ${INPUT_DIR}/seqs.list k18.frac.db
+        ./kmer-db all2all k18.frac.db k18.frac.csv
+        cmp k18.frac.csv ${INPUT_DIR}/k18.frac.csv
+
+    - name: minhash (default k, fraction 0.1) + build + all2all 
+      run: |
+        ./kmer-db minhash 0.1 ${INPUT_DIR}/seqs.list
+        ./kmer-db build -from-minhash -k 25 ${INPUT_DIR}/seqs.list k18.minhash.db
+        ./kmer-db all2all k18.minhash.db k18.minhash.csv
+        cmp k18.minhash.csv ${INPUT_DIR}/k18.frac.csv
+        
+    - name: build (k=24) + all2all 
+      run: |
+        ./kmer-db build -k 24 ${INPUT_DIR}/seqs.list k24.db
+        ./kmer-db all2all k24.db k24.csv
+        cmp k24.csv ${INPUT_DIR}/k24.csv
+        
+    - name: new2all (against itself)
+      run: |
+        ./kmer-db new2all k18.db ${INPUT_DIR}/seqs.list k18.n2a.itself.csv
+        cmp k18.n2a.itself.csv ${INPUT_DIR}/k18.n2a.itself.csv
+
+   
+        
   macos-build:
     name: macOS test
     runs-on: macOS-latest
