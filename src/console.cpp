@@ -43,6 +43,7 @@ const string Params::SWITCH_MINHASH_SAMPLES = "-from-minhash";
 const string Params::SWITCH_MULTISAMPLE_FASTA = "-multisample-fasta";
 const string Params::SWITCH_PHYLIP_OUT = "-phylip-out";
 const string Params::SWITCH_EXTEND_DB = "-extend";
+const string Params::SWITCH_SPARSE = "-sparse";
 
 const string Params::OPTION_FRACTION = "-f";
 const string Params::OPTION_FRACTION_START = "-f-start";
@@ -88,6 +89,7 @@ int Console::parse(int argc, char** argv) {
 	fraction = 1.0;
 	fractionStart = 0.0;
 	kmerLength = 18;
+	sparse = false;
 
 	InputFile::Format inputFormat = InputFile::GENOME;
 	bool extendDb = false;
@@ -145,6 +147,7 @@ int Console::parse(int argc, char** argv) {
 			kmerLength = 0;
 		}
 
+		sparse = findSwitch(params, Params::SWITCH_SPARSE);
 		extendDb = findSwitch(params, Params::SWITCH_EXTEND_DB);
 		
 		// all modes need at least 2 parameters
@@ -396,7 +399,12 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 
 	for (size_t sid = 0; sid < db->getSamplesCount(); ++sid) {
 		ofs << db->getSampleNames()[sid] << ", " << db->getSampleKmersCount()[sid] << ", ";
-		matrix.saveRow(sid, ofs);
+		if (sparse) {
+			matrix.saveRowSparse(sid, ofs);
+		}
+		else {
+			matrix.saveRow(sid, ofs);
+		}
 		ofs << endl;
 	}
 
@@ -583,7 +591,16 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 		LOG_DEBUG << "similarity queue -> (" << task_id + 1 << ", " << task->sampleName << "), buf:" << task->bufferId2 << endl;
 		const auto& row = buffers[task->bufferId2];
 		ofs << endl << task->sampleName << "," << task->kmersCount << ",";
-		std::copy(row.begin(), row.end(), ostream_iterator<uint32_t>(ofs, ","));
+		if (sparse) {
+			for (int i = 0; i < row.size(); ++i) {
+				if (row[i] > 0) {
+					ofs << (i + 1) << ":" << row[i] << ",";
+				}
+			}
+		}
+		else {
+			std::copy(row.begin(), row.end(), ostream_iterator<uint32_t>(ofs, ","));
+		}
 		freeBuffersQueue.Push(task->bufferId2);
 		loader.releaseTask(*task);
 	}

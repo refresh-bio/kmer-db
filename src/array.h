@@ -178,6 +178,17 @@ public:
 		}
 	}
 
+	void saveRowSparse(size_t row, std::ofstream & file) {
+		size_t offset = row * (row - 1) / 2;
+		T * ptr = data.data() + offset;
+
+		for (size_t j = 0; j < row; ++j, ++ptr) {
+			if (*ptr > 0) {
+				file << (j + 1) << ":" << *ptr << ',';
+			}
+		}
+	}
+
 	void saveRow(size_t row, T diagElem, std::ofstream & file) {
 		size_t offset = row * (row - 1) / 2;
 		T * ptr = data.data() + offset;

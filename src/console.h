@@ -29,8 +29,8 @@ public:
 	static const string SWITCH_MINHASH_SAMPLES;
 	static const string SWITCH_MULTISAMPLE_FASTA;
 	static const string SWITCH_PHYLIP_OUT;
-
 	static const string SWITCH_EXTEND_DB;
+	static const string SWITCH_SPARSE;
 	
 	static const string OPTION_FRACTION;
 	static const string OPTION_FRACTION_START;
@@ -61,6 +61,7 @@ protected:
 	double fraction; 
 	double fractionStart;
 	uint32_t kmerLength;
+	bool sparse;
 
 	std::map<std::string, metric_fun_t> availableMetrics;
 

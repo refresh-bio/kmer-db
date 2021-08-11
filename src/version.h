@@ -1,12 +1,14 @@
 #pragma once
 
-#define VERSION "1.9.0"
-#define DATE "09.08.2021"
-
+#define VERSION "1.9.1"
+#define DATE "11.08.2021"
 
 /* 
 
 Version history
+
+1.9.1 (11.08.2021)
+- sparse mode added
 
 1.9.0 (09.08.2021)
 - improved parallelization scheme in new2all mode (few-fold speed improvement).
