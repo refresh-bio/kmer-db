@@ -128,17 +128,13 @@ bool GenomeInputFile::load(
 		}
 
 		for (size_t i = 0; i < chromosomes.size(); ++i) {
-			size_t count = extractKmers(chromosomes[i], lengths[i], kmerLength, minhashFilter, currentKmers, currentPositions);
+			size_t count = KmerHelper::extract(chromosomes[i], lengths[i], kmerLength, minhashFilter, currentKmers, currentPositions);
 			currentKmers += count;
 			currentPositions += storePositions ? count : 0;
 			kmersCount += count;
 		}
 	
-		ParallelSort(kmersBuffer.data(), kmersCount);
-		auto it = std::unique(kmersBuffer.begin(), kmersBuffer.begin() + kmersCount);
-		
 		kmers = kmersBuffer.data();
-		kmersCount = it - kmersBuffer.begin();
 
 		LOG_DEBUG << "Extraction: " << kmersCount << " kmers, " << chromosomes.size() << " chromosomes, " << totalLen << " bases" << endl;
 	}
@@ -211,7 +207,7 @@ bool GenomeInputFile::loadNext(
 	kmersBuffer.clear();
 	kmersBuffer.resize(lengths[multifastaIndex]);
 
-	kmersCount = extractKmers(
+	kmersCount = KmerHelper::extract(
 		chromosomes[multifastaIndex], 
 		lengths[multifastaIndex], 
 		kmerLength, 
@@ -219,11 +215,7 @@ bool GenomeInputFile::loadNext(
 		kmersBuffer.data(), 
 		nullptr);
 
-	ParallelSort(kmersBuffer.data(), kmersCount);
-	auto it = std::unique(kmersBuffer.begin(), kmersBuffer.begin() + kmersCount);
-
 	kmers = kmersBuffer.data();
-	kmersCount = it - kmersBuffer.begin();
 		
 	++multifastaIndex;
 
@@ -489,7 +481,7 @@ bool KmcInputFile::load(
 		std::swap(kmers, aux);
 	}
 #else
-	ParallelSort(kmers, kmersCount);
+	//ParallelSort(kmers, kmersCount);
 #endif
 
 	filterValue = ((double)kmersCount / _total_kmers); // this may differ from theoretical

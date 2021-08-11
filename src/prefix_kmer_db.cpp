@@ -424,8 +424,6 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 	std::vector <hash_map_lp<suffix_t, pattern_id_t>::item_t> hashtableBuffer(numHastableElements);
 	char* buffer = reinterpret_cast<char*>(hashtableBuffer.data());
 	
-	cout << "Storing general info..." << endl;
-
 	// generate format word
 	uint64_t formatWord = 0;
 	if (rawHashtables) {
@@ -568,8 +566,6 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 	size_t numHastableElements = IO_BUFFER_BYTES / sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t);
 	std::vector <hash_map_lp<suffix_t, pattern_id_t>::item_t> hashtableBuffer(numHastableElements);
 	char* buffer = reinterpret_cast<char*>(hashtableBuffer.data());
-
-	cout << "Loading general info..." << endl;
 
 	// load format word
 	bool rawHashtables = false;

@@ -8,17 +8,16 @@
 Version history
 
 1.9.1 (11.08.2021)
-- sparse mode added
-
-1.9.0 (09.08.2021)
-- improved parallelization scheme in new2all mode (few-fold speed improvement).
-- improved -multifasta-mode (memory footprint independent of FASTA size).
-- more than one input FASTA files supported in -multifasta-mode.
+- Improved parallelization scheme in new2all mode (few-fold speed improvement).
+- Reduced memory footprint of -multisample-fasta mode.
+- More than one input FASTA files supported in -multisample-fasta mode.
+- Output matrices can be stored in sparse format (-sparse switch).
+- Better workload balancing.
 
 1.8.0 (19.03.2021)
 - Added -extend switch which allows extending existing kmer database.
 - Serialization/deserialization works much faster now.
-- Fixed serious bug in -multifasta-mode which caused incorrect kmers counting.
+- Fixed serious bug in -multisample-fasta mode which caused incorrect kmers counting.
 
 1.7.6 (31.03.2020)
 - Fixed bug in distance mode when sequence id contained spaces.

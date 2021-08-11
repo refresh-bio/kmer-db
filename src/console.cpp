@@ -18,6 +18,10 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include <iterator>
 #include <functional>
 
+#ifndef __APPLE__
+#include <omp.h>
+#endif
+
 #include "console.h"
 #include "kmer_db.h"
 #include "loader_ex.h"
@@ -25,6 +29,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include "analyzer.h"
 #include "similarity_calculator.h"
 #include "prefix_kmer_db.h"
+#include "kmer_extract.h"
 
 
 using namespace std;
@@ -81,6 +86,9 @@ int Console::parse(int argc, char** argv) {
 	cout << "Kmer-db version " << VERSION << " (" << DATE << ")" << endl 
 		<< "S. Deorowicz, A. Gudys, M. Dlugosz, M. Kokot, and A. Danek (c) 2018" << endl << endl;
 	
+	time_t rawtime;
+	struct tm * timeinfo;
+
 	// set initial values of parameters
 	numThreads = 0;
 	numReaderThreads = 0;
@@ -96,6 +104,8 @@ int Console::parse(int argc, char** argv) {
 	
 	std::vector<string> params(argc - 1);
 	std::transform(argv + 1, argv + argc, params.begin(), [](char* c)->string { return c; });
+
+	int status = -1;
 
 	if (params.size()) {
 
@@ -120,6 +130,11 @@ int Console::parse(int argc, char** argv) {
 			numThreads = std::thread::hardware_concurrency();
 		}
 
+		// limit number of threads used in parallel sorts
+#ifndef __APPLE__
+		omp_set_num_threads(numThreads);
+#endif
+		
 		findOption(params, Params::OPTION_READER_THREADS, numReaderThreads);	// number of threads
 		if (numReaderThreads <= 0) {
 			// more reader threads for smaller filters (from t/8 up to t)
@@ -160,28 +175,33 @@ int Console::parse(int argc, char** argv) {
 				return 0;
 			}
 
+			time(&rawtime);
+			timeinfo = localtime(&rawtime);
+			cout << "Analysis started at " << asctime(timeinfo) << endl;
+
 			// main modes
 			if (params.size() == 3 && mode == Params::MODE_BUILD) {
 				cout << "Database building mode (from " << InputFile::format2string(inputFormat) << ")" << endl;
-				return runBuildDatabase(params[1], params[2], inputFormat, extendDb);
+				status = runBuildDatabase(params[1], params[2], inputFormat, extendDb);
 			}
 			else if (params.size() == 3 && mode == Params::MODE_ALL_2_ALL) {
 				cout << "All versus all comparison" << endl;
-				return runAllVsAll(params[1], params[2]);
+				status = runAllVsAll(params[1], params[2]);
 			}
 			else if (params.size() == 4 && mode == Params::MODE_NEW_2_ALL) {
 				cout << "Set of new samples  (from " << InputFile::format2string(inputFormat) << ") versus entire database comparison" << endl;
-				return runNewVsAll(params[1], params[2], params[3], inputFormat);
+				
+				status = runNewVsAll(params[1], params[2], params[3], inputFormat);
 			}
 			else if (params.size() == 4 && mode == Params::MODE_ONE_2_ALL) {
 				cout << "One new sample  (from " << InputFile::format2string(inputFormat) << ") versus entire database comparison" << endl;
-				return runOneVsAll(params[1], params[2], params[3], inputFormat);
+				status = runOneVsAll(params[1], params[2], params[3], inputFormat);
 			}
 			else if (params.size() == 3 && mode == Params::MODE_MINHASH) {
 				fraction = std::atof(params[1].c_str());
 				if (fraction > 0) {
 					cout << "Minhashing k-mers" << endl;
-					return runMinHash(params[2], inputFormat);
+					status = runMinHash(params[2], inputFormat);
 				}
 			}
 			else if (params.size() >= 2 && mode == Params::MODE_DISTANCE) {
@@ -202,21 +222,30 @@ int Console::parse(int argc, char** argv) {
 				}
 				
 				cout << "Calculating distance measures" << endl;
-				return runDistanceCalculation(params[1], metricNames, phylipOut);			
+				status = runDistanceCalculation(params[1], metricNames, phylipOut);
 			}
 			// debug modes
 			else if (params.size() == 3 && mode == "list-patterns") {
 				cout << "Listing all patterns" << endl;
-				return runListPatterns(params[1], params[2]);
+				status = runListPatterns(params[1], params[2]);
 			}
 			else if (params.size() == 3 && mode == "analyze") {
 				cout << "Analyzing database" << endl;
-				return runAnalyzeDatabase(params[1], params[2]);
+				status = runAnalyzeDatabase(params[1], params[2]);
 			}
 		}
 	}
 
-	showInstructions();
+	if (status == -1) {
+		showInstructions();
+	}
+	else {
+		time(&rawtime);
+		timeinfo = localtime(&rawtime);
+		cout << endl << "Analysis finished at " << asctime(timeinfo) << endl;
+	}
+
+	
 	return 0;
 }
 
@@ -246,6 +275,15 @@ int Console::runMinHash(const std::string& multipleKmcSamples, InputFile::Format
 			auto start = std::chrono::high_resolution_clock::now();
 
 			MihashedInputFile file(nullptr);
+
+			// postprocess k-mers if neccessary
+			if (inputFormat == InputFile::Format::GENOME) {
+				KmerHelper::sortAndUnique(task->kmers, task->kmersCount);
+			}
+			else if (inputFormat == InputFile::Format::KMC) {
+				KmerHelper::sort(task->kmers, task->kmersCount);
+			}
+
 			file.store(task->filePath, task->kmers, task->kmersCount, task->kmerLength, fraction);
 
 			processingTime += std::chrono::high_resolution_clock::now() - start;
@@ -263,14 +301,6 @@ int Console::runBuildDatabase(
 	const std::string dbFilename, 
 	InputFile::Format inputFormat,
 	bool extendDb){
-
-	time_t rawtime;
-	struct tm * timeinfo;
-	
-	time(&rawtime);
-	timeinfo = localtime(&rawtime);
-	
-	cout << "Analysis started at " << asctime(timeinfo) << endl;
 
 	LOG_DEBUG << "Creating PrefixKmerDb object" << endl;
 	AbstractKmerDb* db = new PrefixKmerDb(numThreads);
@@ -290,7 +320,7 @@ int Console::runBuildDatabase(
 		filter = std::make_shared<MinHashFilter>(fraction, fractionStart, kmerLength);
 	}
 
-	std::chrono::duration<double> processingTime;
+	std::chrono::duration<double> sortingTime, processingTime;
 	
 	cout << "Processing samples..." << endl;
 	LOG_DEBUG << "Creating Loader object..." << endl;
@@ -319,8 +349,20 @@ int Console::runBuildDatabase(
 			}
 
 			auto start = std::chrono::high_resolution_clock::now();
+
+			// postprocess k-mers if neccessary
+			if (inputFormat == InputFile::Format::GENOME) {
+				KmerHelper::sortAndUnique(task->kmers, task->kmersCount);
+			}
+			else if (inputFormat == InputFile::Format::KMC) {
+				KmerHelper::sort(task->kmers, task->kmersCount);
+			}
+			sortingTime += std::chrono::high_resolution_clock::now() - start;
+
+			start = std::chrono::high_resolution_clock::now();
 			db->addKmers(task->sampleName, task->kmers, task->kmersCount, task->kmerLength, task->fraction);
 			processingTime += std::chrono::high_resolution_clock::now() - start;
+			
 			loader.releaseTask(*task);
 			LOG_VERBOSE << db->printProgress() << endl;
 		}
@@ -330,32 +372,23 @@ int Console::runBuildDatabase(
 
 	auto totalTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
 
-	time(&rawtime);
-	timeinfo = localtime(&rawtime);
-
-	cout << "Analysis finished at " << asctime(timeinfo) << endl;
-
 	cout << endl << endl << "EXECUTION TIMES" << endl
 		<< "Total: " << totalTime.count() << endl
-		<< "Processing time: " << processingTime.count() << endl
+		<< "Kmer sorting/unique time: " << sortingTime.count() << endl
+		<< "Database update time:" << processingTime.count() << endl
 		<< db->printDetailedTimes() << endl
 		<< "STATISTICS" << endl << db->printStats() << endl;
 
 	std::chrono::duration<double> dt;
 
-	cout << "Serializing database...";
-	auto start = std::chrono::high_resolution_clock::now();
+	cout << "Serializing database..." << endl;
 	std::ofstream ofs;
 	ofs.open(dbFilename, std::ios::binary);
 	db->serialize(ofs, true);
 	ofs.close();
 
-	dt = std::chrono::high_resolution_clock::now() - start;
-
-	cout << "OK (" << dt.count() << " seconds)" << endl;
-
-	cout << "Releasing memory...";
-	start = std::chrono::high_resolution_clock::now();
+	cout << endl << "Releasing memory...";
+	auto start = std::chrono::high_resolution_clock::now();
 	delete db;
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "OK (" << dt.count() << " seconds)" << endl;
@@ -379,9 +412,7 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 		return -1;
 	}
 	dt = std::chrono::high_resolution_clock::now() - start;
-	cout << "OK (" << dt.count() << " seconds)" << endl << db->printStats() << endl;
-
-
+	
 	cout << "Calculating matrix of common k-mers...";
 	start = std::chrono::high_resolution_clock::now();
 	LowerTriangularMatrix<uint32_t> matrix;
@@ -466,6 +497,11 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 	if (!file->open(singleKmcSample) || !file->load(kmersBuffer, positions, queryKmers, queryKmersCount, kmerLength, dummy)) {
 		cout << "FAILED";
 		return -1;
+	}
+
+	// postprocess k-mers if neccessary
+	if (inputFormat == InputFile::Format::GENOME) {
+		KmerHelper::sortAndUnique(queryKmers, queryKmersCount);
 	}
 
 	if (kmerLength != db.getKmerLength()) {
@@ -567,6 +603,10 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 					task->bufferId2 = -1;
 					freeBuffersQueue.Pop(task->bufferId2);
 					buffers[task->bufferId2].clear();
+					
+					// only unique k-mers are needed
+					KmerHelper::unique(task->kmers, task->kmersCount);
+					
 					calculator.one2all<false>(db, task->kmers, task->kmersCount, buffers[task->bufferId2]);
 					similarityQueue.Push(task_id, task);
 				
