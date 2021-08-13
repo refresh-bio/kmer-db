@@ -101,6 +101,12 @@ jobs:
         ./kmer-db all2all k24.db k24.csv
         cmp k24.csv ${INPUT_DIR}/k24.csv
         
+    - name: build (k=25, f=0.1) + one2all 
+      run: |
+        ./kmer-db build -k 25 -f 0.1 ${INPUT_DIR}/seqs.part1.list k25.db
+        ./kmer-db one2all k25.db ${INPUT_DIR}/data/MT159713 MT159713.csv
+        cmp MT159713.csv ${INPUT_DIR}/MT159713.csv    
+        
     - name: new2all (against itself)
       run: |
         ./kmer-db new2all k18.db ${INPUT_DIR}/seqs.list k18.n2a.itself.csv

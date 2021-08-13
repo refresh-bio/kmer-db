@@ -254,7 +254,7 @@ int Console::parse(int argc, char** argv) {
 int Console::runMinHash(const std::string& multipleKmcSamples, InputFile::Format inputFormat) {
 	cout << "Minhashing samples..." << endl;
 
-	std::chrono::duration<double> loadingTime, processingTime;
+	std::chrono::duration<double> loadingTime{ 0 }, processingTime{ 0 };
 
 	LOG_DEBUG << "Creating Loader object..." << endl;
 
@@ -320,7 +320,7 @@ int Console::runBuildDatabase(
 		filter = std::make_shared<MinHashFilter>(fraction, fractionStart, kmerLength);
 	}
 
-	std::chrono::duration<double> sortingTime, processingTime;
+	std::chrono::duration<double> sortingTime{ 0 }, processingTime{ 0 };
 	
 	cout << "Processing samples..." << endl;
 	LOG_DEBUG << "Creating Loader object..." << endl;
@@ -379,7 +379,7 @@ int Console::runBuildDatabase(
 		<< db->printDetailedTimes() << endl
 		<< "STATISTICS" << endl << db->printStats() << endl;
 
-	std::chrono::duration<double> dt;
+	std::chrono::duration<double> dt{ 0 };
 
 	cout << "Serializing database..." << endl;
 	std::ofstream ofs;
@@ -404,7 +404,7 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 	PrefixKmerDb* db = new PrefixKmerDb(numThreads);
 	SimilarityCalculator calculator(numThreads, cacheBufferMb);
 	
-	std::chrono::duration<double> dt;
+	std::chrono::duration<double> dt{ 0 };
 	cout << "Loading k-mer database " << dbFilename << "..." << endl;
 	auto start = std::chrono::high_resolution_clock::now();
 	if (!dbFile || !db->deserialize(dbFile)) {
@@ -453,12 +453,12 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 
 // *****************************************************************************************
 //
-int Console::runOneVsAll(const std::string& dbFilename, const std::string& singleKmcSample, const std::string& similarityFile, InputFile::Format inputFormat) {
+int Console::runOneVsAll(const std::string& dbFilename, const std::string& sampleFasta, const std::string& similarityFile, InputFile::Format inputFormat) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
 	PrefixKmerDb db(numThreads);
 	SimilarityCalculator calculator(numThreads, cacheBufferMb);
 
-	std::chrono::duration<double> dt;
+	std::chrono::duration<double> dt{ 0 };
 
 	cout << "Loading k-mer database " << dbFilename << ":" << endl;
 	auto start = std::chrono::high_resolution_clock::now();
@@ -494,7 +494,7 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 	size_t queryKmersCount;
 	kmer_t* queryKmers;
 
-	if (!file->open(singleKmcSample) || !file->load(kmersBuffer, positions, queryKmers, queryKmersCount, kmerLength, dummy)) {
+	if (!file->open(sampleFasta) || !file->load(kmersBuffer, positions, queryKmers, queryKmersCount, kmerLength, dummy)) {
 		cout << "FAILED";
 		return -1;
 	}
@@ -529,7 +529,7 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& singl
 
 	ofs << endl << "query-samples,total-kmers,";
 	std::copy(db.getSampleKmersCount().cbegin(), db.getSampleKmersCount().cend(), ostream_iterator<size_t>(ofs, ","));
-	ofs << endl << singleKmcSample << "," << queryKmersCount << ",";
+	ofs << endl << sampleFasta << "," << queryKmersCount << ",";
 	std::copy(sims.begin(), sims.end(), ostream_iterator<uint32_t>(ofs, ","));
 
 	ofs.close();
@@ -546,7 +546,7 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 	PrefixKmerDb db(numThreads);
 	SimilarityCalculator calculator(numThreads, cacheBufferMb);
 
-	std::chrono::duration<double> loadingTime, processingTime, dt;
+	std::chrono::duration<double> loadingTime{ 0 }, processingTime{ 0 }, dt{ 0 };
 
 	cout << "Loading k-mer database " << dbFilename << "...";
 	auto start = std::chrono::high_resolution_clock::now();
@@ -789,8 +789,6 @@ int Console::runDistanceCalculation(const std::string& similarityFilename, const
 //
 int Console::runAnalyzeDatabase(const std::string & multipleKmcSamples, const std::string & dbFilename)
 {
-	std::chrono::duration<double> loadingTime, processingTime;
-
 	std::ifstream dbFile(dbFilename, std::ios::binary);
 	PrefixKmerDb db(numThreads);
 
