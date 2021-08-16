@@ -127,7 +127,7 @@ int Console::parse(int argc, char** argv) {
 		
 		findOption(params, Params::OPTION_THREADS, numThreads);			// number of threads
 		if (numThreads <= 0) {
-			numThreads = std::thread::hardware_concurrency();
+			numThreads = std::max((int)std::thread::hardware_concurrency(), 1); // hardware_concurrency may return 0
 		}
 
 		// limit number of threads used in parallel sorts
@@ -597,11 +597,11 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 		workers[tid] = thread([&db, &loader, &freeBuffersQueue, &similarityQueue, &buffers, &calculator, &sample_id, tid]() {
 			while (!loader.isCompleted()) {
 				int task_id = sample_id.fetch_add(1);
-				auto task = loader.popTask(task_id);
-				
-				if (task) {
-					task->bufferId2 = -1;
-					freeBuffersQueue.Pop(task->bufferId2);
+				std::shared_ptr<SampleTask> task;
+				int bufferId2 = 0;
+
+				if (freeBuffersQueue.Pop(bufferId2) && (task = loader.popTask(task_id))) {
+					task->bufferId2 = bufferId2;
 					buffers[task->bufferId2].clear();
 					
 					// only unique k-mers are needed
@@ -622,27 +622,29 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 	// gather results in one thread
 	for (int task_id = 0; !similarityQueue.IsCompleted(); ++task_id) {
 		
-		if ((task_id + 1) % 10 == 0) {
-			cout << "\r" << task_id + 1 << "...                      " << std::flush;
-		}
-		
 		std::shared_ptr<SampleTask> task;
-		similarityQueue.Pop(task_id, task);
-		LOG_DEBUG << "similarity queue -> (" << task_id + 1 << ", " << task->sampleName << "), buf:" << task->bufferId2 << endl;
-		const auto& row = buffers[task->bufferId2];
-		ofs << endl << task->sampleName << "," << task->kmersCount << ",";
-		if (sparse) {
-			for (int i = 0; i < row.size(); ++i) {
-				if (row[i] > 0) {
-					ofs << (i + 1) << ":" << row[i] << ",";
+		if (similarityQueue.Pop(task_id, task)) {
+			
+			if ((task_id + 1) % 10 == 0) {
+				cout << "\r" << task_id + 1 << "...                      " << std::flush;
+			}
+
+			LOG_DEBUG << "similarity queue -> (" << task_id + 1 << ", " << task->sampleName << "), buf:" << task->bufferId2 << endl;
+			const auto& row = buffers[task->bufferId2];
+			ofs << endl << task->sampleName << "," << task->kmersCount << ",";
+			if (sparse) {
+				for (size_t i = 0; i < row.size(); ++i) {
+					if (row[i] > 0) {
+						ofs << (i + 1) << ":" << row[i] << ",";
+					}
 				}
 			}
+			else {
+				std::copy(row.begin(), row.end(), ostream_iterator<uint32_t>(ofs, ","));
+			}
+			freeBuffersQueue.Push(task->bufferId2);
+			loader.releaseTask(*task);
 		}
-		else {
-			std::copy(row.begin(), row.end(), ostream_iterator<uint32_t>(ofs, ","));
-		}
-		freeBuffersQueue.Push(task->bufferId2);
-		loader.releaseTask(*task);
 	}
 
 	// make sure all threads have finished

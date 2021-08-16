@@ -170,7 +170,7 @@ public:
 	{
 		filled = 0;
 
-		int n_threads = std::thread::hardware_concurrency();
+		int n_threads = std::max((int)std::thread::hardware_concurrency(), 1);
 		std::vector<std::thread> threads(n_threads);
 
 		//LOG_DEBUG << "Clearing hashtable (parallel)...";
@@ -429,6 +429,9 @@ public:
 		file.read(reinterpret_cast<char*>(&ht_memory), sizeof(ht_memory));
 		file.read(reinterpret_cast<char*>(&ht_total), sizeof(ht_total));
 		file.read(reinterpret_cast<char*>(&ht_match), sizeof(ht_match));
+
+		// free already allocated memory
+		delete[] data;
 
 		data = new item_t[allocated];
 

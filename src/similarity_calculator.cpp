@@ -11,7 +11,8 @@
 // *****************************************************************************************
 //
 SimilarityCalculator::SimilarityCalculator(int _num_threads, size_t cacheBufferMb) : 
-	num_threads(_num_threads > 0 ? _num_threads : std::thread::hardware_concurrency()),
+	// hardware_concurrency may return 0
+	num_threads(_num_threads > 0 ? _num_threads : std::max((int)std::thread::hardware_concurrency(), 1)),
 	cacheBufferMb(cacheBufferMb) {
 	avx2_present = instrset_detect() >= 8;
 }
