@@ -598,10 +598,8 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 			while (!loader.isCompleted()) {
 				int task_id = sample_id.fetch_add(1);
 				std::shared_ptr<SampleTask> task;
-				int bufferId2 = 0;
-
-				if (freeBuffersQueue.Pop(bufferId2) && (task = loader.popTask(task_id))) {
-					task->bufferId2 = bufferId2;
+				
+				if ((task = loader.popTask(task_id)) && freeBuffersQueue.Pop(task->bufferId2)) {
 					buffers[task->bufferId2].clear();
 					
 					// only unique k-mers are needed

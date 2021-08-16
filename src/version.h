@@ -1,11 +1,14 @@
 #pragma once
 
-#define VERSION "1.9.1"
-#define DATE "11.08.2021"
+#define VERSION "1.9.2"
+#define DATE "16.08.2021"
 
 /* 
 
 Version history
+
+1.9.2 (11.08.2021)
+- Synchronization bugfix in new2all.
 
 1.9.1 (11.08.2021)
 - Output matrices can be stored in sparse format (-sparse switch).
