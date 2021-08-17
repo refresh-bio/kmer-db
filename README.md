@@ -173,7 +173,7 @@ where:
 
 For performance reasons, `all2all` mode produces a lower triangular matrix.
 
-When `-sparse` switch is specified, the table is stored in a sparse form. In particular, zeros are omitted while non-zero elements are represented as pairs (*column_id*, *value*). Thus, rows may have different number of elements:
+When `-sparse` switch is specified, the table is stored in a sparse form. In particular, zeros are omitted while non-zero elements are represented as pairs (*column_id*, *value*) with 1-based column indexing. Thus, rows may have different number of elements, e.g.:
 
 | 									| 								| 					| 				|		|			|	
 | :---: 							| :---: 						| :---: 			| :---:			| :---:	|  :---:	| 
