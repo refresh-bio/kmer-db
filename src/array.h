@@ -7,6 +7,8 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 
 */
 
+#include "conversion.h"
+
 #include <vector>
 #include <iostream>
 #include <fstream>
@@ -169,35 +171,47 @@ public:
 		}
 	}
 
-	void saveRow(size_t row, std::ofstream & file) {
-		size_t offset = row * (row - 1) / 2;
-		T * ptr = data.data() + offset;
+	void saveRow(size_t row_id, std::ofstream & file) {
+		size_t offset = row_id * (row_id - 1) / 2;
+		T * elem = data.data() + offset;
 
-		for (size_t j = 0; j < row; ++j) {
-			file << *ptr++ << ',';
+		for (size_t j = 0; j < row_id; ++j) {
+			file << *elem++ << ',';
 		}
 	}
 
-	void saveRowSparse(size_t row, std::ofstream & file) {
-		size_t offset = row * (row - 1) / 2;
-		T * ptr = data.data() + offset;
+	void saveRowSparse(size_t row_id, std::ofstream & file) {
+		size_t offset = row_id * (row_id - 1) / 2;
+		T * elem = data.data() + offset;
 
-		for (size_t j = 0; j < row; ++j, ++ptr) {
-			if (*ptr > 0) {
-				file << (j + 1) << ":" << *ptr << ',';
+		for (size_t j = 0; j < row_id; ++j, ++elem) {
+			if (*elem > 0) {
+				file << (j + 1) << ":" << *elem << ',';
 			}
 		}
 	}
 
-	void saveRow(size_t row, T diagElem, std::ofstream & file) {
+	int saveRow(size_t row, char* out) {
 		size_t offset = row * (row - 1) / 2;
-		T * ptr = data.data() + offset;
+		return num2str(data.data() + offset, row, ',', out);
+	}
 
-		for (size_t j = 0; j < row; ++j) {
-			file << *ptr++ << ',';
+	int saveRowSparse(size_t row_id, char* out) {
+		size_t offset = row_id * (row_id - 1) / 2;
+		T * elem = data.data() + offset;
+		
+		char *ptr = out;
+
+		for (size_t j = 0; j < row_id; ++j, ++elem) {
+			if (*elem > 0) {
+				ptr += num2str(j + 1, ptr);
+				*ptr++ = ':';
+				ptr += num2str(*elem, ptr);
+				*ptr++ = ',';
+			}
 		}
-
-		file << diagElem << ",";
+		
+		return ptr - out;
 	}
 
 

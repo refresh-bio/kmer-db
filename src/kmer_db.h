@@ -75,7 +75,7 @@ public:
 
 	virtual void serialize(std::ofstream& file, bool rawHashtables) const = 0;
 
-	virtual bool deserialize(std::ifstream& file) = 0;
+	virtual bool deserialize(std::ifstream& file, bool skipHashtables = false) = 0;
 
 	virtual std::string printStats() const = 0;
 

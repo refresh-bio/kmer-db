@@ -1,13 +1,17 @@
 #pragma once
 
-#define VERSION "1.9.2"
-#define DATE "16.08.2021"
+#define VERSION "1.9.3"
+#define DATE "27.08.2021"
 
 /* 
 
 Version history
 
-1.9.2 (11.08.2021)
+1.9.3 (27.08.2021)
+- Disabled h-mer hashatables loading in all2all mode.
+- Fast CSV saving in all2all and new2all modes.
+
+1.9.2 (16.08.2021)
 - Synchronization bugfix in new2all.
 
 1.9.1 (11.08.2021)

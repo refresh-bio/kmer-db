@@ -561,7 +561,7 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 
 // *****************************************************************************************
 //
-bool PrefixKmerDb::deserialize(std::ifstream& file) {
+bool PrefixKmerDb::deserialize(std::ifstream& file, bool skipHashtables) {
 
 	size_t numHastableElements = IO_BUFFER_BYTES / sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t);
 	std::vector <hash_map_lp<suffix_t, pattern_id_t>::item_t> hashtableBuffer(numHastableElements);
@@ -597,7 +597,10 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 		return false;
 	}
 
-	cout << "Loading k-mer hashtables (" << (rawHashtables ? "raw" : "compressed") << ")..." << endl;
+	if (!skipHashtables) {
+		cout << "Loading k-mer hashtables (" << (rawHashtables ? "raw" : "compressed") << ")..." << endl;
+	}
+	
 	auto time = std::chrono::high_resolution_clock::now();
 
 	// load number of hashmaps
@@ -609,7 +612,7 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 	// load all hashtables
 	for (size_t i = 0; i < hashtables.size(); ++i) {
 		
-		if (i * 100 / hashtables.size() > percent) {
+		if (!skipHashtables && (i * 100 / hashtables.size() > percent)) {
 			cout << "\r" << percent << "%" << std::flush;
 			++percent;
 		}
@@ -617,7 +620,7 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 		auto& ht = hashtables[i];
 
 		if (rawHashtables) {
-			ht.deserialize(file, hashtableBuffer.data(), hashtableBuffer.size());
+			ht.deserialize(file, hashtableBuffer.data(), hashtableBuffer.size(), skipHashtables);
 		}
 		else {
 			// load ht size
@@ -645,8 +648,10 @@ bool PrefixKmerDb::deserialize(std::ifstream& file) {
 	}
 	
 	std::chrono::duration<double> dt = std::chrono::high_resolution_clock::now() - time;
-	cout << "\r" << hashtables.size() << "/" << hashtables.size() << " hashtables loaded in " << dt.count() << " s" << std::flush;
-	cout << endl;
+	if (!skipHashtables) {
+		cout << "\r" << hashtables.size() << "/" << hashtables.size() << " hashtables loaded in " << dt.count() << " s" << std::flush;
+		cout << endl;
+	}
 
 	if (!file) {
 		return false;

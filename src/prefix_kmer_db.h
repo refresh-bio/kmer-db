@@ -71,7 +71,7 @@ public:
 
 	void serialize(std::ofstream& file, bool rawHashtables) const override;
 
-	bool deserialize(std::ifstream& file) override;
+	bool deserialize(std::ifstream& file, bool skipHashtables = false) override;
 
 	std::string printProgress() const override {
 		std::ostringstream oss;

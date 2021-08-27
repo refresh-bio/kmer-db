@@ -407,7 +407,7 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 	std::chrono::duration<double> dt{ 0 };
 	cout << "Loading k-mer database " << dbFilename << "..." << endl;
 	auto start = std::chrono::high_resolution_clock::now();
-	if (!dbFile || !db->deserialize(dbFile)) {
+	if (!dbFile || !db->deserialize(dbFile, true)) {
 		cout << "FAILED";
 		return -1;
 	}
@@ -424,20 +424,33 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 	start = std::chrono::high_resolution_clock::now();
 	ofs << "kmer-length: " << db->getKmerLength() << " fraction: " << db->getFraction() << " ,db-samples ,";
 	std::copy(db->getSampleNames().cbegin(), db->getSampleNames().cend(), ostream_iterator<string>(ofs, ","));
-	ofs << endl << "query-samples,total-kmers,";
-	std::copy(db->getSampleKmersCount().cbegin(), db->getSampleKmersCount().cend(), ostream_iterator<size_t>(ofs, ","));
 	ofs << endl;
 
+	// allocate row buffer (10000 for sample name + 100 for each row)
+	char* row = new char[10000 + db->getSamplesCount() * 100];
+	char *ptr = row;
+
+	ptr += sprintf(ptr, "query-samples,total-kmers,");
+	ptr += num2str(db->getSampleKmersCount().data(), db->getSampleKmersCount().size(), ',', ptr);
+	*ptr++ = '\n';
+	ofs.write(row, ptr - row);
+	
 	for (size_t sid = 0; sid < db->getSamplesCount(); ++sid) {
-		ofs << db->getSampleNames()[sid] << ", " << db->getSampleKmersCount()[sid] << ", ";
+		ptr = row;
+		ptr += sprintf(ptr, "%s,%lu,", db->getSampleNames()[sid].c_str(), db->getSampleKmersCount()[sid]);
+	
 		if (sparse) {
-			matrix.saveRowSparse(sid, ofs);
+			ptr += matrix.saveRowSparse(sid, ptr);
 		}
 		else {
-			matrix.saveRow(sid, ofs);
+			ptr += matrix.saveRow(sid, ptr);
 		}
-		ofs << endl;
+
+		*ptr++ = '\n';
+		ofs.write(row, ptr - row);
 	}
+
+	delete[] row;
 
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "OK (" << dt.count() << " seconds)" << endl;
@@ -548,7 +561,7 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 
 	std::chrono::duration<double> loadingTime{ 0 }, processingTime{ 0 }, dt{ 0 };
 
-	cout << "Loading k-mer database " << dbFilename << "...";
+	cout << "Loading k-mer database " << dbFilename << "..." << endl;
 	auto start = std::chrono::high_resolution_clock::now();
 	if (!dbFile || !db.deserialize(dbFile)) {
 		cout << "FAILED";
@@ -556,19 +569,6 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 	}
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "OK (" << dt.count() << " seconds)" << endl << db.printStats() << endl;
-
-	// Opening file
-	std::ofstream ofs(similarityFile);
-	
-	cout << "Storing matrix of common k-mers in " << similarityFile << endl;
-	start = std::chrono::high_resolution_clock::now();
-	ofs << "kmer-length: " << db.getKmerLength() << " fraction: " << db.getFraction() << " ,db-samples ,";
-	std::copy(db.getSampleNames().cbegin(), db.getSampleNames().cend(), ostream_iterator<string>(ofs, ","));
-	ofs << endl << "query-samples,total-kmers,";
-	std::copy(db.getSampleKmersCount().cbegin(), db.getSampleKmersCount().cend(), ostream_iterator<size_t>(ofs, ","));
-	
-	cout << "Loading queries...";
-	start = std::chrono::high_resolution_clock::now();
 
 	LOG_DEBUG << "Creating Loader object..." << endl;
 	shared_ptr<MinHashFilter> filter = shared_ptr<MinHashFilter>(new MinHashFilter(db.getFraction(), db.getStartFraction(), db.getKmerLength()));
@@ -617,7 +617,23 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 		});
 	}
 
-	// gather results in one thread
+	
+	// Opening file
+	std::ofstream ofs(similarityFile);
+	ofs << "kmer-length: " << db.getKmerLength() << " fraction: " << db.getFraction() << " ,db-samples ,";
+	std::copy(db.getSampleNames().cbegin(), db.getSampleNames().cend(), ostream_iterator<string>(ofs, ","));
+	ofs << endl;
+
+	// allocate row buffer (10000 for sample name + 100 for each row)
+	char* row = new char[10000 + db.getSamplesCount() * 100];
+	char *ptr = row;
+
+	ptr += sprintf(ptr, "query-samples,total-kmers,");
+	ptr += num2str(db.getSampleKmersCount().data(), db.getSampleKmersCount().size(), ',', ptr);
+	*ptr++ = '\n';
+	ofs.write(row, ptr - row);
+
+	// Gather results in one thread
 	for (int task_id = 0; !similarityQueue.IsCompleted(); ++task_id) {
 		
 		std::shared_ptr<SampleTask> task;
@@ -628,22 +644,36 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 			}
 
 			LOG_DEBUG << "similarity queue -> (" << task_id + 1 << ", " << task->sampleName << "), buf:" << task->bufferId2 << endl;
-			const auto& row = buffers[task->bufferId2];
-			ofs << endl << task->sampleName << "," << task->kmersCount << ",";
+			const auto& buf = buffers[task->bufferId2];
+			
+			ptr = row;
+			ptr += sprintf(ptr, "%s,%lu,", task->sampleName.c_str(), task->kmersCount);
+
 			if (sparse) {
-				for (size_t i = 0; i < row.size(); ++i) {
-					if (row[i] > 0) {
-						ofs << (i + 1) << ":" << row[i] << ",";
+				const auto* elem = buf.data();
+
+				for (size_t i = 0; i < buf.size(); ++i, ++elem) {
+					if (*elem > 0) {
+						ptr += num2str(i + 1, ptr);
+						*ptr++ = ':';
+						ptr += num2str(*elem, ptr);
+						*ptr++ = ',';
 					}
 				}
 			}
 			else {
-				std::copy(row.begin(), row.end(), ostream_iterator<uint32_t>(ofs, ","));
+				ptr += num2str(buf.data(), buf.size(), ',', ptr);
 			}
+
 			freeBuffersQueue.Push(task->bufferId2);
 			loader.releaseTask(*task);
+
+			*ptr++ = '\n';
+			ofs.write(row, ptr - row);
 		}
 	}
+
+	delete[] row;
 
 	// make sure all threads have finished
 	for (auto &w : workers) {
@@ -654,7 +684,6 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 
 	cout << endl << endl << "EXECUTION TIMES" << endl
 		<< "Total: " << totalTime.count() << endl;
-
 
 	return 0;
 }

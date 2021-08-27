@@ -417,7 +417,7 @@ public:
 
 	// *****************************************************************************************
 	//
-	bool deserialize(std::ifstream& file, item_t* buffer, size_t buf_size) {
+	bool deserialize(std::ifstream& file, item_t* buffer, size_t buf_size, bool skipData) {
 
 		file.read(reinterpret_cast<char*>(&max_fill_factor), sizeof(max_fill_factor));
 
@@ -430,42 +430,50 @@ public:
 		file.read(reinterpret_cast<char*>(&ht_total), sizeof(ht_total));
 		file.read(reinterpret_cast<char*>(&ht_match), sizeof(ht_match));
 
-		// free already allocated memory
-		delete[] data;
-
-		data = new item_t[allocated];
-
 		// load bit vectors of filled slots
 		size_t bv_size = (allocated + 63) / 64;
-		uint64_t* bv = new uint64_t[bv_size];
-		file.read(reinterpret_cast<char*>(bv), sizeof(uint64_t) * bv_size);
-
-		// 32MB portion
-		size_t buf_id = 0;
-		size_t remaining = filled;
-	
-		for (uint64_t i = 0; i < allocated; ++i) {
-			// load data 
-			if (buf_id == 0 || buf_id == buf_size) {
-				file.read(reinterpret_cast<char*>(buffer), sizeof(uint64_t) * std::min(buf_size, remaining));
-				buf_id = 0;
-				remaining -= std::min(buf_size, remaining);
-			}
-			
-			uint64_t word = i >> 6;
-			uint64_t offset = i & 63;
 		
-			// if slot is filled
-			if (bv[word] & (1ull << offset)) {
-				data[i] = buffer[buf_id++];
-			}
-			else {
-				data[i].key = Key{};
-				data[i].val = empty_value;
-			}
+		if (skipData) {
+			// skip bit vectors and raw data
+			file.seekg(sizeof(uint64_t) * bv_size, ios_base::cur);
+			file.seekg(sizeof(uint64_t) * filled, ios_base::cur);
 		}
+		else {
+			uint64_t* bv = new uint64_t[bv_size];
 
-		delete[] bv;
+			file.read(reinterpret_cast<char*>(bv), sizeof(uint64_t) * bv_size);
+
+			// free already allocated memory
+			delete[] data;
+			data = new item_t[allocated];
+
+			// load in portions
+			size_t buf_id = 0;
+			size_t remaining = filled;
+
+			for (uint64_t i = 0; i < allocated; ++i) {
+				// load data 
+				if (buf_id == 0 || buf_id == buf_size) {
+					file.read(reinterpret_cast<char*>(buffer), sizeof(uint64_t) * std::min(buf_size, remaining));
+					buf_id = 0;
+					remaining -= std::min(buf_size, remaining);
+				}
+
+				uint64_t word = i >> 6;
+				uint64_t offset = i & 63;
+
+				// if slot is filled
+				if (bv[word] & (1ull << offset)) {
+					data[i] = buffer[buf_id++];
+				}
+				else {
+					data[i].key = Key{};
+					data[i].val = empty_value;
+				}
+			}
+
+			delete[] bv;
+		}
 
 		return file.good();
 	}

@@ -2,6 +2,7 @@
 [![GitHub downloads](https://img.shields.io/github/downloads/refresh-bio/kmer-db/total.svg?style=flag&label=GitHub%20downloads)](https://github.com/refresh-bio/kmer-db/releases)
 [![Bioconda downloads](https://img.shields.io/conda/dn/bioconda/kmer-db.svg?style=flag&label=Bioconda%20downloads)](https://anaconda.org/bioconda/kmer-db)
 [![C/C++ CI](https://github.com/refresh-bio/kmer-db/workflows/C/C++%20CI/badge.svg)](https://github.com/refresh-bio/kmer-db/actions)
+[![License](https://anaconda.org/bioconda/famsa/badges/license.svg)](https://www.gnu.org/licenses/gpl-3.0.html)
 
 
 Kmer-db is a fast and memory-efficient tool for large-scale k-mer analyses (indexing, querying, estimating evolutionary relationships, etc.). 
@@ -173,17 +174,17 @@ where:
 
 For performance reasons, `all2all` mode produces a lower triangular matrix.
 
-When `-sparse` switch is specified, the table is stored in a sparse form. In particular, zeros are omitted while non-zero elements are represented as pairs (*column_id*, *value*) with 1-based column indexing. Thus, rows may have different number of elements, e.g.:
+When `-sparse` switch is specified, the table is stored in a sparse form. In particular, zeros are omitted while non-zero elements are represented as pairs (*column_id*: *value*) with 1-based column indexing. Thus, rows may have different number of elements, e.g.:
 
 | 									| 								| 					| 				|		|			|	
 | :---: 							| :---: 						| :---: 			| :---:			| :---:	|  :---:	| 
 | kmer-length: *k* fraction: *f* 	| db-samples 					| *s<sub>1</sub>*					| *s<sub>2</sub>* | ... 	|  *s<sub>n</sub>* |
 | query-samples 					| total-kmers 					| &#124;*s<sub>1</sub>*&#124;		| &#124;*s<sub>2</sub>*&#124; 	| ... 	|  &#124;*s<sub>n</sub>*&#124; |
-| *q<sub>1</sub>* 					| &#124;*q<sub>1</sub>*&#124;	| (*i<sub>11</sub>*, &#124;*q<sub>1</sub> &cap; s<sub>i<sub>11</sub></sub>*&#124;)	| (*i<sub>12</sub>*, &#124;*q<sub>1</sub> &cap; s<sub>i<sub>12</sub></sub>*&#124;) | ||
-| *q<sub>2</sub>* 					| &#124;*q<sub>2</sub>*&#124;	| (*i<sub>21</sub>*, &#124;*q<sub>2</sub> &cap; s<sub>i<sub>21</sub></sub>*&#124;)	| (*i<sub>22</sub>*, &#124;*q<sub>2</sub> &cap; s<sub>i<sub>22</sub></sub>*&#124;) 	| (*i<sub>23</sub>*, &#124;*q<sub>2</sub> &cap; s<sub>i<sub>23</sub></sub>*&#124;)  	| |   
+| *q<sub>1</sub>* 					| &#124;*q<sub>1</sub>*&#124;	| *i<sub>11</sub>*: &#124;*q<sub>1</sub> &cap; s<sub>i<sub>11</sub></sub>*&#124;	| *i<sub>12</sub>*: &#124;*q<sub>1</sub> &cap; s<sub>i<sub>12</sub></sub>*&#124; | ||
+| *q<sub>2</sub>* 					| &#124;*q<sub>2</sub>*&#124;	| *i<sub>21</sub>*: &#124;*q<sub>2</sub> &cap; s<sub>i<sub>21</sub></sub>*&#124;	| *i<sub>22</sub>*: &#124;*q<sub>2</sub> &cap; s<sub>i<sub>22</sub></sub>*&#124; 	| *i<sub>23</sub>*: &#124;*q<sub>2</sub> &cap; s<sub>i<sub>23</sub></sub>*&#124;  	| |   
 | *q<sub>2</sub>* 					| &#124;*q<sub>2</sub>*&#124;	| ||||
 | ... 								| ...							| ... ||||
-| *q<sub>m</sub>* 					| &#124;*q<sub>m</sub>*&#124;	| (*i<sub>m1</sub>*, &#124;*q<sub>m</sub> &cap; s<sub>i<sub>m1</sub></sub>*&#124;)	| |||
+| *q<sub>m</sub>* 					| &#124;*q<sub>m</sub>*&#124;	| *i<sub>m1</sub>*: &#124;*q<sub>m</sub> &cap; s<sub>i<sub>m1</sub></sub>*&#124;	| |||
  
  ## 2.3. Calculating similarities or distances
 

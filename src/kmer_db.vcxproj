@@ -159,6 +159,7 @@
     <ClInclude Include="analyzer.h" />
     <ClInclude Include="array.h" />
     <ClInclude Include="console.h" />
+    <ClInclude Include="conversion.h" />
     <ClInclude Include="elias_gamma.h" />
     <ClInclude Include="filter.h" />
     <ClInclude Include="hashmap_lp.h" />
