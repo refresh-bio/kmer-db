@@ -256,18 +256,18 @@ int Console::runMinHash(const std::string& multipleKmcSamples, InputFile::Format
 
 	std::chrono::duration<double> loadingTime{ 0 }, processingTime{ 0 };
 
-	LOG_DEBUG << "Creating Loader object..." << endl;
+	LOG_DEBUG << "Creating Loader object..." << endl ;
 
 	auto filter = std::make_shared<MinHashFilter>(fraction, 0, kmerLength);
 
 	LoaderEx loader(filter, inputFormat, numReaderThreads, numThreads, multisampleFasta);
 	loader.configure(multipleKmcSamples);
 
-	LOG_DEBUG << "Starting loop..." << endl;
+	LOG_DEBUG << "Starting loop..." << endl ;
 	auto totalStart = std::chrono::high_resolution_clock::now();
 	for (int i = 0; !loader.isCompleted(); ++i) {
 		auto partialTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
-		LOG_VERBOSE << "Processing time: " << partialTime.count() << ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl;
+		LOG_VERBOSE << "Processing time: " << partialTime.count() << ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl ;
 
 		auto task = loader.popTask(i);
 
@@ -302,7 +302,7 @@ int Console::runBuildDatabase(
 	InputFile::Format inputFormat,
 	bool extendDb){
 
-	LOG_DEBUG << "Creating PrefixKmerDb object" << endl;
+	LOG_DEBUG << "Creating PrefixKmerDb object" << endl ;
 	AbstractKmerDb* db = new PrefixKmerDb(numThreads);
 	std::shared_ptr<MinHashFilter> filter;
 
@@ -323,17 +323,17 @@ int Console::runBuildDatabase(
 	std::chrono::duration<double> sortingTime{ 0 }, processingTime{ 0 };
 	
 	cout << "Processing samples..." << endl;
-	LOG_DEBUG << "Creating Loader object..." << endl;
+	LOG_DEBUG << "Creating Loader object..." << endl ;
 
 	LoaderEx loader(filter, inputFormat, numReaderThreads, numThreads, multisampleFasta);
 	loader.configure(multipleSamples);
 
-	LOG_DEBUG << "Starting loop..." << endl;
+	LOG_DEBUG << "Starting loop..." << endl ;
 	auto totalStart = std::chrono::high_resolution_clock::now();
 	int sample_id = 0;
 	for (; !loader.isCompleted(); ++sample_id) {
 		auto partialTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
-		LOG_VERBOSE << "Processing time: " << partialTime.count() <<  ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl;
+		LOG_VERBOSE << "Processing time: " << partialTime.count() <<  ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl ;
 		
 		auto task = loader.popTask(sample_id);
 
@@ -364,7 +364,7 @@ int Console::runBuildDatabase(
 			processingTime += std::chrono::high_resolution_clock::now() - start;
 			
 			loader.releaseTask(*task);
-			LOG_VERBOSE << db->printProgress() << endl;
+			LOG_VERBOSE << db->printProgress() << endl ;
 		}
 	}
 
@@ -570,7 +570,7 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 	dt = std::chrono::high_resolution_clock::now() - start;
 	cout << "OK (" << dt.count() << " seconds)" << endl << db.printStats() << endl;
 
-	LOG_DEBUG << "Creating Loader object..." << endl;
+	LOG_DEBUG << "Creating Loader object..." << endl ;
 	shared_ptr<MinHashFilter> filter = shared_ptr<MinHashFilter>(new MinHashFilter(db.getFraction(), db.getStartFraction(), db.getKmerLength()));
 
 	LoaderEx loader(filter, inputFormat, numReaderThreads, numThreads, multisampleFasta);
@@ -595,11 +595,11 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 
 	for (int tid = 0; tid < numThreads; ++tid) {
 		workers[tid] = thread([&db, &loader, &freeBuffersQueue, &similarityQueue, &buffers, &calculator, &sample_id, tid]() {
+			int task_id = sample_id.fetch_add(1);
 			while (!loader.isCompleted()) {
-				int task_id = sample_id.fetch_add(1);
-				std::shared_ptr<SampleTask> task;
-				
+				std::shared_ptr<SampleTask> task;	
 				if ((task = loader.popTask(task_id)) && freeBuffersQueue.Pop(task->bufferId2)) {
+					LOG_DEBUG << "loader queue " << task_id + 1 << " -> (" << task->id + 1 << ", " << task->sampleName << ")" << endl ;
 					buffers[task->bufferId2].clear();
 					
 					// only unique k-mers are needed
@@ -608,12 +608,14 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 					calculator.one2all<false>(db, task->kmers, task->kmersCount, buffers[task->bufferId2]);
 					similarityQueue.Push(task_id, task);
 				
-					LOG_DEBUG << "(" << task_id + 1 << ") -> similarity queue, tid:"  << tid << ", buf:" << task->bufferId2 << endl;
+					LOG_DEBUG << "(" << task->id + 1 << ", " << task->sampleName << ") -> similarity queue, tid:"  << tid << ", buf:" << task->bufferId2 << endl ;
+					task_id = sample_id.fetch_add(1);
+				
 				}
 			}
 
 			similarityQueue.MarkCompleted();
-			LOG_DEBUG << "processing finished, tid: " << tid << endl;
+			LOG_DEBUG << "similarity thread completed: " << tid << endl ;
 		});
 	}
 
@@ -643,7 +645,7 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 				cout << "\r" << task_id + 1 << "...                      " << std::flush;
 			}
 
-			LOG_DEBUG << "similarity queue -> (" << task_id + 1 << ", " << task->sampleName << "), buf:" << task->bufferId2 << endl;
+			LOG_DEBUG << "similarity queue -> (" << task_id + 1 << ", " << task->sampleName << "), buf:" << task->bufferId2 << endl ;
 			const auto& buf = buffers[task->bufferId2];
 			
 			ptr = row;
@@ -837,7 +839,7 @@ int Console::runAnalyzeDatabase(const std::string & multipleKmcSamples, const st
 	LoaderEx loader(filter, InputFile::GENOME, numReaderThreads, numThreads, true);
 	int numSamples = loader.configure(multipleKmcSamples);
 
-	LOG_DEBUG << "Starting loop..." << endl;
+	LOG_DEBUG << "Starting loop..." << endl ;
 	for (int i = 0; i < numSamples; ++i) {
 		
 		auto task = loader.popTask(i);

@@ -1,11 +1,16 @@
 #pragma once
 
-#define VERSION "1.9.3"
-#define DATE "27.08.2021"
+#define VERSION "1.9.4"
+#define DATE "19.04.2022"
 
 /* 
 
 Version history
+
+1.9.4 (19.04.2022)
+- fixed database construction for very small samples (#kmers < #threads)
+- fixed synchronization issues in new2all mode (non-deterministic row order in output matrix).
+- fixed deadlock during database construction when -multisample-fasta mode is run on more than one file.
 
 1.9.3 (27.08.2021)
 - Disabled h-mer hashatables loading in all2all mode.

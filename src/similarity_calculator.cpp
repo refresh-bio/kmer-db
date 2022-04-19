@@ -467,7 +467,7 @@ void  SimilarityCalculator::one2all<true>(const PrefixKmerDb& db, const kmer_t* 
 
 
 	dt = std::chrono::high_resolution_clock::now() - start;
-	LOG_VERBOSE << "Pattern listing time: " << dt.count() << endl;
+	//LOG_VERBOSE << "Pattern listing time: " << dt.count() << endl ;
 
 	start = std::chrono::high_resolution_clock::now();
 	std::vector<std::thread> workers(num_threads);
@@ -531,7 +531,7 @@ void  SimilarityCalculator::one2all<true>(const PrefixKmerDb& db, const kmer_t* 
 	}
 
 	dt = std::chrono::high_resolution_clock::now() - start;
-	LOG_VERBOSE << "Pattern unpacking time: " << dt.count() << endl;
+	//LOG_VERBOSE << "Pattern unpacking time: " << dt.count() << endl ;
 }
 
 // *****************************************************************************************
@@ -594,7 +594,7 @@ void SimilarityCalculator::one2all<false>(const PrefixKmerDb& db, const kmer_t* 
 	patterns2count.clear();
 
 	dt = std::chrono::high_resolution_clock::now() - start;
-	LOG_VERBOSE << "Pattern listing time: " << dt.count() << endl;
+	LOG_VERBOSE << "Pattern listing time: " << dt.count() << endl ;
 
 	start = std::chrono::high_resolution_clock::now();
 	
@@ -646,5 +646,5 @@ void SimilarityCalculator::one2all<false>(const PrefixKmerDb& db, const kmer_t* 
 	}
 
 	dt = std::chrono::high_resolution_clock::now() - start;
-	LOG_VERBOSE << "Pattern unpacking time: " << dt.count() << endl;
+	LOG_VERBOSE << "Pattern unpacking time: " << dt.count() << endl ;
 }

@@ -301,11 +301,10 @@ public:
 		unique_lock<mutex> lck(mtx);
 		cv_queue_empty.wait(lck, [this, priority] {return (!this->q.empty() && q.top().first == priority)  || !this->n_producers; });
 
-		if (n_elements == 0)
+		if (n_elements == 0 || q.top().first != priority)
 			return false;
 
-		auto entry = q.top();
-		data = entry.second;
+		data = q.top().second;	
 		q.pop();
 		--n_elements;
 	//	if (n_elements == 0)
@@ -318,6 +317,7 @@ public:
 	//
 	uint32_t GetSize()
 	{
+		unique_lock<mutex> lck(mtx);
 		return n_elements;
 	}
 };

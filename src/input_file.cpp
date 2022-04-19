@@ -136,7 +136,7 @@ bool GenomeInputFile::load(
 	
 		kmers = kmersBuffer.data();
 
-		LOG_DEBUG << "Extraction: " << kmersCount << " kmers, " << chromosomes.size() << " chromosomes, " << totalLen << " bases" << endl;
+		//LOG_DEBUG << "Extraction: " << kmersCount << " kmers, " << chromosomes.size() << " chromosomes, " << totalLen << " bases" << endl ;
 	}
 	
 	// free memory
@@ -270,7 +270,7 @@ bool GenomeInputFile::unzip(char* compressedData, size_t compressedSize, char*&o
 				//multistream detection
 				if (stream.avail_in >= 2 && stream.next_in[0] == 0x1f && stream.next_in[1] == 0x8b) {
 					if (inflateReset(&stream) != Z_OK) {
-						LOG_NORMAL << "Error while reading gzip file\n";
+						LOG_NORMAL << "Error while reading gzip file\n" ;
 						exit(1);
 					}
 				}
@@ -485,7 +485,7 @@ bool KmcInputFile::load(
 #endif
 
 	filterValue = ((double)kmersCount / _total_kmers); // this may differ from theoretical
-	LOG_DEBUG << "Filter passed: " << kmersCount << "/" << _total_kmers << "(" << filterValue << ")" << endl;
+	//LOG_DEBUG << "Filter passed: " << kmersCount << "/" << _total_kmers << "(" << filterValue << ")" << endl ;
 	filterValue = minhashFilter->getFraction(); // use proper value
 	return kmcfile->Close();
 }

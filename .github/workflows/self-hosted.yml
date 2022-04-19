@@ -1,0 +1,148 @@
+name: Self-hosted CI
+
+on:
+  pull_request:
+    branches: [ master, v2 ]
+    paths-ignore:
+      - '**.md'
+  workflow_dispatch:
+
+jobs:
+
+ ########################################################################################
+  checkout:
+    name: checkout
+    runs-on: [self-hosted, kmer-db]
+    
+    steps:
+    - uses: actions/checkout@v2
+    
+    
+  ########################################################################################
+  make-tests:
+    name: make
+    runs-on: [self-hosted, kmer-db]
+    needs: checkout
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [9, 10, 11]
+        
+        
+    steps:
+    - name: make (g++-${{matrix.compiler}})
+      run: | 
+        make -j32 CXX=g++-${{matrix.compiler}}
+        cp ./kmer-db ./kmer-db-${{matrix.compiler}}
+        make clean 
+    
+  ########################################################################################
+  main-test:
+    name: Main tests
+    runs-on: [self-hosted, kmer-db]
+    needs: make-tests
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [9, 10, 11]
+        threads: [1, 2, 16, 0]
+    env: 
+      INPUT_DIR: ./test/virus
+ 
+    steps:
+    
+    - name: build 
+      run: |
+        ./kmer-db-${{matrix.compiler}} build -t ${{matrix.threads}} ${INPUT_DIR}/seqs.part1.list k18.parts.db
+   
+    - name: new2all 
+      run: |
+        ./kmer-db-${{matrix.compiler}} new2all -t ${{matrix.threads}} k18.parts.db ${INPUT_DIR}/seqs.part2.list k18.n2a.csv
+        cmp k18.n2a.csv ${INPUT_DIR}/k18.n2a.csv
+        
+    - name: new2all (sparse)
+      run: |
+        ./kmer-db-${{matrix.compiler}} new2all -t ${{matrix.threads}} -sparse k18.parts.db ${INPUT_DIR}/seqs.part2.list k18.n2a.sparse.csv
+        cmp k18.n2a.sparse.csv ${INPUT_DIR}/k18.n2a.sparse.csv
+    
+    - name: extend  
+      run: |     
+        ./kmer-db-${{matrix.compiler}} build -t ${{matrix.threads}} -extend -k 25 ${INPUT_DIR}/seqs.part2.list k18.parts.db
+        
+    - name: all2all  
+      run: |     
+        ./kmer-db-${{matrix.compiler}} all2all -t ${{matrix.threads}} k18.parts.db k18.csv
+        cmp k18.csv ${INPUT_DIR}/k18.csv
+        
+    - name: all2all (sparse)
+      run: |     
+        ./kmer-db-${{matrix.compiler}} all2all -t ${{matrix.threads}} -sparse k18.parts.db k18.sparse.csv
+        cmp k18.sparse.csv ${INPUT_DIR}/k18.sparse.csv
+
+    - name: distance
+      run: | 
+        ./kmer-db-${{matrix.compiler}} distance jaccard min max cosine mash k18.csv
+        cmp k18.csv.jaccard ${INPUT_DIR}/k18.csv.jaccard
+        cmp k18.csv.min ${INPUT_DIR}/k18.csv.min
+        cmp k18.csv.max ${INPUT_DIR}/k18.csv.max
+        cmp k18.csv.cosine ${INPUT_DIR}/k18.csv.cosine
+        cmp k18.csv.mash ${INPUT_DIR}/k18.csv.mash
+        
+    - name: build (default k) + all2all 
+      run: |
+        ./kmer-db-${{matrix.compiler}} build -t ${{matrix.threads}} ${INPUT_DIR}/seqs.list k18.db
+        ./kmer-db-${{matrix.compiler}} all2all -t ${{matrix.threads}} k18.db k18.csv
+        cmp k18.csv ${INPUT_DIR}/k18.csv
+        
+    - name: build (default k, multifasta) + all2all 
+      run: |
+        ./kmer-db-${{matrix.compiler}} build -t ${{matrix.threads}} -multisample-fasta ${INPUT_DIR}/multi.list k18.multi.db
+        ./kmer-db-${{matrix.compiler}} all2all -t ${{matrix.threads}} k18.multi.db k18.multi.csv
+        cmp k18.multi.csv ${INPUT_DIR}/k18.csv
+
+    - name: build (default k, 2 x multifasta) + all2all 
+      run: |
+        ./kmer-db-${{matrix.compiler}} build -t ${{matrix.threads}} -multisample-fasta ${INPUT_DIR}/multi.split.list k18.multi.split.db
+        ./kmer-db-${{matrix.compiler}} all2all -t ${{matrix.threads}} k18.multi.split.db k18.multi.split.csv
+        cmp k18.multi.split.csv ${INPUT_DIR}/k18.csv
+    
+    - name: build (default k) + extend + all2all 
+      run: |
+        ./kmer-db-${{matrix.compiler}} build -t ${{matrix.threads}} ${INPUT_DIR}/seqs.part1.list k18.parts.db
+        ./kmer-db-${{matrix.compiler}} build -t ${{matrix.threads}} -extend -k 25 ${INPUT_DIR}/seqs.part2.list k18.parts.db
+        ./kmer-db-${{matrix.compiler}} all2all -t ${{matrix.threads}} k18.parts.db k18.parts.csv
+        cmp k18.parts.csv ${INPUT_DIR}/k18.csv
+        
+    - name: build (default k, fraction 0.1) + all2all 
+      run: |    
+        ./kmer-db-${{matrix.compiler}} build -t ${{matrix.threads}} -f 0.1 ${INPUT_DIR}/seqs.list k18.frac.db
+        ./kmer-db-${{matrix.compiler}} all2all -t ${{matrix.threads}} k18.frac.db k18.frac.csv
+        cmp k18.frac.csv ${INPUT_DIR}/k18.frac.csv
+
+    - name: minhash (default k, fraction 0.1) + build + all2all 
+      run: |
+        ./kmer-db-${{matrix.compiler}} minhash 0.1 ${INPUT_DIR}/seqs.list
+        ./kmer-db-${{matrix.compiler}} build -t ${{matrix.threads}} -from-minhash -k 25 ${INPUT_DIR}/seqs.list k18.minhash.db
+        ./kmer-db-${{matrix.compiler}} all2all -t ${{matrix.threads}} k18.minhash.db k18.minhash.csv
+        cmp k18.minhash.csv ${INPUT_DIR}/k18.frac.csv
+        
+    - name: build (k=24) + all2all 
+      run: |
+        ./kmer-db-${{matrix.compiler}} build -t ${{matrix.threads}} -k 24 ${INPUT_DIR}/seqs.list k24.db
+        ./kmer-db-${{matrix.compiler}} all2all -t ${{matrix.threads}} k24.db k24.csv
+        cmp k24.csv ${INPUT_DIR}/k24.csv
+        
+    - name: build (k=25, f=0.1) + one2all 
+      run: |
+        ./kmer-db-${{matrix.compiler}} build -t ${{matrix.threads}} -k 25 -f 0.1 ${INPUT_DIR}/seqs.part1.list k25.db
+        ./kmer-db-${{matrix.compiler}} one2all -t ${{matrix.threads}} k25.db ${INPUT_DIR}/data/MT159713 MT159713.csv
+        cmp MT159713.csv ${INPUT_DIR}/MT159713.csv    
+        
+    - name: new2all (against itself)
+      run: |
+        ./kmer-db-${{matrix.compiler}} new2all -t ${{matrix.threads}} k18.db ${INPUT_DIR}/seqs.list k18.n2a.itself.csv
+        cmp k18.n2a.itself.csv ${INPUT_DIR}/k18.n2a.itself.csv
+
+   
+
+

@@ -90,7 +90,7 @@ public:
 		size_t kmersCount,
 		uint32_t kmerLength, 
 		double fraction) {
-		LOG_VERBOSE << "Adding sample " << sampleNames.size() + 1 << ": " << sampleName << " (" << kmersCount << " kmers)" << endl;
+		LOG_VERBOSE << "Adding sample " << sampleNames.size() + 1 << ": " << sampleName << " (" << kmersCount << " kmers)" << endl ;
 		
 		if (!isInitialized) {
 			initialize(kmerLength, fraction);

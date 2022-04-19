@@ -124,7 +124,7 @@ void PrefixKmerDb::hashtableJob() {
 
 				times.hashtableResize_worker += std::chrono::high_resolution_clock::now() - start;
 
-			//	LOG_DEBUG << "Block: " << task.block_id << ", lo_prefix: " << lo_prefix << ", hi_prefix: " << hi_prefix << endl << flush;
+			//	LOG_DEBUG << "Block: " << task.block_id << ", lo_prefix: " << lo_prefix << ", hi_prefix: " << hi_prefix << endl ;
 
 				start = std::chrono::high_resolution_clock::now();
 
@@ -182,7 +182,7 @@ void PrefixKmerDb::patternJob() {
 			uint32_t lo = task.lo;
 			uint32_t hi = task.hi;
 			
-		//	LOG_DEBUG << "Pattern job " << task.block_id << " started (" << lo << "-" << hi << ")" << endl;
+		//	LOG_DEBUG << "Pattern job " << task.block_id << " started (" << lo << "-" << hi << ")" << endl ;
 			
 			sample_id_t sampleId = (sample_id_t)(task.sample_id);
 			
@@ -230,7 +230,7 @@ void PrefixKmerDb::patternJob() {
 			// update memory statistics (atomic - no sync needed)
 			stats.patternBytes += deltaSize;
 
-		//	LOG_DEBUG << "Pattern job " << task.block_id << " finished" << endl;
+		//	LOG_DEBUG << "Pattern job " << task.block_id << " finished" << endl ;
 			this->semaphore.dec();
 		}
 	}
@@ -254,7 +254,7 @@ sample_id_t PrefixKmerDb::addKmers(
 
 	//--------------------------------------------------------------------------
 	// get prefix histogram (parallel)
-	LOG_DEBUG << "Hashtable resizing, searching, and adding (parallel)..." << endl;
+	LOG_DEBUG << "Hashtable resizing, searching, and adding (parallel)..." << endl ;
 	auto start = std::chrono::high_resolution_clock::now();
 	std::fill(prefixHistogram.begin(), prefixHistogram.end(), 0);
 	samplePatterns.resize(n_kmers);
@@ -300,7 +300,7 @@ sample_id_t PrefixKmerDb::addKmers(
 
 	semaphore.inc((int)hashtableTasks.size());
 	for (size_t tid = 0; tid < hashtableTasks.size(); ++tid) {
-		// LOG_DEBUG << "Hashtable job " << tid << " scheduled (" << hashtableTasks[tid].lo << "-" << hashtableTasks[tid].hi << ")" << endl;
+		// LOG_DEBUG << "Hashtable job " << tid << " scheduled (" << hashtableTasks[tid].lo << "-" << hashtableTasks[tid].hi << ")" << endl ;
 		queues.hashtableAddition.Push(hashtableTasks[tid]);
 	}
 
@@ -316,7 +316,7 @@ sample_id_t PrefixKmerDb::addKmers(
 
 	//--------------------------------------------------------------------------
 	// sort in parallel
-	LOG_DEBUG << "Sorting (parallel)..." << endl;
+	LOG_DEBUG << "Sorting (parallel)..." << endl ;
 	start = std::chrono::high_resolution_clock::now();
 
 	ParallelSort(samplePatterns.data(), samplePatterns.size(), nullptr, 0, 0, num_threads);
@@ -324,13 +324,13 @@ sample_id_t PrefixKmerDb::addKmers(
 	
 	//--------------------------------------------------------------------------
 	// exdtend patterns
-	LOG_DEBUG << "Extending patterns (parallel)..." << endl;
+	LOG_DEBUG << "Extending patterns (parallel)..." << endl ;
 	start = std::chrono::high_resolution_clock::now();
 	std::atomic<pattern_id_t> new_pid((pattern_id_t)patterns.size());
 
 	// prepare tasks
 	num_blocks = num_threads;
-	block = n_kmers / num_blocks;
+	block = std::max(n_kmers / num_blocks, 1u);
 	std::vector<PatternTask> patternTasks(num_blocks, PatternTask{ 0, n_kmers, n_kmers, sampleId, &new_pid});
 	patternTasks[0].lo = 0;
 
@@ -388,7 +388,7 @@ sample_id_t PrefixKmerDb::addKmers(
 
 	semaphore.inc((int)patternTasks.size());
 	for (size_t tid = 0; tid < patternTasks.size(); ++tid) {
-		// LOG_DEBUG << "Pattern job " << tid << " scheduled" << endl;
+		// LOG_DEBUG << "Pattern job " << tid << " scheduled" << endl ;
 		queues.patternExtension.Push(patternTasks[tid]);
 	}
 
@@ -398,7 +398,7 @@ sample_id_t PrefixKmerDb::addKmers(
 
 	//--------------------------------------------------------------------------
 	// patterns insertion
-	LOG_DEBUG << "Moving patterns to global collection (serial)..." << endl;
+	LOG_DEBUG << "Moving patterns to global collection (serial)..." << endl ;
 	
 	// extend by 1.5 on reallocation
 	if (patterns.capacity() < (size_t)new_pid) {

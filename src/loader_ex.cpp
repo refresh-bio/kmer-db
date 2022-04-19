@@ -20,7 +20,7 @@ LoaderEx::LoaderEx(
 	std::shared_ptr<AbstractFilter> filter, 
 	InputFile::Format inputFormat, 
 	int suggestedNumThreads, 
-	int outputBuffersCount,
+	int numConsumers,
 	bool multisampleFasta,
 	bool storePositions) :
 
@@ -30,6 +30,8 @@ LoaderEx::LoaderEx(
 	storePositions(storePositions)
 {
 	readers.resize(numThreads);
+	
+	int outputBuffersCount = numThreads + numConsumers;
 	
 	// configure queues
 	queues.input.Restart(1);
@@ -101,7 +103,7 @@ void LoaderEx::prefetcherJob(std::shared_ptr<AbstractFilter> filter) {
 		std::shared_ptr<InputTask> task;
 		
 		if (this->queues.input.Pop(task)) {
-			LOG_DEBUG << "input queue -> (file " << task->fileId + 1 << ")" << endl << std::flush;
+			LOG_DEBUG << "input queue -> (file " << task->fileId + 1 << ")" << endl ;
 
 			if (this->inputFormat == InputFile::KMC) {
 				task->file = std::make_shared<KmcInputFile>(filter->clone());
@@ -115,16 +117,16 @@ void LoaderEx::prefetcherJob(std::shared_ptr<AbstractFilter> filter) {
 
 			if (task->file->open(task->filePath)) {
 				queues.readers.Push(task);
-				LOG_DEBUG << "(file " << task->fileId + 1 << ") -> readers queue " << endl << std::flush;
+				LOG_DEBUG << "(file " << task->fileId + 1 << ", " << task->filePath << ") -> readers queue " << endl ;
 			}
 			else {
-				cout << "failed:" << task->filePath << endl << std::flush;
+				cout << "failed:" << task->filePath << endl;
 			}
 		}
 	}
 
 	queues.readers.MarkCompleted();
-	LOG_DEBUG << "readers queue: mark completed" <<  endl << std::flush;
+	LOG_DEBUG << "reader thread completed" << endl ;
 }
 
 // *****************************************************************************************
@@ -139,7 +141,7 @@ void LoaderEx::readerJob(int tid) {
 		// get buffer and input task
 		if (this->queues.freeBuffers.Pop(bufferId) && this->queues.readers.Pop(inputTask)) {
 
-			LOG_DEBUG << "readers queue -> (file " << inputTask->fileId + 1 << "), tid: " << tid << std::flush;
+			LOG_DEBUG << "readers queue -> (file " << inputTask->fileId + 1 << "), tid: " << tid << endl;
 
 			auto sampleTask = make_shared<SampleTask>(
 				inputTask->fileId,
@@ -154,8 +156,8 @@ void LoaderEx::readerJob(int tid) {
 			if (ok) {
 				++bufferRefCounters[bufferId];
 				queues.output.Push((int)sampleTask->id, sampleTask);
-				LOG_DEBUG << "(sample " << sampleTask->id + 1 << ") -> output queue, buf: " << bufferId << std::endl << std::flush;
-				LOG_VERBOSE << "File loaded successfully: " << inputTask->fileId + 1 << endl << std::flush;
+				LOG_DEBUG << "(sample " << sampleTask->id + 1 << ", " << sampleTask->sampleName <<") -> loader output queue, buf: " << bufferId << std::endl ;
+				LOG_VERBOSE << "File loaded successfully: " << inputTask->fileId + 1 << endl ;
 			}
 			else {
 				cout << "File load failed: " << inputTask->fileId + 1 << endl << std::flush;
@@ -164,7 +166,7 @@ void LoaderEx::readerJob(int tid) {
 	}
 
 	queues.output.MarkCompleted();
-	LOG_DEBUG << "output queue: mark completed" << endl << std::flush;
+	LOG_DEBUG << "loader thread completed: " << tid << endl ;
 }
 
 
@@ -189,7 +191,7 @@ void LoaderEx::multifastaReaderJob() {
 		// initialize multifasta file
 		if (genomicFile->initMultiFasta()) {
 
-			LOG_DEBUG << "multifasta initialized " << endl << std::flush;
+			LOG_DEBUG << "multifasta initialized " << endl ;
 
 			while (true) {
 
@@ -215,12 +217,12 @@ void LoaderEx::multifastaReaderJob() {
 				queues.output.Push((int)sampleTask->id, sampleTask);
 				++count;
 
-				LOG_DEBUG << "(sample " << sampleTask->id + 1 << ") -> output queue, buf: " << bufferId << std::endl << std::flush;
+				LOG_DEBUG << "(sample " << sampleTask->id + 1 << ") -> output queue, buf: " << bufferId << std::endl ;
 			}
 		}
 
 		if (count > 0) {
-			LOG_VERBOSE << "File loaded successfully: " << inputTask->fileId + 1 << endl << std::flush;
+			LOG_VERBOSE << "File loaded successfully: " << inputTask->fileId + 1 << endl ;
 		}
 		else {
 			cout << "File load failed: " << inputTask->fileId + 1 << endl << std::flush;
@@ -228,6 +230,6 @@ void LoaderEx::multifastaReaderJob() {
 	}
 	queues.output.MarkCompleted();
 
-	LOG_DEBUG << "output queue: mark completed" << endl << std::flush;
+	LOG_DEBUG << "output queue: mark completed" << endl ;
 }
 

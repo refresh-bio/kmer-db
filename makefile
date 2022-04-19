@@ -35,8 +35,6 @@ else
 	EXTRA_LIBS_DIR = ""
 endif
 
-
-CC = g++
 LDFLAGS += 
 CFLAGS	+= -Wall -O3 -m64 -std=c++11 $(OMP_FLAGS) -pthread 
 CFLAGS_AVX2	+= $(CFLAGS) -mavx2 -I $(KMER_DB_LIBS_DIR) -I $(EXTRA_LIBS_DIR)
@@ -60,35 +58,35 @@ OBJS := $(KMER_DB_MAIN_DIR)/analyzer.o \
 	$(KMER_DB_LIBS_DIR)/mmer.o 
 
 $(KMER_DB_MAIN_DIR)/parallel_sorter.o: $(KMER_DB_MAIN_DIR)/parallel_sorter.cpp
-	$(CC) -O3 -mavx -m64 -std=c++11 -pthread $(OMP_FLAGS) -c $< -o $@
+	$(CXX) -O3 -mavx -m64 -std=c++11 -pthread $(OMP_FLAGS) -c $< -o $@
 
 ifeq ($(HAVE_AVX2),)
 ## no avx2 support
 AVX_OBJS := $(KMER_DB_MAIN_DIR)/row_add_avx.o 
 $(KMER_DB_MAIN_DIR)/row_add_avx.o: $(KMER_DB_MAIN_DIR)/row_add_avx.cpp
-	$(CC) $(CFLAGS) -DNO_AVX2 -c $< -o $@
+	$(CXX) $(CFLAGS) -DNO_AVX2 -c $< -o $@
 
 else
 # with avx2 support
 AVX_OBJS := $(KMER_DB_MAIN_DIR)/row_add_avx.o \
 	$(KMER_DB_MAIN_DIR)/row_add_avx2.o 
 $(KMER_DB_MAIN_DIR)/row_add_avx.o: $(KMER_DB_MAIN_DIR)/row_add_avx.cpp
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CXX) $(CFLAGS) -c $< -o $@
 $(KMER_DB_MAIN_DIR)/row_add_avx2.o: $(KMER_DB_MAIN_DIR)/row_add_avx2.cpp
-	$(CC) $(CFLAGS_AVX2) -c $< -o $@
+	$(CXX) $(CFLAGS_AVX2) -c $< -o $@
 
 endif
 
 
 %.o: %.cpp
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CXX) $(CFLAGS) -c $< -o $@
 
 ifeq ($(INTERNAL_ZLIB),true)
 kmer-db: $(OBJS) $(AVX_OBJS)
-	$(CC) $(CLINK) $(LDFLAGS) -o $(KMER_DB_ROOT_DIR)/$@ $(OBJS) $(AVX_OBJS) $(EXTRA_LIBS_DIR)/libz.a
+	$(CXX) $(CLINK) $(LDFLAGS) -o $(KMER_DB_ROOT_DIR)/$@ $(OBJS) $(AVX_OBJS) $(EXTRA_LIBS_DIR)/libz.a
 else
 kmer-db: $(OBJS) $(AVX_OBJS)
-	$(CC) $(CLINK) $(LDFLAGS) -o $(KMER_DB_ROOT_DIR)/$@ $(OBJS) $(AVX_OBJS) -lz 
+	$(CXX) $(CLINK) $(LDFLAGS) -o $(KMER_DB_ROOT_DIR)/$@ $(OBJS) $(AVX_OBJS) -lz 
 endif	
 
 clean:

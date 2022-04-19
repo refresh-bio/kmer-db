@@ -1,12 +1,8 @@
-name: C/C++ CI
+name: GitHub Actions CI
 
 on:
   push:
-    branches: [ master, v2, feature/tests ]
-    paths-ignore:
-      - '**.md'
-  pull_request:
-    branches: [ master, v2, feature/tests ]
+    branches: [ master, v2]
     paths-ignore:
       - '**.md'
   workflow_dispatch:
@@ -22,7 +18,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: make
-      run: make
+      run: make -j2
     
     - name: build 
       run: |

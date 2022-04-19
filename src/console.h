@@ -72,8 +72,7 @@ protected:
 
 	int runMinHash(const std::string& multipleSamples, InputFile::Format inputFormat);
 	int runDistanceCalculation(const std::string& similarityFilename, const std::vector<string>& metricNames, bool usePhylip);
-	int runDistanceCalculationPhylip(const std::string& similarityFilename, const std::vector<string>& metricNames);
-
+	
 	int runListPatterns(const std::string& dbFilename, const std::string& patternFile);
 	int runAnalyzeDatabase(const std::string& multipleKmcSamples, const std::string& dbFilename);
 

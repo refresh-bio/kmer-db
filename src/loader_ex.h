@@ -29,7 +29,7 @@ public:
 		std::shared_ptr<AbstractFilter> filter, 
 		InputFile::Format inputFormat, 
 		int suggestedNumThreads,
-		int outputBuffersCount,
+		int numConsumers,
 		bool multisampleFasta,
 		bool storePositions = false);
 
@@ -37,17 +37,18 @@ public:
 
 	int configure(const std::string& multipleKmcSamples);
 
-	std::shared_ptr<SampleTask> popTask(int fileId) {
+	std::shared_ptr<SampleTask> popTask(int sampleId) {
 		std::shared_ptr<SampleTask> task;
-		queues.output.Pop(fileId, task);
-		LOG_DEBUG << "output queue -> (sample " << fileId + 1 << ")" << std::endl << std::flush;
+		if (queues.output.Pop(sampleId, task)) {
+			LOG_DEBUG << "output queue -> (sample " << sampleId + 1 << ")" << std::endl;
+		}
 		return task;
 	}
 
 	void releaseTask(SampleTask& t) {
 		if (--bufferRefCounters[t.bufferId] == 0) {
 			queues.freeBuffers.Push(t.bufferId);
-			LOG_DEBUG << "sample " << t.id + 1 << ": release buffer " << t.bufferId << std::endl << std::flush;
+			LOG_DEBUG << "sample " << t.id + 1 << ": release buffer " << t.bufferId << std::endl ;
 		}
 	}
 	
