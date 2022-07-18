@@ -14,5 +14,7 @@
 *.sqlite
 *.json
 *.suo
+*.o
 /src/kmer_db.vcxproj.user
 /src/.vs
+/kmer-db
