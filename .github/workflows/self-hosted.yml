@@ -2,7 +2,7 @@ name: Self-hosted CI
 
 on:
   pull_request:
-    branches: [ master, v2 ]
+    branches: [ master, develop ]
     paths-ignore:
       - '**.md'
   workflow_dispatch:
