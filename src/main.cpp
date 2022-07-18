@@ -11,10 +11,17 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 
 #include "console.h"
 
+#include <stdexcept>
+
 int main(int argc, char **argv)
 {
-	Console console;
-	console.parse(argc, argv);
+	try {
+		Console console;
+		console.parse(argc, argv);
+	}
+	catch (std::runtime_error& err) {
+		cout << "ERROR: " << err.what() << endl;
+	}
 
 	return 0;
 }

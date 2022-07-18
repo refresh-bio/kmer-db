@@ -191,27 +191,14 @@ public:
 		}
 	}
 
-	int saveRow(size_t row, char* out) {
-		size_t offset = row * (row - 1) / 2;
-		return num2str(data.data() + offset, row, ',', out);
+	int saveRow(size_t row_id, char* out) {
+		size_t offset = row_id * (row_id - 1) / 2;
+		return num2str(data.data() + offset, row_id, ',', out);
 	}
 
 	int saveRowSparse(size_t row_id, char* out) {
 		size_t offset = row_id * (row_id - 1) / 2;
-		T * elem = data.data() + offset;
-		
-		char *ptr = out;
-
-		for (size_t j = 0; j < row_id; ++j, ++elem) {
-			if (*elem > 0) {
-				ptr += num2str(j + 1, ptr);
-				*ptr++ = ':';
-				ptr += num2str(*elem, ptr);
-				*ptr++ = ',';
-			}
-		}
-		
-		return ptr - out;
+		return num2str_sparse(data.data() + offset, row_id, ',', out);
 	}
 
 

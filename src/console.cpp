@@ -43,6 +43,7 @@ const string Params::MODE_NEW_2_ALL = "new2all";
 const string Params::MODE_ONE_2_ALL = "one2all";
 const string Params::MODE_DISTANCE = "distance";
 
+const string Params::SWITCH_HELP = "-help";
 const string Params::SWITCH_KMC_SAMPLES = "-from-kmers";
 const string Params::SWITCH_MINHASH_SAMPLES = "-from-minhash";
 const string Params::SWITCH_MULTISAMPLE_FASTA = "-multisample-fasta";
@@ -58,6 +59,8 @@ const string Params::OPTION_DEBUG = "-vv";
 const string Params::OPTION_THREADS = "-t";
 const string Params::OPTION_READER_THREADS = "-rt";
 const string Params::OPTION_BUFFER = "-buffer";
+const string Params::OPTION_BELOW = "-below";
+const string Params::OPTION_ABOVE = "-above";
 
 
 // *****************************************************************************************
@@ -70,6 +73,11 @@ Console::Console() {
 	availableMetrics["mash"] = [](size_t common, size_t queryCnt, size_t dbCnt, int kmerLength) -> double {
 		double d_jaccard = (double)common / (queryCnt + dbCnt - common);
 		return  (d_jaccard == 0) ? 1.0 : (-1.0 / kmerLength) * log((2 * d_jaccard) / (d_jaccard + 1)); 
+	};
+	availableMetrics["ani"] = [](size_t common, size_t queryCnt, size_t dbCnt, int kmerLength) -> double {
+		double d_jaccard = (double)common / (queryCnt + dbCnt - common);
+		double d_mash = (d_jaccard == 0) ? 1.0 : (-1.0 / kmerLength) * log((2 * d_jaccard) / (d_jaccard + 1));
+		return 1.0 - d_mash;
 	};
 
 	availableMetrics["mash-query"] = [](size_t common, size_t queryCnt, size_t dbCnt, int kmerLength) -> double {
@@ -101,13 +109,25 @@ int Console::parse(int argc, char** argv) {
 
 	InputFile::Format inputFormat = InputFile::GENOME;
 	bool extendDb = false;
+
+	double below = std::numeric_limits<double>::max();
+	double above = -std::numeric_limits<double>::max();
 	
 	std::vector<string> params(argc - 1);
 	std::transform(argv + 1, argv + argc, params.begin(), [](char* c)->string { return c; });
 
 	int status = -1;
 
-	if (params.size()) {
+	bool helpWanted = findSwitch(params, Params::SWITCH_HELP);
+	if (params.size() == 0) { 
+		// no arguments or -help switch already consumed
+		showInstructions("");
+		return 0;
+	}
+	else if (helpWanted && params.size() == 1) {
+		// help for particular mode
+		showInstructions(params[0]);
+	} else {
 
 		// search for switches and options
 		if (findSwitch(params, Params::OPTION_VERBOSE)) { // verbose mode
@@ -124,6 +144,10 @@ int Console::parse(int argc, char** argv) {
 		findOption(params, Params::OPTION_FRACTION, fraction);				// minhash fraction
 		findOption(params, Params::OPTION_FRACTION_START, fractionStart);	// minhash fraction start value
 		findOption(params, Params::OPTION_LENGTH, kmerLength);				// kmer length
+
+		if (kmerLength > 30) {
+			throw std::runtime_error("K-mer length must not exceed 30.");
+		}
 		
 		findOption(params, Params::OPTION_THREADS, numThreads);			// number of threads
 		if (numThreads <= 0) {
@@ -147,6 +171,9 @@ int Console::parse(int argc, char** argv) {
 			cacheBufferMb = 8;
 		}
 
+		findOption(params, Params::OPTION_BELOW, below);
+		findOption(params, Params::OPTION_ABOVE, above);
+
 		if (findSwitch(params, Params::SWITCH_KMC_SAMPLES)) {
 			inputFormat = InputFile::KMC;
 			kmerLength = 0;
@@ -154,8 +181,8 @@ int Console::parse(int argc, char** argv) {
 
 		if (findSwitch(params, Params::SWITCH_MINHASH_SAMPLES)) {
 			if (inputFormat == InputFile::KMC) {
-				cout << "Error: " << Params::SWITCH_KMC_SAMPLES << " and " << Params::SWITCH_MINHASH_SAMPLES << " switches exclude one another." << endl;
-				return 0;
+				throw std::runtime_error(
+					Params::SWITCH_KMC_SAMPLES + " and " + Params::SWITCH_MINHASH_SAMPLES + " switches exclude one another.");
 			}
 			inputFormat = InputFile::MINHASH;
 			fraction = 1.0;
@@ -171,35 +198,39 @@ int Console::parse(int argc, char** argv) {
 
 			// detect obsolete modes
 			if (mode == "build-kmers" || mode == "build-mh") {
-				cout << "Error: build-kmers/build-mh modes are obsolete, use " << Params::SWITCH_KMC_SAMPLES << "/" << Params::SWITCH_MINHASH_SAMPLES << " switches instead." << endl;
-				return 0;
+				throw std::runtime_error(
+					"build -kmers / build -mh modes are obsolete, use " + Params::SWITCH_KMC_SAMPLES + " / " + Params::SWITCH_MINHASH_SAMPLES + " switches instead.");
 			}
-
+		
 			time(&rawtime);
 			timeinfo = localtime(&rawtime);
-			cout << "Analysis started at " << asctime(timeinfo) << endl;
+				
 
 			// main modes
 			if (params.size() == 3 && mode == Params::MODE_BUILD) {
+				cout << "Analysis started at " << asctime(timeinfo) << endl;
 				cout << "Database building mode (from " << InputFile::format2string(inputFormat) << ")" << endl;
 				status = runBuildDatabase(params[1], params[2], inputFormat, extendDb);
 			}
 			else if (params.size() == 3 && mode == Params::MODE_ALL_2_ALL) {
+				cout << "Analysis started at " << asctime(timeinfo) << endl;
 				cout << "All versus all comparison" << endl;
 				status = runAllVsAll(params[1], params[2]);
 			}
 			else if (params.size() == 4 && mode == Params::MODE_NEW_2_ALL) {
+				cout << "Analysis started at " << asctime(timeinfo) << endl;
 				cout << "Set of new samples  (from " << InputFile::format2string(inputFormat) << ") versus entire database comparison" << endl;
-				
 				status = runNewVsAll(params[1], params[2], params[3], inputFormat);
 			}
 			else if (params.size() == 4 && mode == Params::MODE_ONE_2_ALL) {
+				cout << "Analysis started at " << asctime(timeinfo) << endl;
 				cout << "One new sample  (from " << InputFile::format2string(inputFormat) << ") versus entire database comparison" << endl;
 				status = runOneVsAll(params[1], params[2], params[3], inputFormat);
 			}
 			else if (params.size() == 3 && mode == Params::MODE_MINHASH) {
 				fraction = std::atof(params[1].c_str());
 				if (fraction > 0) {
+					cout << "Analysis started at " << asctime(timeinfo) << endl;
 					cout << "Minhashing k-mers" << endl;
 					status = runMinHash(params[2], inputFormat);
 				}
@@ -207,6 +238,9 @@ int Console::parse(int argc, char** argv) {
 			else if (params.size() >= 2 && mode == Params::MODE_DISTANCE) {
 
 				bool phylipOut = findSwitch(params, Params::SWITCH_PHYLIP_OUT);
+				if (phylipOut) {
+					sparse = false;
+				}
 
 				// check selected metrics
 				std::vector<string> metricNames;
@@ -220,9 +254,10 @@ int Console::parse(int argc, char** argv) {
 				if (metricNames.empty()) {
 					metricNames.push_back("jaccard");
 				}
-				
+
+				cout << "Analysis started at " << asctime(timeinfo) << endl;
 				cout << "Calculating distance measures" << endl;
-				status = runDistanceCalculation(params[1], metricNames, phylipOut);
+				status = runDistanceCalculation(params[1], metricNames, phylipOut, sparse, below, above);
 			}
 			// debug modes
 			else if (params.size() == 3 && mode == "list-patterns") {
@@ -233,13 +268,13 @@ int Console::parse(int argc, char** argv) {
 				cout << "Analyzing database" << endl;
 				status = runAnalyzeDatabase(params[1], params[2]);
 			}
+			else {
+				showInstructions("");
+			}
 		}
 	}
 
-	if (status == -1) {
-		showInstructions();
-	}
-	else {
+	if (status != -1) {
 		time(&rawtime);
 		timeinfo = localtime(&rawtime);
 		cout << endl << "Analysis finished at " << asctime(timeinfo) << endl;
@@ -652,16 +687,7 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 			ptr += sprintf(ptr, "%s,%lu,", task->sampleName.c_str(), task->kmersCount);
 
 			if (sparse) {
-				const auto* elem = buf.data();
-
-				for (size_t i = 0; i < buf.size(); ++i, ++elem) {
-					if (*elem > 0) {
-						ptr += num2str(i + 1, ptr);
-						*ptr++ = ':';
-						ptr += num2str(*elem, ptr);
-						*ptr++ = ',';
-					}
-				}
+				ptr += num2str_sparse(buf.data(), buf.size(), ',', ptr);
 			}
 			else {
 				ptr += num2str(buf.data(), buf.size(), ',', ptr);
@@ -692,7 +718,13 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 
 // *****************************************************************************************
 //
-int Console::runDistanceCalculation(const std::string& similarityFilename, const std::vector<string>& metricNames, bool usePhylip) {
+int Console::runDistanceCalculation(
+	const std::string& similarityFilename, 
+	const std::vector<string>& metricNames, 
+	bool usePhylip, 
+	bool sparseOut,
+	double below,
+	double above) {
 
 	std::vector<size_t> kmersCount;
 	uint32_t kmerLength;
@@ -705,34 +737,32 @@ int Console::runDistanceCalculation(const std::string& similarityFilename, const
 	}
 	cout << "OK" << endl;
 
-	cout << "Calculating distances...";
-
 	std::vector<metric_fun_t> metrics; 
 	for (const auto& name : metricNames) {
 		metrics.push_back(availableMetrics[name]);
 	}
 	
 	std::vector<std::ofstream> files(metricNames.size());
-//	std::vector<std::ofstream> histoFiles(metricNames.size());
-	
+	std::vector<std::string> dbSampleNames;
+
 	for (size_t i = 0; i < files.size(); ++i) {
 		files[i].open(similarityFilename + "." + metricNames[i]);
-//		histoFiles[i].open(similarityFilename + "." + metricNames[i] + ".histo");
 	}
-
-	std::vector<std::vector<size_t>> histograms(metrics.size(), std::vector<size_t>(100));
 
 	string tmp, in;
 	double fraction;
 	similarityFile >> tmp >> kmerLength >> tmp >> fraction >> tmp;
 
 	getline(similarityFile, in); // copy sample names to output files
-	
 	if (!usePhylip) {
 		for (auto & f : files) {
 			f << "kmer-length: " << kmerLength << " fraction: " << fraction << in << endl;
 		}
 	}
+
+	std::replace(in.begin(), in.end(), ',', ' ');
+	istringstream iss(in);
+	std::copy(std::istream_iterator<string>(iss), std::istream_iterator<string>(), std::back_inserter(dbSampleNames));
 
 	getline(similarityFile, in); // get number of kmers for all samples
 	std::replace(in.begin(), in.end(), ',', ' ');
@@ -749,68 +779,105 @@ int Console::runDistanceCalculation(const std::string& similarityFilename, const
 	std::vector<size_t> intersections(kmersCount.size());
 	std::vector<double> values(kmersCount.size());
 
-	char* outBuffer = new char[10000000];
-
-	cout << "Processing rows..." << endl;
-	for (int i = 0; getline(similarityFile, in); ++i) {
-		if ((i + 1) % 10 == 0) {
-			cout << "\r" << i + 1 << "/" << kmersCount.size() << "...";
-		}
-		// find first comma 
-		auto pos = in.find(',');
-		string queryName(in.begin(), in.begin() + pos);
-
-		std::replace(in.begin(), in.end(), ',', ' ');
-		istringstream iss(in);
-		iss.seekg(pos + 1); // move right after first comma separator
-		uint64_t queryKmersCount = 0;
-
-		iss >> queryKmersCount;
+	const size_t bufsize = 1ULL << 27; // 128 MB  buffer
+	char* outBuffer = new char[bufsize];
+	char* line = new char[bufsize];
+	char* begin, * end, * p;
 	
-		auto newEnd = std::copy(std::istream_iterator<size_t>(iss), std::istream_iterator<size_t>(), intersections.begin());
-		size_t numVals = newEnd - intersections.begin();
+	cout << "Processing rows..." << endl;
+	bool triangle = false;
+	bool sparseIn = false;
+	
+	for (int row_id = 0; similarityFile.getline(line, bufsize); ++row_id) {
+		if ((row_id + 1) % 10 == 0) {
+			cout << "\r" << row_id + 1 << "/" << kmersCount.size() << "...                      " << std::flush;
+		}
+
+		// extract name
+		end = line + similarityFile.gcount() - 1; // do not count \n
+		begin = line;
+		p = std::find(begin, end, ',');
+		string queryName(begin, p);
+		begin = p + 1;
+
+		// extract kmer count
+		uint64_t queryKmersCount = NumericConversions::strtol(begin, &p); // assume no white characters after the number -> p points comma
+		begin = p + 1;
+
+		int numRead = 0;
+		for (numRead = 0; end - begin > 1; ++numRead) {
+			long v = NumericConversions::strtol(begin, &p);
+
+			if (*p == ':') {
+				// sparse form
+				begin = p + 1;
+				long common = NumericConversions::strtol(begin, &p);
+				intersections[v - 1] = common; // 1-based indexing in file
+				sparseIn = true;
+			}
+			else {
+				// dense form
+				intersections[numRead] = v;
+			}
+
+			begin = p + 1;
+		}
+
+		// determine if matrix is triangle
+		if (row_id == 0 && queryName == dbSampleNames[0] && intersections[0] == 0) {
+			triangle = true;
+		}
 
 		for (size_t m = 0; m < metrics.size(); ++m) {
 			auto& metric = metrics[m];
 			
-			std::transform(intersections.begin(), newEnd, kmersCount.begin(), values.begin(),
+			// number of processed elements:
+			// - triangle matrices - same as row id
+			// - non-triangle sparse matrices - entire row 
+			// - others - same as input
+			int numToProcess =  triangle ? row_id : (sparseIn ? intersections.size() : numRead);
+
+			std::transform(intersections.begin(), intersections.begin() + numToProcess, kmersCount.begin(), values.begin(),
 				[&metric, queryKmersCount, kmerLength](size_t intersection, size_t dbKmerCount)->double { return  metric(intersection, queryKmersCount, dbKmerCount, kmerLength); });
 			
 			char* ptr = outBuffer;
 			memcpy(ptr, queryName.c_str(), queryName.size());
 			ptr += queryName.size();
-			*ptr = usePhylip ? ' ' : ',';
-			++ptr;
 
-			for (size_t j = 0; j < numVals; ++j) {
-				
-				if (values[j] == 0) {
-					*ptr = '0';
-					++ptr;
+			if (usePhylip) {
+				// phylip matrices are always stored in the dense form
+				*ptr++ = ' ';
+				ptr += num2str(values.data(), numRead, ' ', ptr);
+			}
+			else {
+				*ptr++ = ',';
+				if (sparseOut) {
+					std::replace_if(values.begin(), values.end(),
+						[below, above](double x) { return x >= below || x <= above; }, 0.0);
+					ptr += num2str_sparse(values.data(), numToProcess, ',', ptr);
 				}
 				else {
-					ptr += NumericConversions::Double2PChar(values[j], 6, ptr);
+					// dense matrix - write the same number of elements as was read
+					ptr += num2str(values.data(), numToProcess, ',', ptr);
 				}
-					
-//				int binId = (size_t)(values[j] * 100);
-//				++histograms[m][binId];
-				*ptr = usePhylip ? ' ' : ',';
-				++ptr;
 			}
+			
 			*ptr = 0;
 			size_t len = ptr - outBuffer;
 			files[m].write(outBuffer, len);
 			files[m] << endl;
 		}
+
+		if (sparseIn) {
+			intersections.assign(intersections.size(), 0);
+		}
 	}
 
-	for (size_t m = 0; m < metrics.size(); ++m) {
-//		std::copy(histograms[m].begin(), histograms[m].end(), std::ostream_iterator<size_t>(histoFiles[m], ","));
-	}
-
+	cout << "\r" << kmersCount.size() << "/" << kmersCount.size() << "...";
 	cout << "OK" << endl;
 
 	delete[] outBuffer;
+	delete[] line;
 
 	return 0;
 }
@@ -875,71 +942,137 @@ int Console::runListPatterns(const std::string& dbFilename, const std::string& p
 
 // *****************************************************************************************
 //
-void Console::showInstructions() {
-	cout << "USAGE" << endl << endl
+void Console::showInstructions(const std::string& mode) {
+	
+	 if (mode == Params::MODE_BUILD) {
+		cout
+			<< "Building a database:" << endl
+			<< "    kmer-db " << Params::MODE_BUILD 
+			<< " [" << Params::OPTION_LENGTH << " <kmer-length>]"
+			<< " [" << Params::OPTION_FRACTION << " <fraction>]"
+			<< " [" << Params::SWITCH_MULTISAMPLE_FASTA << "]"
+			<< " [" << Params::SWITCH_EXTEND_DB << "]"
+			<< " [" << Params::OPTION_THREADS << " <threads>] <sample_list> <database>" << endl
+			
+			<< "    kmer-db " << Params::MODE_BUILD << " " << Params::SWITCH_KMC_SAMPLES
+			<< " [" << Params::OPTION_FRACTION << " <fraction>]" 
+			<< " [" << Params::SWITCH_EXTEND_DB << "]"
+			<< " [" << Params::OPTION_THREADS << " <threads>] <sample_list> <database>" << endl
+			
+			<< "    kmer-db " << Params::MODE_BUILD << " " << Params::SWITCH_MINHASH_SAMPLES
+			<< " [" << Params::SWITCH_EXTEND_DB << "]"
+			<< " [" << Params::OPTION_THREADS << " <threads>] <sample_list> <database>" << endl << endl
+			
+			<< "Positional arguments:" << endl
+			<< "    sample_list (input) - file containing list of samples in one of the following formats:" << endl
+			<< "                          FASTA genomes/reads (default), KMC k-mers (" << Params::SWITCH_KMC_SAMPLES << "), or minhashed k-mers (" << Params::SWITCH_MINHASH_SAMPLES << ")," << endl
+			<< "    database (output) - file with generated k-mer database," << endl
+			
+			<< "Options: " << endl
+			<< "    " << Params::OPTION_LENGTH << " <kmer_length> - length of k-mers (default: 18, maximum: 30)" << endl
+			<< "    " << Params::OPTION_FRACTION << " <fraction> - fraction of all k-mers to be accepted by the minhash filter (default: 1)" << endl
+			<< "    " << Params::SWITCH_MULTISAMPLE_FASTA << " - each sequence in a FASTA file is treated as a separate sample" << endl
+			<< "    " << Params::SWITCH_EXTEND_DB << " - extend the existing database with new samples" << endl
+			<< "    " << Params::OPTION_THREADS << " <threads> - number of threads (default: number of available cores)" << endl << endl;
+	}
+	else if (mode == Params::MODE_ALL_2_ALL) {
+		cout
+			<< "Counting common k-mers for all the samples in the database:" << endl
+			<< "    kmer-db " << Params::MODE_ALL_2_ALL   
+			<< " [" << Params::OPTION_BUFFER << " <size_mb>]"
+			<< " [" << Params::SWITCH_SPARSE << "]"
+			<< " [" << Params::OPTION_THREADS << " <threads>] <database> <common_table>" << endl << endl
+			
+			<< "Positional arguments:" << endl
+			<< "    database (input) - k-mer database file" << endl
+			<< "    common_table (output) - comma-separated table with number of common k-mers" << endl
+			
+			<< "Options:" << endl
+			<< "    " << Params::OPTION_BUFFER << " <size_mb> - size of cache buffer in megabytes" << endl
+			<< "                      (use L3 size for Intel CPUs and L2 for AMD to maximize performance; default: 8)" << endl
+			<< "    " << Params::SWITCH_SPARSE << " - produce sparse matrix as output" << endl
+			<< "    " << Params::OPTION_THREADS << " <threads> - number of threads (default: number of available cores)" << endl << endl;
+	} 
+	else if (mode == Params::MODE_NEW_2_ALL) {
+		cout
+			<< "Counting common kmers between set of new samples and all the samples in the database:" << endl
+			<< "    kmer-db " << Params::MODE_NEW_2_ALL 
+			<< " [" << Params::SWITCH_MULTISAMPLE_FASTA << " | " << Params::SWITCH_KMC_SAMPLES << " | " << Params::SWITCH_MINHASH_SAMPLES << "]"
+			<< " [" << Params::SWITCH_SPARSE << "]"
+			<< " [" << Params::OPTION_THREADS << " <threads>] <database> <sample_list> <common_table>" << endl << endl
+			
+			<< "Positional arguments:" << endl
+			<< "    database (input) - k-mer database file" << endl
+			<< "    sample_list (input) - file containing list of samples in one of the following formats:" << endl
+			<< "                          FASTA genomes/reads (default), KMC k-mers (" << Params::SWITCH_KMC_SAMPLES << "), or minhashed k-mers (" << Params::SWITCH_MINHASH_SAMPLES << ")" << endl
+			<< "    common_table (output) - comma-separated table with number of common k-mers" << endl
+			
+			<< "Options:" << endl
+			<< "    " << Params::SWITCH_MULTISAMPLE_FASTA << " - each sequence in a FASTA file is treated as a separate sample" << endl
+			<< "    " << Params::SWITCH_SPARSE << " - outputs a sparse matrix" << endl
+			<< "    " << Params::OPTION_THREADS << " <threads> - number of threads (default: number of available cores)" << endl << endl;
+	}
+	else if (mode == Params::MODE_ONE_2_ALL) {
+		cout
+			<< "Counting common kmers between single sample and all the samples in the database:" << endl
+			<< "    kmer-db " << Params::MODE_ONE_2_ALL
+			<< " [" << Params::SWITCH_KMC_SAMPLES << " | " << Params::SWITCH_MINHASH_SAMPLES << "] <database> <sample> <common_table>" << endl << endl
+			
+			<< "Positional arguments:" << endl
+			<< "    database (input) - k-mer database file." << endl
+			<< "    sample (input) - query sample in one of the supported formats:" << endl
+			<< "                     FASTA genomes/reads (default), KMC k-mers (" << Params::SWITCH_KMC_SAMPLES << "), or minhashed k-mers (" << Params::SWITCH_MINHASH_SAMPLES << "), " << endl
+			<< "    common_table (output) - comma-separated table with number of common k-mers." << endl << endl;
+	}
+	else if (mode == Params::MODE_DISTANCE) {
+		cout
+			<< "Calculating similarities/distances on the basis of common k-mers:" << endl
+			<< "    kmer-db " << Params::MODE_DISTANCE << " [<measures>]"
+			<< " [" << Params::SWITCH_SPARSE << " [" << Params::OPTION_ABOVE << " <a_th>] ["<< Params::OPTION_BELOW <<" <b_th>]] <common_table>" << endl << endl
+			
+			<< "Positional arguments:" << endl
+			<< "    common_table (input) - comma-separated table with a number of common k-mers" << endl
+			
+			<< "Options:" << endl
+			<< "    measures - names of the similarity/distance measures to be calculated, one or more of the following" << endl
+			<< "               jaccard (default), min, max, cosine, mash, ani." << endl
+			<< "    " << Params::SWITCH_PHYLIP_OUT << " - store output distance matrix in a Phylip format" << endl
+			<< "    " << Params::SWITCH_SPARSE << " - outputs a sparse matrix (independently of the input matrix format)"<< endl
+			<< "    " << Params::OPTION_ABOVE << " <a_th> - retains elements larger then <a_th>" << endl
+			<< "    " << Params::OPTION_BELOW << " <b_th> - retains elements smaller then <b_th>" << endl << endl
+			<< "This mode generates a file with similarity/distance table for each selected measure." << endl
+			<< "Name of the output file is produced by adding to the input file an extension with a measure name." << endl << endl;
+	}
+	else if (mode == Params::MODE_MINHASH) {
+		 cout
+			 << "Storing minhashed k-mers:" << endl
+			 << "    kmer-db " << Params::MODE_MINHASH << " [" << Params::OPTION_LENGTH << " <kmer-length>]" << " [" << Params::SWITCH_MULTISAMPLE_FASTA << "] <fraction> <sample_list>" << endl
+			 << "    kmer-db " << Params::MODE_MINHASH << " " << Params::SWITCH_KMC_SAMPLES << " <fraction> <sample_list>" << endl << endl
+			 << "Positional arguments:" << endl
+			 << "    fraction(input) - fraction of all k-mers to be accepted by the minhash filter" << endl
+			 << "    sample (input) - query sample in one of the supported formats:" << endl
+			 << "                     FASTA genomes/reads (default) or KMC k-mers (" << Params::SWITCH_KMC_SAMPLES << ")" << endl
+			 << "Options:" << endl
+			 << "    " << Params::OPTION_LENGTH << " <kmer_length> - length of k-mers (default: 18, maximum: 30)" << endl
+			 << "    " << Params::SWITCH_MULTISAMPLE_FASTA << " - each sequence in a FASTA file is treated as a separate sample" << endl << endl
+			<< "For each sample from the list, a binary file with *.minhash* extension containing filtered k-mers is created" << endl << endl;
+	 }
+	else {
+		cout
+			<< "USAGE" << endl 
+			<< "    kmer-db <mode> [options] <positional arguments>" << endl << endl
 
-		<< "kmer-db <mode> [options] <positional arguments>" << endl << endl
-
-		<< "Modes:" << endl
-		<< "  " << Params::MODE_BUILD << " - building a database from genomes, k-mers, or minhashed k-mers," << endl
-
-		<< "  " << Params::MODE_ALL_2_ALL << " - counting common k-mers - all samples in the database," << endl
-		<< "  " << Params::MODE_NEW_2_ALL << " - counting common k-mers - set of new samples versus database," << endl
-		<< "  " << Params::MODE_ONE_2_ALL << " - counting common k-mers - single sample versus database," << endl
-		<< "  " << Params::MODE_DISTANCE << " - calculating similarities/distances." << endl
-		<< "  " << Params::MODE_MINHASH << " - storing minhashed k-mers," << endl
-		<< "Common options:" << endl
-		<< "  " << Params::OPTION_THREADS << " <threads> - number of threads (default: number of available cores)," << endl
-		<< "The meaning of other options and positional arguments depends on the selected mode." << endl << endl
-
-		<< "Building a database:" << endl
-		<< "  kmer-db " << Params::MODE_BUILD << " [" << Params::OPTION_LENGTH << " <kmer-length>] [" << Params::OPTION_FRACTION << " <fraction>] [" 
-			<< Params::SWITCH_MULTISAMPLE_FASTA << "] [" << Params::SWITCH_EXTEND_DB << "] <sample_list> <database>" << endl
-		<< "  kmer-db " << Params::MODE_BUILD << " " << Params::SWITCH_KMC_SAMPLES << " [" << Params::OPTION_FRACTION << " <fraction>] [" << Params::SWITCH_EXTEND_DB << "] <sample_list> <database>" << endl
-		<< "  kmer-db " << Params::MODE_BUILD << " " << Params::SWITCH_MINHASH_SAMPLES << " [" << Params::SWITCH_EXTEND_DB << "] <sample_list> <database>" << endl
-		<< "    sample_list (input) - file containing list of samples in one of the following formats:" << endl
-		<< "                          fasta genomes or reads (default), KMC k-mers (" << Params::SWITCH_KMC_SAMPLES << "), or minhashed k-mers (" << Params::SWITCH_MINHASH_SAMPLES << ")," << endl
-		<< "    database (output) - file with generated k-mer database," << endl
-		<< "    " << Params::OPTION_LENGTH << " <kmer_length> - length of k-mers (default: 18)," << endl
-		<< "    " << Params::OPTION_FRACTION << " <fraction> - fraction of all k-mers to be accepted by the minhash filter (default: 1)," << endl
-		<< "    " << Params::SWITCH_MULTISAMPLE_FASTA << " - each sequence in a genome FASTA file is treated as a separate sample," << endl
-		<< "	" << Params::SWITCH_EXTEND_DB << " - extend the existing database with new samples." << endl <<endl
-
-		<< "Counting common k-mers for all the samples in the database:" << endl
-		<< "  kmer-db " << Params::MODE_ALL_2_ALL << " [" << Params::OPTION_BUFFER << " <size_mb>] <database> <common_table>" << endl
-		<< "    database (input) - k-mer database file." << endl
-		<< "    common_table (output) - comma-separated table with number of common k-mers." << endl
-		<< "    " << Params::OPTION_BUFFER << " <size_mb> - size of cache buffer in megabytes, applies to all2all mode" << endl
-		<< "                      (use L3 size for Intel CPUs and L2 for AMD to maximize performance; default: 8)." << endl << endl
-
-		<< "Counting common kmers between set of new samples and all the samples in the database:" << endl
-		<< "  kmer-db " << Params::MODE_NEW_2_ALL << " [" << Params::SWITCH_MULTISAMPLE_FASTA << " | " << Params::SWITCH_KMC_SAMPLES << " | " << Params::SWITCH_MINHASH_SAMPLES << "] <database> <sample_list> <common_table>" << endl
-		<< "    database (input) - k-mer database file." << endl
-		<< "    sample_list (input) - file containing list of query samples in one of the supported formats (see build mode)." << endl
-		<< "    common_table (output) - comma-separated table with number of common k-mers." << endl << endl
-
-		<< "Counting common kmers between single sample and all the samples in the database:" << endl
-		<< "  kmer-db " << Params::MODE_ONE_2_ALL << " [" << Params::SWITCH_MULTISAMPLE_FASTA << " | " << Params::SWITCH_KMC_SAMPLES << " | " << Params::SWITCH_MINHASH_SAMPLES << "] <database> <sample> <common_table>" << endl
-		<< "    database (input) - k-mer database file." << endl
-		<< "    sample (input) - query sample in one of the supported formats (see build mode)." << endl
-		<< "    common_table (output) - comma-separated table with number of common k-mers." << endl << endl
-
-		<< "Calculating similarities/distances on the basis of common k-mers:" << endl
-		<< "  kmer-db " << Params::MODE_DISTANCE << " [<measures>] [" << Params::SWITCH_PHYLIP_OUT << "] <common_table>" << endl
-		<< "    common_table (input) - comma-separated table with number of common k-mers." << endl
-		<< "    " << Params::SWITCH_PHYLIP_OUT << " - store output distance matrix in a Phylip format" << endl	
-		<< "    measures - names of the similarity/distance measures to be calculated, one or more of the following" << endl
-		<< "               jaccard (default), min, max, cosine, mash." << endl
-
-		<< "This mode generates a file with similarity/distance table for each selected measure." << endl
-		<< "Name of the output file is produced by adding to the input file an extension with a measure name." << endl << endl
-
-		<< "Storing minhashed k-mers:" << endl
-		<< "  kmer-db " << Params::MODE_MINHASH << " [" << Params::OPTION_LENGTH << " <kmer-length>]" << " [" << Params::SWITCH_MULTISAMPLE_FASTA << "] <fraction> <sample_list>" << endl
-		<< "  kmer-db " << Params::MODE_MINHASH << " " << Params::SWITCH_KMC_SAMPLES << " <fraction> <sample_list>" << endl
-		<< "    fraction (input) - fraction of all k-mers to be accepted by the minhash filter." << endl
-		<< "    sample_list (input) - file containing list of query samples in one of the supported formats (see build mode)." << endl
-		<< "For each sample from the list, a binary file with *.minhash* extension containing filtered k-mers is created." << endl << endl;
-		
+			<< "Modes:" << endl
+			<< "    " << Params::MODE_BUILD << " - building a database from FASTA genomes/reads, k-mers, or minhashed k-mers" << endl
+			<< "    " << Params::MODE_ALL_2_ALL << " - counting common k-mers - all samples in the database" << endl
+			<< "    " << Params::MODE_NEW_2_ALL << " - counting common k-mers - set of new samples versus database" << endl
+			<< "    " << Params::MODE_ONE_2_ALL << " - counting common k-mers - single sample versus database" << endl
+			<< "    " << Params::MODE_DISTANCE << " - calculating similarities/distances" << endl
+			<< "    " << Params::MODE_MINHASH << " - storing minhashed k-mers" << endl
+			<< "Common options:" << endl
+			<< "    " << Params::OPTION_THREADS << " <threads> - number of threads (default: number of available cores)" << endl << endl
+			<< "The meaning of other options and positional arguments depends on the selected mode. For more information, run:" << endl
+			<< "kmer-db <mode> -help" << endl << endl;
+	 }
 }
 

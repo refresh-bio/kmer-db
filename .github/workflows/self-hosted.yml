@@ -40,7 +40,7 @@ jobs:
   main-test:
     name: Main tests
     runs-on: [self-hosted, kmer-db]
-    needs: make-tests
+    needs: synth-test
     strategy:
       fail-fast: false
       matrix:
@@ -144,5 +144,87 @@ jobs:
         cmp k18.n2a.itself.csv ${INPUT_DIR}/k18.n2a.itself.csv
 
    
-
-
+  ########################################################################################
+  synth-test:
+    name: Synthetic tests
+    runs-on: [self-hosted, kmer-db]
+    needs: make-tests
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [9, 10, 11]
+    env: 
+      INPUT_DIR: ./test/synth
+        
+    steps:
+          
+    - name: build 
+      run: |
+        ./kmer-db-${{matrix.compiler}} build -multisample-fasta -k 21 ${INPUT_DIR}/synth.list synth.db
+        
+    - name: all2all (dense and sparse)
+      run: |     
+        ./kmer-db-${{matrix.compiler}} all2all synth.db a2a.csv
+        ./kmer-db-${{matrix.compiler}} all2all -sparse synth.db a2a.sparse.csv
+   
+    - name: all2all distances (dense -> dense)
+      run: |
+        ./kmer-db-${{matrix.compiler}} distance mash ani a2a.csv
+        cmp ${INPUT_DIR}/a2a.ani a2a.csv.ani
+        cmp ${INPUT_DIR}/a2a.mash a2a.csv.mash
+        
+ 
+    - name: all2all distances (sparse -> dense)
+      run: |
+        ./kmer-db-${{matrix.compiler}} distance mash ani a2a.sparse.csv
+        cmp ${INPUT_DIR}/a2a.ani a2a.sparse.csv.ani
+        cmp ${INPUT_DIR}/a2a.mash a2a.sparse.csv.mash
+        
+    - name: all2all distances (dense -> sparse)
+      run: |
+        ./kmer-db-${{matrix.compiler}} -sparse distance mash ani a2a.csv
+        cmp ${INPUT_DIR}/a2a.ani.sparse a2a.csv.ani
+        cmp ${INPUT_DIR}/a2a.mash.sparse a2a.csv.mash
+        
+    - name: all2all distances (sparse -> sparse)
+      run: |
+        ./kmer-db-${{matrix.compiler}} -sparse distance mash ani a2a.sparse.csv
+        cmp ${INPUT_DIR}/a2a.ani.sparse a2a.sparse.csv.ani
+        cmp ${INPUT_DIR}/a2a.mash.sparse a2a.sparse.csv.mash
+        
+    - name: all2all distances (sparse -> sparse + above + below)
+      run: |
+        ./kmer-db-${{matrix.compiler}} -sparse distance mash -above 0.03 -below 1.0 a2a.sparse.csv
+        cmp ${INPUT_DIR}/a2a.mash.above-below a2a.sparse.csv.mash    
+        
+       
+    - name: new2all (dense and sparse)
+      run: |
+        ./kmer-db-${{matrix.compiler}} new2all -multisample-fasta synth.db ${INPUT_DIR}/synth.list n2a.csv
+        ./kmer-db-${{matrix.compiler}} new2all -multisample-fasta -sparse synth.db ${INPUT_DIR}/synth.list n2a.sparse.csv 
+            
+    - name: new2all distances (dense -> dense)
+      run: |
+        ./kmer-db-${{matrix.compiler}} distance mash ani n2a.csv
+        cmp ${INPUT_DIR}/n2a.ani n2a.csv.ani
+        cmp ${INPUT_DIR}/n2a.mash n2a.csv.mash
+        
+ 
+    - name: new2all distances (sparse -> dense)
+      run: |
+        ./kmer-db-${{matrix.compiler}} distance mash ani n2a.sparse.csv
+        cmp ${INPUT_DIR}/n2a.ani n2a.sparse.csv.ani
+        cmp ${INPUT_DIR}/n2a.mash n2a.sparse.csv.mash
+        
+    - name: new2all distances (dense -> sparse)
+      run: |
+        ./kmer-db-${{matrix.compiler}} -sparse distance mash ani n2a.csv
+        cmp ${INPUT_DIR}/n2a.ani.sparse n2a.csv.ani
+        cmp ${INPUT_DIR}/n2a.mash.sparse n2a.csv.mash
+        
+    - name: new2all distances (sparse -> sparse)
+      run: |
+        ./kmer-db-${{matrix.compiler}} -sparse distance mash ani n2a.sparse.csv
+        cmp ${INPUT_DIR}/n2a.ani.sparse n2a.sparse.csv.ani
+        cmp ${INPUT_DIR}/n2a.mash.sparse n2a.sparse.csv.mash
+    

@@ -117,6 +117,29 @@ public:
 
 		return r1 + r2;
 	}
+
+	static long int strtol(const char* str, char** endptr) {
+		long int val = 0;
+		char* p = (char*)str;
+		bool is_negative = false;
+
+
+		if (*p == '-')
+		{
+			is_negative = true;
+			++p;
+		}
+
+		while (*p >= '0' && *p <= '9')
+		{
+			val = val * 10 + (*p++ - '0');
+		}
+
+		if (endptr)
+			*endptr = p;
+
+		return is_negative ? -val : val;
+	}
 };
 
 
@@ -129,7 +152,11 @@ int num2str(Integer val, char *out) {
 // floating point specialization
 template <typename Floating, typename std::enable_if<std::is_floating_point<Floating>::value, int>::type* = nullptr>
 int num2str(Floating val, char *out) {
-	return NumericConversions::Double2PChar((double)val, 10, out);
+	if (val == 0) {
+		*out = '0';
+		return 1;
+	}
+	return NumericConversions::Double2PChar((double)val, 6, out);
 }
 
 // pair specialization
@@ -150,6 +177,21 @@ int num2str(const T* collection, size_t size, char delim, char* out) {
 	for (size_t i = 0; i < size; ++i) {
 		ptr += num2str(*collection++, ptr);
 		*ptr++ = delim;
+	}
+
+	return ptr - out;
+}
+
+template <typename T>
+int num2str_sparse(const T* collection, size_t size, char delim, char* out) {
+	char* ptr = out;
+	for (size_t i = 0; i < size; ++i, collection++) {
+		if (*collection != 0) {
+			ptr += num2str(i + 1, ptr);
+			*ptr++ = ':';
+			ptr += num2str(*collection, ptr);
+			*ptr++ = delim;
+		}
 	}
 
 	return ptr - out;

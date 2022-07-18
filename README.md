@@ -36,7 +36,7 @@ mkdir $OUTPUT
 ./kmer-db build -k 25 -f 0.1 -t 16 $INPUT/seqs.part1.list $OUTPUT/k25.db
 
 # establish number of common 25-mers between single sequence and the database 
-# (minhash filtering that retains 10% of MT159713 k-mers is done prior to the comparison)  
+# (minhash filtering that retains 10% of MT159713 k-mers is done automatically prior to the comparison)  
 ./kmer-db one2all $OUTPUT/k25.db $INPUT/data/MT159713.fasta $OUTPUT/MT159713.csv
 ```
 
@@ -62,7 +62,7 @@ conda install -c bioconda kmer-db
 For detailed instructions how to set up Bioconda, please refer to the [Bioconda manual](https://bioconda.github.io/user/install.html#install-conda).
 Kmer-db can be also built from the sources distributed as:
 
-* MAKE project (G++ 4.8.5 tested) for Linux and OS X,
+* MAKE project (G++ 5.5.0 tested) for Linux and OS X,
 * Visual Studio 2015 solution for Windows.
 
 
@@ -96,16 +96,16 @@ The meaning of other options and positional arguments depends on the selected mo
 ## 2.1. Building a database
 
 Construction of k-mers database is an obligatory step for further analyses. The procedure accepts several input types:
-* compressed or uncompressed genomes:
+* compressed or uncompressed genomes/reads:
 
-    ```kmer-db build [-k <kmer-length>] [-f <fraction>] [-multisample-fasta] [-extend] <sample_list> <database>```
+    ```kmer-db build [-k <kmer-length>] [-f <fraction>] [-multisample-fasta] [-extend] [-t <threads>] <sample_list> <database>```
 * [KMC-generated](https://github.com/refresh-bio/KMC) k-mers: 
 
-    ```kmer-db build -from-kmers [-f <fraction>] [-extend] <sample_list> <database>```
+    ```kmer-db build -from-kmers [-f <fraction>] [-extend] [-t <threads>] <sample_list> <database>```
   
 * [minhashed k-mers](#24-storing-minhashed-k-mers) produced by `minhash` mode:
 
-    ```kmer-db build -from-minhash [-extend] <sample_list> <database>```
+    ```kmer-db build -from-minhash [-extend] [-t <threads>] <sample_list> <database>```
 
 Parameters:
 * `sample_list` (input) - file containing list of samples in the following format:
@@ -119,35 +119,38 @@ Parameters:
 * `database` (output) - file with generated k-mer database. 
 * `-k <kmer-length>` - length of k-mers (default: 18); ignored when `-from-kmers` or `-from-minhash` switch is specified.
 * `-f <fraction>` - fraction of all k-mers to be accepted by the minhash filter during database construction (default: 1); ignored when `-from-minhash` switch is present.
-* `-multisample-fasta` - each sequence in a genome FASTA file is treated as a separate sample,
-* `-extend` - extend the existing database with new samples.
+* `-multisample-fasta` - each sequence in a FASTA file is treated as a separate sample,
+* `-extend` - extend the existing database with new samples,
+* `-t <threads>` - number of threads (default: number of available cores).
 
 ## 2.2. Counting common k-mers 
 
 ### Samples in the database against each other:
  
- `kmer-db all2all [-buffer <size_mb>] [-sparse] <database> <common_table>`
+ `kmer-db all2all [-buffer <size_mb>] [-sparse] [-t <threads>] <database> <common_table>`
  
 Parameters:
 * `database` (input) - k-mer database file created by `build` mode,
 * `common_table` (output) - file containing table with common k-mer counts.
 * `-buffer <size_mb>` - size of cache buffer in megabytes; use L3 size for Intel CPUs and L2 for AMD for best performance; default: 8
-* `-sparse` - stores output matrix in a sparse form.
+* `-sparse` - stores output matrix in a sparse form,
+* `-t <threads>` - number of threads (default: number of available cores).
 
 ### New samples against the database:
 
-`kmer-db new2all [-multisample-fasta | -from-kmers | -from-minhash] [-sparse] <database> <sample_list> <common_table>`
+`kmer-db new2all [-multisample-fasta | -from-kmers | -from-minhash] [-sparse] [-t <threads>] <database> <sample_list> <common_table>`
 
 Parameters:
 * `database` (input) - k-mer database file created by `build` mode.
 * `sample_list` (input) - file containing list of samples in one of the supported formats (see `build` mode); if samples are given as genomes (default) or k-mers (`-from-kmers` switch), the minhashing is done automatically with the same filter as in the database.
 * `common_table` (output) - file containing table with common k-mer counts.
 * `-multisample-fasta` / `-from-kmers` / `-from-minhash` - see `build` mode for details.
-* `-sparse` - stores output matrix in a sparse form.
+* `-sparse` - stores output matrix in a sparse form,
+* `-t <threads>` - number of threads (default: number of available cores).
  
 ### Single sample against the database:
 
-`kmer-db one2all [-multisample-fasta | -from-kmers | -from-minhash] <database> <sample> <common_table>`
+`kmer-db one2all [-from-kmers | -from-minhash] [-t <threads>] <database> <sample> <common_table>`
 
 The meaning of the parameters is the same as in `new2all` mode, but instead of specifying file with sample list, a single sample file is used as a query.
 
@@ -188,12 +191,21 @@ When `-sparse` switch is specified, the table is stored in a sparse form. In par
  
  ## 2.3. Calculating similarities or distances
 
-`kmer-db distance [<measures>] <common_table>`
+`kmer-db distance [<measures>] [-sparse [-above <a_th>] [-below <b_th>]] <common_table>`
 
 Parameters:
-* `common_table` (input) - file containing table with numbers of common k-mers produced by `all2all`, `new2all`, or `one2all` mode (only dense matrices are supported). 
-* `measures` - names of the similarity/distance measures to be calculated, can be one or several of the following: `jaccard`, `min`, `max`, `cosine`, `mash`. If measures are not specified, `jaccard` is used by default.
-* `-phylip-out` - store output distance matrix in a Phylip format.
+* `common_table` (input) - file containing table with numbers of common k-mers produced by `all2all`, `new2all`, or `one2all` mode (both, dense and sparse matrices are supported). 
+* `measures` - names of the similarity/distance measures to be calculated, can be one or several of the following (is not specified, `jaccard` is used): 
+  * `jaccard`: $J(q,s) = |p \cap q| / |p \cup q|$, 
+  * `min`: $\min(q,s) =  |p \cap q| / \min(|p|,|q|)$, 
+  * `max`: $\max(q,s) =  |p \cap q| / \max(|p|,|q|)$, 
+  * `cosine`: $\cos(q,s) = |p \cap q| / \sqrt{|p| \cdot |q|}$,  
+  * `mash` (Mash distance): $\textrm{Mash}(q,s) = -\frac{1}{k}ln\frac{2 \cdot J(q,s)}{1 + J(q,s)}$ 
+  * `ani` (average nucleotide identity): $\textrm{ANI}(q,s) = 1 - \textrm{Mash}(p,q)$
+* `-phylip-out` - store output distance matrix in a Phylip format,
+* `-sparse` - outputs a sparse matrix (independently of the input matrix format),
+* `-above <a_th>` - retains elements larger then <a_th>,
+* `-below <b_th>` - retains elements smaller then <b_th>.
 
 This mode generates a file with similarity/distance table for each selected measure. Name of the output file is produced by adding to the input file an extension with a measure name.
     
@@ -209,7 +221,7 @@ This is an optional analysis step which stores minhashed k-mers on the hard disk
 Parameters:
  * `fraction` (input) - fraction of all k-mers to be accepted by the minhash filter.
  * `sample_list` (input) - file containing list of samples in one of the supported formats (see `build` mode). 
- * `-k <kmer-length>` - length of k-mers (default: 18); ignored when `-from-kmers` switch is specified.
+ * `-k <kmer-length>` - length of k-mers (default: 18; maximum: 30); ignored when `-from-kmers` switch is specified.
  * `-multisample-fasta` / `-from-kmers` - see `build` mode for details.
 
 For each sample from the list, a binary file with *.minhash* extension containing filtered k-mers is created.

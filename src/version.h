@@ -1,11 +1,16 @@
 #pragma once
 
-#define VERSION "1.9.4"
-#define DATE "19.04.2022"
+#define VERSION "1.10.0"
+#define DATE "18.07.2022"
 
 /* 
 
 Version history
+
+1.10.0 (18.07.2022)
+- Added support of sparse inputs in distance mode,
+- Added support of sparse outputs in distance mode (-sparse switch) with optional filtering (-above/-below options),
+- Extended help information.
 
 1.9.4 (19.04.2022)
 - fixed database construction for very small samples (#kmers < #threads)

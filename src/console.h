@@ -16,8 +16,6 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 
 class Params {
 public:
-
-
 	static const string MODE_BUILD;
 	static const string MODE_MINHASH;
 	static const string MODE_ALL_2_ALL;
@@ -25,6 +23,7 @@ public:
 	static const string MODE_ONE_2_ALL;
 	static const string MODE_DISTANCE;
 
+	static const string SWITCH_HELP;
 	static const string SWITCH_KMC_SAMPLES;
 	static const string SWITCH_MINHASH_SAMPLES;
 	static const string SWITCH_MULTISAMPLE_FASTA;
@@ -40,7 +39,8 @@ public:
 	static const string OPTION_THREADS;
 	static const string OPTION_READER_THREADS;
 	static const string OPTION_BUFFER;
-	
+	static const string OPTION_BELOW;
+	static const string OPTION_ABOVE;
 
 };
 
@@ -71,12 +71,18 @@ protected:
 	int runOneVsAll(const std::string& dbFilename, const std::string& singleFasta, const std::string& similarityFilename, InputFile::Format inputFormat);
 
 	int runMinHash(const std::string& multipleSamples, InputFile::Format inputFormat);
-	int runDistanceCalculation(const std::string& similarityFilename, const std::vector<string>& metricNames, bool usePhylip);
+	int runDistanceCalculation(
+		const std::string& similarityFilename, 
+		const std::vector<string>& metricNames, 
+		bool usePhylip, 
+		bool sparseOut,
+		double below,
+		double above);
 	
 	int runListPatterns(const std::string& dbFilename, const std::string& patternFile);
 	int runAnalyzeDatabase(const std::string& multipleKmcSamples, const std::string& dbFilename);
 
-	void showInstructions();
+	void showInstructions(const std::string& mode);
 
 	bool findSwitch(std::vector<std::string>& params, const std::string& name) {
 		auto it = find(params.begin(), params.end(), name); // verbose mode
