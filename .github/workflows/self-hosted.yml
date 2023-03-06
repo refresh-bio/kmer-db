@@ -166,6 +166,8 @@ jobs:
       run: |     
         ./kmer-db-${{matrix.compiler}} all2all synth.db a2a.csv
         ./kmer-db-${{matrix.compiler}} all2all -sparse synth.db a2a.sparse.csv
+        ./kmer-db-${{matrix.compiler}} all2all -sparse -below 70 -above 20 synth.db a2a.sparse.above-below.csv
+        cmp ${INPUT_DIR}/a2a.sparse.above-below.csv a2a.sparse.above-below.csv
    
     - name: all2all distances (dense -> dense)
       run: |
@@ -202,6 +204,9 @@ jobs:
       run: |
         ./kmer-db-${{matrix.compiler}} new2all -multisample-fasta synth.db ${INPUT_DIR}/synth.list n2a.csv
         ./kmer-db-${{matrix.compiler}} new2all -multisample-fasta -sparse synth.db ${INPUT_DIR}/synth.list n2a.sparse.csv 
+        ./kmer-db-${{matrix.compiler}} new2all -multisample-fasta -sparse -below 70 -above 20 synth.db ${INPUT_DIR}/synth.list n2a.sparse.above-below.csv 
+        cmp ${INPUT_DIR}/n2a.sparse.above-below.csv n2a.sparse.above-below.csv
+   
             
     - name: new2all distances (dense -> dense)
       run: |

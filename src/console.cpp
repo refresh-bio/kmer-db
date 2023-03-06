@@ -110,8 +110,8 @@ int Console::parse(int argc, char** argv) {
 	InputFile::Format inputFormat = InputFile::GENOME;
 	bool extendDb = false;
 
-	double below = std::numeric_limits<double>::max();
-	double above = -std::numeric_limits<double>::max();
+	double below = (double)std::numeric_limits<int>::max(); // using integer boundaries is on purpose as thrsholds can also be integer values
+	double above = (double)std::numeric_limits<int>::min();
 	
 	std::vector<string> params(argc - 1);
 	std::transform(argv + 1, argv + argc, params.begin(), [](char* c)->string { return c; });
@@ -215,12 +215,12 @@ int Console::parse(int argc, char** argv) {
 			else if (params.size() == 3 && mode == Params::MODE_ALL_2_ALL) {
 				cout << "Analysis started at " << asctime(timeinfo) << endl;
 				cout << "All versus all comparison" << endl;
-				status = runAllVsAll(params[1], params[2]);
+				status = runAllVsAll(params[1], params[2], (uint32_t)lrint(below), (uint32_t)std::max(0l, lrint(above)));
 			}
 			else if (params.size() == 4 && mode == Params::MODE_NEW_2_ALL) {
 				cout << "Analysis started at " << asctime(timeinfo) << endl;
 				cout << "Set of new samples  (from " << InputFile::format2string(inputFormat) << ") versus entire database comparison" << endl;
-				status = runNewVsAll(params[1], params[2], params[3], inputFormat);
+				status = runNewVsAll(params[1], params[2], params[3], inputFormat, (uint32_t)lrint(below), (uint32_t)std::max(0l, lrint(above)));
 			}
 			else if (params.size() == 4 && mode == Params::MODE_ONE_2_ALL) {
 				cout << "Analysis started at " << asctime(timeinfo) << endl;
@@ -433,7 +433,7 @@ int Console::runBuildDatabase(
 
 // *****************************************************************************************
 //
-int Console::runAllVsAll(const std::string& dbFilename, const std::string& similarityFile) {
+int Console::runAllVsAll(const std::string& dbFilename, const std::string& similarityFile, uint32_t below, uint32_t above) {
 	std::ifstream dbFile(dbFilename, std::ios::binary);
 	std::ofstream ofs(similarityFile);
 	PrefixKmerDb* db = new PrefixKmerDb(numThreads);
@@ -469,6 +469,11 @@ int Console::runAllVsAll(const std::string& dbFilename, const std::string& simil
 	ptr += num2str(db->getSampleKmersCount().data(), db->getSampleKmersCount().size(), ',', ptr);
 	*ptr++ = '\n';
 	ofs.write(row, ptr - row);
+
+	if (sparse) {
+		std::replace_if(matrix.getData().begin(), matrix.getData().end(),
+			[below, above](uint32_t x) { return x >= below || x <= above; }, 0);
+	}
 	
 	for (size_t sid = 0; sid < db->getSamplesCount(); ++sid) {
 		ptr = row;
@@ -589,7 +594,13 @@ int Console::runOneVsAll(const std::string& dbFilename, const std::string& sampl
 
 // *****************************************************************************************
 //
-int Console::runNewVsAll(const std::string& dbFilename, const std::string& multipleSamples, const std::string& similarityFile, InputFile::Format inputFormat) {
+int Console::runNewVsAll(
+	const std::string& dbFilename,
+	const std::string& multipleSamples,
+	const std::string& similarityFile, 
+	InputFile::Format inputFormat, 
+	uint32_t below, uint32_t above)
+{
 	std::ifstream dbFile(dbFilename, std::ios::binary);
 	PrefixKmerDb db(numThreads);
 	SimilarityCalculator calculator(numThreads, cacheBufferMb);
@@ -681,12 +692,14 @@ int Console::runNewVsAll(const std::string& dbFilename, const std::string& multi
 			}
 
 			LOG_DEBUG << "similarity queue -> (" << task_id + 1 << ", " << task->sampleName << "), buf:" << task->bufferId2 << endl ;
-			const auto& buf = buffers[task->bufferId2];
+			auto& buf = buffers[task->bufferId2];
 			
 			ptr = row;
 			ptr += sprintf(ptr, "%s,%lu,", task->sampleName.c_str(), task->kmersCount);
 
 			if (sparse) {
+				std::replace_if(buf.begin(), buf.end(),
+					[below, above](uint32_t x) { return x >= below || x <= above; }, 0);
 				ptr += num2str_sparse(buf.data(), buf.size(), ',', ptr);
 			}
 			else {

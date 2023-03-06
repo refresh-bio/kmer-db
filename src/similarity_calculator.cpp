@@ -26,7 +26,7 @@ void SimilarityCalculator::all2all(PrefixKmerDb& db, LowerTriangularMatrix<uint3
 	int samples_count = db.getSamplesCount();
 
 	matrix.resize(samples_count);
-	matrix.clear();
+	//matrix.clear();
 
 	size_t bufsize = cacheBufferMb * 1000000 / sizeof(uint32_t);
 	std::vector<uint32_t> patternsBuffer(bufsize);
@@ -333,6 +333,7 @@ void SimilarityCalculator::all2all(PrefixKmerDb& db, LowerTriangularMatrix<uint3
 		hist_time += dt2.count();
 		patterns_time += dt3.count();
 
+		
 		// determine ranges of blocks processed by threads 
 		workerRanges.assign(no_ranges + 1, sample2pattern.size());
 		workerRanges[0] = 0;
@@ -340,27 +341,30 @@ void SimilarityCalculator::all2all(PrefixKmerDb& db, LowerTriangularMatrix<uint3
 
 		auto currentIndex = workerBlock;
 
-		for (int rid = 0; rid < no_ranges - 1; ++rid) {
-			// make sure no single row of matrix is updated by multiple workers
-			auto it = std::upper_bound(
-				sample2pattern.begin() + currentIndex,
-				sample2pattern.end(),
-				*(sample2pattern.begin() + currentIndex - 1),
-				[](const std::tuple<sample_id_t, uint32_t, uint32_t>& x, const std::tuple<sample_id_t, uint32_t, uint32_t>& y) -> bool { 
+		if (currentIndex > 0) {
+			for (int rid = 0; rid < no_ranges - 1; ++rid) {
+				// make sure no single row of matrix is updated by multiple workers
+				auto it = std::upper_bound(
+					sample2pattern.begin() + currentIndex,
+					sample2pattern.end(),
+					*(sample2pattern.begin() + currentIndex - 1),
+					[](const std::tuple<sample_id_t, uint32_t, uint32_t>& x, const std::tuple<sample_id_t, uint32_t, uint32_t>& y) -> bool {
 					return get<0>(x) < get<0>(y); });	// Necessary, because we are looking for end of sample data
 
-			size_t range = it - sample2pattern.begin();
-			workerRanges[rid + 1] = range;
-			currentIndex = range + workerBlock;
+				size_t range = it - sample2pattern.begin();
+				workerRanges[rid + 1] = range;
+				currentIndex = range + workerBlock;
 
-			if (currentIndex >= sample2pattern.size())
-				break;
+				if (currentIndex >= sample2pattern.size())
+					break;
+			}
 		}
 
 		// this should never happen
 		if (workerRanges[no_ranges] != sample2pattern.size()) {
 			throw std::runtime_error("ERROR in FastKmerDb::calculateSimilarity(): Invalid ranges");
 		}
+		
 
 		semaphore_matrix.inc(no_ranges);
 		tasks_matrix_queue.PushRange(v_range_ids);

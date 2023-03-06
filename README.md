@@ -134,6 +134,8 @@ Parameters:
 * `common_table` (output) - file containing table with common k-mer counts.
 * `-buffer <size_mb>` - size of cache buffer in megabytes; use L3 size for Intel CPUs and L2 for AMD for best performance; default: 8
 * `-sparse` - stores output matrix in a sparse form,
+* `-above <a_th>` - retains elements larger then <a_th>,
+* `-below <b_th>` - retains elements smaller then <b_th>.
 * `-t <threads>` - number of threads (default: number of available cores).
 
 ### New samples against the database:

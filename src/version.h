@@ -1,11 +1,14 @@
 #pragma once
 
-#define VERSION "1.10.0"
-#define DATE "18.07.2022"
+#define VERSION "1.11.0"
+#define DATE "27.02.2023"
 
 /* 
 
 Version history
+
+1.11.0 (27.02.2023)
+- Added -below and -above thresholds for all2all and new2all modes.
 
 1.10.0 (18.07.2022)
 - Added support of sparse inputs in distance mode,

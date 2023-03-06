@@ -66,8 +66,11 @@ protected:
 	std::map<std::string, metric_fun_t> availableMetrics;
 
 	int runBuildDatabase(const std::string& multipleSamples, const std::string dbFilename, InputFile::Format inputFormat, bool extendDb);
-	int runAllVsAll(const std::string& dbFilename, const std::string& similarityFile);
-	int runNewVsAll(const std::string& dbFilename, const std::string& multipleSamples, const std::string& similarityFilename, InputFile::Format inputFormat);
+	
+	int runAllVsAll(const std::string& dbFilename, const std::string& similarityFile, uint32_t below, uint32_t above);
+	
+	int runNewVsAll(const std::string& dbFilename, const std::string& multipleSamples, const std::string& similarityFilename, InputFile::Format inputFormat, uint32_t below, uint32_t above);
+	
 	int runOneVsAll(const std::string& dbFilename, const std::string& singleFasta, const std::string& similarityFilename, InputFile::Format inputFormat);
 
 	int runMinHash(const std::string& multipleSamples, InputFile::Format inputFormat);
