@@ -1,11 +1,14 @@
 #pragma once
 
-#define VERSION "1.11.0"
-#define DATE "27.02.2023"
+#define VERSION "1.11.1"
+#define DATE "07.03.2023"
 
 /* 
 
 Version history
+
+1.11.1 (07.03.2023)
+- Removed deadlock in the -multisample-fasta mode.
 
 1.11.0 (27.02.2023)
 - Added -below and -above thresholds for all2all and new2all modes.

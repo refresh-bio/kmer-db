@@ -148,6 +148,8 @@ Parameters:
 * `common_table` (output) - file containing table with common k-mer counts.
 * `-multisample-fasta` / `-from-kmers` / `-from-minhash` - see `build` mode for details.
 * `-sparse` - stores output matrix in a sparse form,
+* `-above <a_th>` - retains elements larger then <a_th>,
+* `-below <b_th>` - retains elements smaller then <b_th>,
 * `-t <threads>` - number of threads (default: number of available cores).
  
 ### Single sample against the database:

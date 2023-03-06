@@ -189,11 +189,6 @@ bool GenomeInputFile::loadNext(
 	std::string& sampleName
 ) {
 	
-	// no more sequences in multifasta
-	if (multifastaIndex == chromosomes.size()) {
-		return false;
-	}
-
 	std::shared_ptr<MinHashFilter> minhashFilter = dynamic_pointer_cast<MinHashFilter>(filter);
 
 	if (!minhashFilter) {
@@ -219,7 +214,8 @@ bool GenomeInputFile::loadNext(
 		
 	++multifastaIndex;
 
-	return true;
+	// no more sequences in multifasta
+	return multifastaIndex < chromosomes.size();
 }
 
 

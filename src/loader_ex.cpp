@@ -191,11 +191,12 @@ void LoaderEx::multifastaReaderJob() {
 		// initialize multifasta file
 		if (genomicFile->initMultiFasta()) {
 
-			LOG_DEBUG << "multifasta initialized " << endl ;
+			LOG_DEBUG << "multifasta initialized: " << inputTask->fileId + 1 << endl ;
 
 			while (true) {
-
+				LOG_DEBUG << "wait for buf for sample " << sample_id + 1 << endl;
 				this->queues.freeBuffers.Pop(bufferId); // wait for free buffer
+				LOG_DEBUG << "acquired buf " << bufferId << " for sample " << sample_id + 1 << endl;
 			
 				auto sampleTask = make_shared<SampleTask>(
 					sample_id,
@@ -207,17 +208,17 @@ void LoaderEx::multifastaReaderJob() {
 					kmersCollections[bufferId], positionsCollections[bufferId],
 					sampleTask->kmers, sampleTask->kmersCount, sampleTask->kmerLength, sampleTask->fraction, sampleTask->sampleName);
 
-				// no more samples
-				if (!ok) {
-					break;
-				}
-
 				++sample_id;
 				++bufferRefCounters[bufferId];
 				queues.output.Push((int)sampleTask->id, sampleTask);
 				++count;
 
-				LOG_DEBUG << "(sample " << sampleTask->id + 1 << ") -> output queue, buf: " << bufferId << std::endl ;
+				LOG_DEBUG << "(sample " << sampleTask->id + 1 << ") -> output queue, buf: " << bufferId << std::endl;
+
+				// no more samples
+				if (!ok) {
+					break;
+				}
 			}
 		}
 
