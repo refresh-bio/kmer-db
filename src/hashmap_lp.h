@@ -7,9 +7,14 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 
 */
 
+#ifdef ARCH_X64
 #include <mmintrin.h>
-#include <cstdint>
 #include <xmmintrin.h>
+#else
+#include <arm_neon.h>
+#endif
+
+#include <cstdint>
 #include <iostream> 
 #include <cstddef>
 #include <thread>
@@ -28,17 +33,34 @@ inline size_t my_hasher_lp(T x)
 // *****************************************************************************************
 //
 template<>
-inline size_t my_hasher_lp<uint64_t>(uint64_t x)
+inline size_t my_hasher_lp<uint64_t>(uint64_t h)
 {
-	return x * 0xc70f6907ull;
+//	return x * 0xc70f6907ull;
+
+	h ^= h >> 33;
+	h *= 0xff51afd7ed558ccdL;
+	h ^= h >> 33;
+	h *= 0xc4ceb9fe1a85ec53L;
+	h ^= h >> 33;
+
+	return h;
+
 }
 
 // *****************************************************************************************
 //
 template<>
-inline size_t my_hasher_lp<uint32_t>(uint32_t x)
+inline size_t my_hasher_lp<uint32_t>(uint32_t h)
 {
-	return x * 0xc70f6907ul;
+//	return h * 0xc70f6907ul;
+
+	h ^= h >> 16;
+	h *= 0x85ebca6b;
+	h ^= h >> 13;
+	h *= 0xc2b2ae35;
+	h ^= h >> 16;
+
+	return h;
 }
 
 // *****************************************************************************************
@@ -76,7 +98,7 @@ private:
 		item_t *old_data = data;
 		size_t old_allocated = allocated;
 
-		if (filled > old_allocated * max_fill_factor)
+		if (filled >= size_when_restruct)
 			allocated *= 2;
 
 		allocated_mask = allocated - 1ull;
@@ -86,10 +108,11 @@ private:
 		clear();
 
 		ht_memory += allocated * sizeof(item_t);
+		filled = 0;
 
 		for (size_t i = 0; i < old_allocated; ++i)
 			if (old_data[i].val != empty_value)
-				insert(old_data[i].key, old_data[i].val);
+				fast_insert(old_data[i].key, old_data[i].val);
 
 		delete[] old_data;
 		ht_memory -= old_allocated * sizeof(item_t);
@@ -223,6 +246,26 @@ public:
 
 	// *****************************************************************************************
 	//
+	void fast_insert(Key k, Value v)
+	{
+		size_t h = my_hasher_lp<Key>(k) & allocated_mask;
+
+		if (data[h].val != empty_value)
+		{
+			do
+			{
+				h = (h + 1) & allocated_mask;
+			} while (data[h].val != empty_value);
+		}
+
+		++filled;
+
+		data[h].key = k;
+		data[h].val = v;
+	}
+
+	// *****************************************************************************************
+	//
 	void insert(Key k, Value v, item_t* place) 
 	{
 		place->key = k;
@@ -277,6 +320,19 @@ public:
 			h = (h + 1) & allocated_mask;
 		} 
 		return &(data[h]);
+
+/*		if (data[h].val == empty_value || data[h].key == k)
+			return &(data[h]);
+
+		for (++h; h < allocated; ++h)
+			if(data[h].val == empty_value || data[h].key == k)
+				return &(data[h]);
+
+		for (h = 0; h < allocated; ++h)
+			if (data[h].val == empty_value || data[h].key == k)
+				return &(data[h]);
+
+		return &(data[h]);*/
 	}
 
 	// *****************************************************************************************
@@ -290,6 +346,56 @@ public:
 #else
 		__builtin_prefetch(data + h);
 #endif
+	}
+
+	// *****************************************************************************************
+	//
+	Value& operator[](const Key key)
+	{
+		if (filled >= size_when_restruct) {
+			restruct();
+		}
+
+		size_t h = my_hasher_lp<Key>(key) & allocated_mask;
+
+		if (data[h].val == empty_value)
+		{
+			data[h].key = key;
+			data[h].val = 0;
+			++filled;
+
+			return data[h].val;
+		}
+
+		if (data[h].key == key)
+			return data[h].val;
+
+		h = (h + 1) & allocated_mask;
+
+		while (data[h].val != empty_value)
+		{
+			if (data[h].key == key)
+			{
+				return data[h].val;
+			}
+			else
+			{
+				h = (h + 1) & allocated_mask;
+			}
+		}
+
+		data[h].key = key;
+		data[h].val = 0;
+		++filled;
+
+		return data[h].val;
+	}
+
+	// *****************************************************************************************
+	//
+	bool need_reserve_for_additional(size_t n_elems)
+	{
+		return filled + n_elems > allocated * max_fill_factor;
 	}
 
 	// *****************************************************************************************
@@ -474,4 +580,47 @@ public:
 		return file.good();
 	}
 
+	// *****************************************************************************************
+	//
+	bool deserialize_into_vector(std::ifstream& file, item_t* buffer, size_t buf_size, vector<pair<Key, Value>> &vec, bool skipData) {
+
+		file.read(reinterpret_cast<char*>(&max_fill_factor), sizeof(max_fill_factor));
+
+		file.read(reinterpret_cast<char*>(&filled), sizeof(filled));
+		file.read(reinterpret_cast<char*>(&allocated), sizeof(allocated));
+		file.read(reinterpret_cast<char*>(&size_when_restruct), sizeof(size_when_restruct));
+		file.read(reinterpret_cast<char*>(&allocated_mask), sizeof(allocated_mask));
+
+		file.read(reinterpret_cast<char*>(&ht_memory), sizeof(ht_memory));
+		file.read(reinterpret_cast<char*>(&ht_total), sizeof(ht_total));
+		file.read(reinterpret_cast<char*>(&ht_match), sizeof(ht_match));
+
+		// load bit vectors of filled slots
+		size_t bv_size = (allocated + 63) / 64;
+
+		if (skipData) {
+			// skip bit vectors and raw data
+			file.seekg(sizeof(uint64_t) * bv_size, ios_base::cur);
+			file.seekg(sizeof(uint64_t) * filled, ios_base::cur);
+		}
+		else {
+			file.seekg(sizeof(uint64_t) * bv_size, ios_base::cur);
+
+			vec.resize(filled);
+
+			// load in portions
+			size_t remaining = filled;
+
+			char* vec_ptr = reinterpret_cast<char*>(vec.data());
+
+			while (remaining)
+			{
+				file.read(vec_ptr, sizeof(uint64_t) * std::min(buf_size, remaining));
+				vec_ptr += sizeof(uint64_t) * std::min(buf_size, remaining);
+				remaining -= std::min(buf_size, remaining);
+			}
+		}
+
+		return file.good();
+	}
 };

@@ -17,7 +17,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 
 #define LOG_VERBOSE Log::getInstance(Log::LEVEL_VERBOSE)
 #define LOG_DEBUG Log::getInstance(Log::LEVEL_DEBUG)
-#define LOG_NORMAL Log::getInstance(Log::LEVEL_DEBUG)
+#define LOG_NORMAL Log::getInstance(Log::LEVEL_NORMAL)
 
 
 class LockedStream {

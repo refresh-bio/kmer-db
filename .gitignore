@@ -18,3 +18,5 @@
 /src/kmer_db.vcxproj.user
 /src/.vs
 /kmer-db
+/src/kmer_db/x64
+/libs/nasm

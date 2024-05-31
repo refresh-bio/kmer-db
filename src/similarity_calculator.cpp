@@ -1,12 +1,23 @@
+// build -k 25 -t 32 -multisample-fasta fl.txt part_00000.kdb
+// all2all-sp -sparse -t 32 part_00000.kdb part_00000.a2as
+
 #include "similarity_calculator.h"
+#include "parallel_sorter.h"
+#include "../libs/refresh/pdqsort_par.h"
+
+#if defined(ARCH_X64)
+#include <emmintrin.h>
+#include <immintrin.h>
+#elif defined(ARCH_ARM)
+#include <arm_neon.h>
+#endif
 
 #include <unordered_map>
 #include <algorithm>
 #include <numeric>
-#include <emmintrin.h>
-#include <immintrin.h>
-#include "instrset.h"
-
+#include "instr_set_detect.h"
+#include <barrier>
+#include <future>
 
 // *****************************************************************************************
 //
@@ -14,7 +25,14 @@ SimilarityCalculator::SimilarityCalculator(int _num_threads, size_t cacheBufferM
 	// hardware_concurrency may return 0
 	num_threads(_num_threads > 0 ? _num_threads : std::max((int)std::thread::hardware_concurrency(), 1)),
 	cacheBufferMb(cacheBufferMb) {
-	avx2_present = instrset_detect() >= 8;
+
+#if defined(ARCH_X64)
+	// !!! TODO: do zmiany ten instrset_detect()
+	auto instr = InstrSetDetect::GetInstr();
+	avx2_present = (instr == InstrSetDetect::Instr::AVX2);
+#elif defined(ARCH_ARM)
+	// 
+#endif
 }
 
 // *****************************************************************************************
@@ -84,57 +102,60 @@ void SimilarityCalculator::all2all(PrefixKmerDb& db, LowerTriangularMatrix<uint3
 	for (int i = 0; i < num_threads; ++i)
 		v_hist_ids[i] = i;
 
+	bool use_busy_wait = num_threads >= 8;
 
 	// Decompress patterns
 	for (int tid = 0; tid < num_threads; ++tid) {
 		workers_decomp[tid] = std::thread([this, samples_count, &patterns, &sample2pattern, &v_range_patterns, &tasks_decomp_queue, &semaphore_decomp, &rawPatterns, &first_pid, &patternsBuffer, &hist_sample_ids]
 		{
-			while (!tasks_decomp_queue.IsCompleted())
+			pair<int, uint32_t> decomp_task;
+
+			while (tasks_decomp_queue.Pop(decomp_task))
 			{
-				pair<int, uint32_t> decomp_task;
+				int part_id = decomp_task.first;
+				auto &my_hist_sample_ids = hist_sample_ids[part_id];
+				my_hist_sample_ids.clear();
+				my_hist_sample_ids.resize(samples_count, 0);
 
-				if (tasks_decomp_queue.Pop(decomp_task))
+				int f_pid = v_range_patterns[part_id];
+				int l_pid = v_range_patterns[part_id + 1];
+				auto currentPtr = patternsBuffer.data() + decomp_task.second;
+
+				for (int pid = f_pid; pid < l_pid; ++pid)
 				{
-					int part_id = decomp_task.first;
-					auto &my_hist_sample_ids = hist_sample_ids[part_id];
-					my_hist_sample_ids.clear();
-					my_hist_sample_ids.resize(samples_count, 0);
+					const auto& pattern = patterns[pid];
 
-					int f_pid = v_range_patterns[part_id];
-					int l_pid = v_range_patterns[part_id + 1];
-					auto currentPtr = patternsBuffer.data() + decomp_task.second;
+					currentPtr += pattern.get_num_samples();
+					uint32_t* out = currentPtr;		// start from the end
 
-					for (int pid = f_pid; pid < l_pid; ++pid)
-					{
-						const auto& pattern = patterns[pid];
+													// decode all samples from pattern and its parents
+					int64_t current_id = pid;
+					while (current_id >= 0) {
+						const auto& cur = patterns[current_id];
+						auto parent_id = cur.get_parent_id();
 
-						currentPtr += pattern.get_num_samples();
-						uint32_t* out = currentPtr;		// start from the end
+						if (parent_id >= 0)
+//							_mm_prefetch((const char*)(patterns.data() + parent_id), _MM_HINT_T0);
+#ifdef WIN32
+							_mm_prefetch((const char*)(patterns.data() + parent_id), _MM_HINT_T0);
+#else
+							__builtin_prefetch(patterns.data() + parent_id);
+#endif
 
-														// decode all samples from pattern and its parents
-						int64_t current_id = pid;
-						while (current_id >= 0) {
-							const auto& cur = patterns[current_id];
-							auto parent_id = cur.get_parent_id();
+						out -= cur.get_num_local_samples();
+						cur.decodeSamples(out);
 
-							if (parent_id >= 0)
-								_mm_prefetch((const char*)(patterns.data() + parent_id), _MM_HINT_T0);
-
-							out -= cur.get_num_local_samples();
-							cur.decodeSamples(out);
-
-							current_id = parent_id;
-						}
-						rawPatterns[pid - first_pid] = out; // begin of unpacked pattern
-
-						int num_samples = pattern.get_num_samples();
-						int num_local_samples = pattern.get_num_local_samples();
-						for (int i = num_samples - num_local_samples; i < num_samples; ++i)
-							++my_hist_sample_ids[out[i]];
+						current_id = parent_id;
 					}
+					rawPatterns[pid - first_pid] = out; // begin of unpacked pattern
 
-					semaphore_decomp.dec();
+					int num_samples = pattern.get_num_samples();
+					int num_local_samples = pattern.get_num_local_samples();
+					for (int i = num_samples - num_local_samples; i < num_samples; ++i)
+						++my_hist_sample_ids[out[i]];
 				}
+
+				semaphore_decomp.dec();
 			}
 		});
 	}
@@ -145,11 +166,12 @@ void SimilarityCalculator::all2all(PrefixKmerDb& db, LowerTriangularMatrix<uint3
 			this, &patterns, &sample2pattern, &v_range_patterns, &tasks_sample2patterns_queue, 
 				&semaphore_sample2patterns, &rawPatterns, &first_pid, &patternsBuffer, &hist_sample_ids]
 		{
-			while (!tasks_sample2patterns_queue.IsCompleted())
-			{
+//			while (!tasks_sample2patterns_queue.IsCompleted())
+//			{
 				int part_id;
 
-				if (tasks_sample2patterns_queue.Pop(part_id))
+//				if (tasks_sample2patterns_queue.Pop(part_id))
+				while (tasks_sample2patterns_queue.Pop(part_id))
 				{
 					auto &my_hist_sample_ids = hist_sample_ids[part_id];
 
@@ -174,102 +196,100 @@ void SimilarityCalculator::all2all(PrefixKmerDb& db, LowerTriangularMatrix<uint3
 
 					semaphore_sample2patterns.dec();
 				}
-			}
+//			}
 		});
 	}
 
 	// increment array elements in threads
 	for (int tid = 0; tid < num_threads; ++tid) {
 		workers_matrix[tid] = std::thread([this, &patterns, &sample2pattern, &rawPatterns, &workerRanges, &matrix, &tasks_matrix_queue, &first_pid, &semaphore_matrix, &numAdditions] {
-			uint64_t localAdditions = 0;
-
+			
 			int range_id;
 
-			while (!tasks_matrix_queue.IsCompleted())
+			while (tasks_matrix_queue.Pop(range_id))
 			{
-				if (tasks_matrix_queue.Pop(range_id))
-				{
-					for (size_t id = workerRanges[range_id]; id < workerRanges[range_id + 1]; ) {
-						sample_id_t Si = get<0>(sample2pattern[id]);
-						uint32_t *row = matrix[Si];
-						while (id < workerRanges[range_id + 1] && get<0>(sample2pattern[id]) == Si) {
-							int local_pid = get<1>(sample2pattern[id]);
-							const auto& pattern = patterns[local_pid + first_pid];
+				for (size_t id = workerRanges[range_id]; id < workerRanges[range_id + 1]; ) {
+					sample_id_t Si = get<0>(sample2pattern[id]);
+					uint32_t *row = matrix[Si];
+					while (id < workerRanges[range_id + 1] && get<0>(sample2pattern[id]) == Si) {
+						int local_pid = get<1>(sample2pattern[id]);
+						const auto& pattern = patterns[local_pid + first_pid];
 
-							uint32_t* rawData = rawPatterns[local_pid];
-							int num_samples = get<2>(sample2pattern[id]);
-							uint32_t to_add = pattern.get_num_kmers();
+						uint32_t* rawData = rawPatterns[local_pid];
+						int num_samples = get<2>(sample2pattern[id]);
+						uint32_t to_add = pattern.get_num_kmers();
 
 #ifdef ALL_STATS
-							localAdditions += num_samples;
+						localAdditions += num_samples;
 #endif
 
-							auto *p = rawData;
+						auto *p = rawData;
 
-							row_add(row, p, num_samples, to_add, avx2_present);
-							++id;
-						}
+						row_add(row, p, num_samples, to_add, avx2_present);
+						++id;
 					}
-					semaphore_matrix.dec();
 				}
+				semaphore_matrix.dec();
 			}
+
+#ifdef ALL_STATS
 			numAdditions.fetch_add(localAdditions);
+#endif
 		});
 	}
 
 	// calculate histogram
 	for (int tid = 0; tid < num_threads; ++tid)
 		workers_histogram[tid] = std::thread([&hist_boundary_values, &tasks_histogram_queue, samples_count, this, &v_tmp,
-			&hist_sample_ids, &semaphore_hist_first, &semaphore_hist_second] {
+			&hist_sample_ids, &semaphore_hist_first, &semaphore_hist_second, &use_busy_wait] {
 		int task_id;
 
-		while (!tasks_histogram_queue.IsCompleted())
+		while (tasks_histogram_queue.Pop(task_id))
 		{
-			if (tasks_histogram_queue.Pop(task_id))
-			{
-				int first_sample = samples_count * task_id / num_threads;
-				int last_sample = samples_count * (task_id + 1) / num_threads;
+			int first_sample = samples_count * task_id / num_threads;
+			int last_sample = samples_count * (task_id + 1) / num_threads;
 
-				int sum = 0;
-				int max_j = v_tmp.size();
-				for (int i = first_sample; i < last_sample; ++i)
-					for (int j = 0; j < max_j; ++j)
-					{
-						int x = hist_sample_ids[j][i];
-						hist_sample_ids[j][i] = sum;
-						sum += x;
-					}
+			int sum = 0;
+			int max_j = v_tmp.size();
+			for (int i = first_sample; i < last_sample; ++i)
+				for (int j = 0; j < max_j; ++j)
+				{
+					int x = hist_sample_ids[j][i];
+					hist_sample_ids[j][i] = sum;
+					sum += x;
+				}
 
-				hist_boundary_values[task_id] = sum;
-				semaphore_hist_first.dec_notify_all();
+			hist_boundary_values[task_id] = sum;
+			semaphore_hist_first.dec_notify_all();
+			if(use_busy_wait)
+				semaphore_hist_first.waitForZeroBusy();
+			else
 				semaphore_hist_first.waitForZero();
 
-				int to_add = 0;
-				for (int i = 0; i < task_id; ++i)
-					to_add += hist_boundary_values[i];
+			int to_add = 0;
+			for (int i = 0; i < task_id; ++i)
+				to_add += hist_boundary_values[i];
 
-				for (int j = 0; j < max_j; ++j)
-					for (int i = first_sample; i < last_sample; ++i)
-						hist_sample_ids[j][i] += to_add;
-				semaphore_hist_second.dec();
-			}
+			for (int j = 0; j < max_j; ++j)
+				for (int i = first_sample; i < last_sample; ++i)
+					hist_sample_ids[j][i] += to_add;
+			semaphore_hist_second.dec();
 		}
 	});
 
 	// process all patterns in blocks determined by buffer size
-	std::cout << std::endl;
+	//LOG_NORMAL << std::endl;
 
 	double decomp_time = 0;
 	double hist_time = 0;
 	double patterns_time = 0;
 
-	size_t pid_to_cout = 0;
+	size_t percent = 0;
 	for (size_t pid = 0; pid < patterns.size(); ) {
-		if (pid >= pid_to_cout)
-		{
-			std::cout << pid << " of " << patterns.size() << "\r";
-			fflush(stdout);
-			pid_to_cout += 50000;
+		
+		if (pid * 100 / patterns.size() >= percent) {
+			LOG_NORMAL << "\r" << percent << "%" << std::flush;
+			++percent;
 		}
 
 		first_pid = pid;
@@ -284,6 +304,7 @@ void SimilarityCalculator::all2all(PrefixKmerDb& db, LowerTriangularMatrix<uint3
 		v_tmp.clear();
 		v_tmp_int.clear();
 
+		// !!! Fix me: what if no_samples > bufsize?
 		while (pid < patterns.size() && samplesCount + patterns[pid].get_num_samples() < bufsize && part_id < no_hist_parts) {
 			const auto& pattern = patterns[pid];
 
@@ -304,14 +325,22 @@ void SimilarityCalculator::all2all(PrefixKmerDb& db, LowerTriangularMatrix<uint3
 		v_range_patterns[part_id] = pid;
 		semaphore_decomp.inc(v_tmp.size());
 		tasks_decomp_queue.PushRange(v_tmp);
-		semaphore_decomp.waitForZero();
+
+		if(use_busy_wait)
+			semaphore_decomp.waitForZeroBusy();
+		else
+			semaphore_decomp.waitForZero();
 
 		auto t2 = std::chrono::high_resolution_clock::now();
 
 		semaphore_hist_first.inc(num_threads);
 		semaphore_hist_second.inc(num_threads);
 		tasks_histogram_queue.PushRange(v_hist_ids);
-		semaphore_hist_second.waitForZero();
+
+		if (use_busy_wait)
+			semaphore_hist_second.waitForZeroBusy();
+		else
+			semaphore_hist_second.waitForZero();
 
 		auto t3 = std::chrono::high_resolution_clock::now();
 
@@ -321,7 +350,11 @@ void SimilarityCalculator::all2all(PrefixKmerDb& db, LowerTriangularMatrix<uint3
 
 		semaphore_sample2patterns.inc(v_tmp_int.size());
 		tasks_sample2patterns_queue.PushRange(v_tmp_int);
-		semaphore_sample2patterns.waitForZero();
+
+		if (use_busy_wait)
+			semaphore_sample2patterns.waitForZeroBusy();
+		else
+			semaphore_sample2patterns.waitForZero();
 
 		auto t4 = std::chrono::high_resolution_clock::now();
 
@@ -332,7 +365,6 @@ void SimilarityCalculator::all2all(PrefixKmerDb& db, LowerTriangularMatrix<uint3
 		decomp_time += dt1.count();
 		hist_time += dt2.count();
 		patterns_time += dt3.count();
-
 		
 		// determine ranges of blocks processed by threads 
 		workerRanges.assign(no_ranges + 1, sample2pattern.size());
@@ -368,9 +400,13 @@ void SimilarityCalculator::all2all(PrefixKmerDb& db, LowerTriangularMatrix<uint3
 
 		semaphore_matrix.inc(no_ranges);
 		tasks_matrix_queue.PushRange(v_range_ids);
-		semaphore_matrix.waitForZero();
-	}
 
+		if (use_busy_wait)
+			semaphore_matrix.waitForZeroBusy();
+		else
+			semaphore_matrix.waitForZero();
+	}
+	
 	tasks_matrix_queue.MarkCompleted();
 	tasks_decomp_queue.MarkCompleted();
 	tasks_sample2patterns_queue.MarkCompleted();
@@ -388,13 +424,151 @@ void SimilarityCalculator::all2all(PrefixKmerDb& db, LowerTriangularMatrix<uint3
 	for (auto &w : workers_histogram)
 		w.join();
 
-	cout << "Decomp   time: " << decomp_time << endl;
-	cout << "Hist     time: " << hist_time << endl;
-	cout << "Sample2p time: " << patterns_time << endl;
+	LOG_NORMAL << "\r100%" << std::flush << "\r" << std::flush;
+
+	LOG_VERBOSE << "  Decomp   time: " << decomp_time << endl;
+	LOG_VERBOSE << "  Hist     time: " << hist_time << endl;
+	LOG_VERBOSE << "  Sample2p time: " << patterns_time << endl;
 
 #ifdef ALL_STATS
-	cout << "Number of additions:" << numAdditions << endl;
+	LOG_NORMAL << "Number of additions:" << numAdditions << endl;
 #endif
+}
+
+// *****************************************************************************************
+//
+void SimilarityCalculator::all2all_sp(PrefixKmerDb& db, SparseMatrix<uint32_t>& matrix) const
+{
+	auto& patterns = db.getPatterns();
+	
+	matrix.resize(db.getSamplesCount());
+
+	size_t buf_size = cacheBufferMb * 1000000 / sizeof(uint32_t);
+
+	if (buf_size < db.getSamplesCount())
+		buf_size = 2 * db.getSamplesCount();
+
+	std::vector<uint32_t> patternsBuffer_cur(buf_size);
+	std::vector<uint32_t> patternsBuffer_next(buf_size);
+
+	// Set number of k-mers to internal nodes
+//	int num_patterns = patterns.size();
+/*	for (int i = num_patterns - 1; i > 0; --i)
+	{
+		int parent_id = patterns[i].get_parent_id();
+
+		if (parent_id >= 0)
+			patterns[parent_id].add_num_kmers(patterns[i].get_num_kmers());
+	}*/
+
+	vector<pair<uint32_t, uint32_t*>> pattern_ptrs_cur;
+	vector<pair<uint32_t, uint32_t*>> pattern_ptrs_next;
+
+	auto t1 = std::chrono::high_resolution_clock::now();
+
+	barrier bar_patterns(num_threads + 1);
+
+	size_t percent = 0;
+
+	thread thr_pattern_decompress([&] {
+		auto& patterns = db.getPatterns();
+		size_t buf_pos = 0;
+
+	
+		for (size_t i = 0; i < patterns.size(); ++i)
+		{
+			if (i * 100 / patterns.size() >= percent) {
+				LOG_NORMAL << "\r" << percent << "%" << std::flush;
+				++percent;
+			}
+			
+			const auto& ps = patterns[i];
+
+			if (buf_pos + ps.get_num_samples() >= buf_size)
+			{
+				bar_patterns.arrive_and_wait();
+				swap(pattern_ptrs_cur, pattern_ptrs_next);
+				swap(patternsBuffer_cur, patternsBuffer_next);
+				bar_patterns.arrive_and_wait();
+
+				pattern_ptrs_next.clear();
+				buf_pos = 0;
+			}
+
+			uint32_t* buf_ptr = patternsBuffer_next.data() + buf_pos;
+			decode_pattern_samples(patterns, i, buf_ptr);
+
+			pattern_ptrs_next.emplace_back(ps.get_num_samples(), buf_ptr);
+			buf_pos += ps.get_num_samples();
+		}
+
+		bar_patterns.arrive_and_wait();
+		swap(pattern_ptrs_cur, pattern_ptrs_next);
+		swap(patternsBuffer_cur, patternsBuffer_next);
+		bar_patterns.arrive_and_wait();
+
+		if (!patternsBuffer_cur.empty())
+		{
+			bar_patterns.arrive_and_wait();
+			patternsBuffer_cur.clear();
+			bar_patterns.arrive_and_wait();
+		}
+
+		});
+
+	vector<thread> thr_workers;
+	thr_workers.reserve(num_threads);
+
+	for (int i = 0; i < num_threads; ++i)
+		thr_workers.emplace_back([&, i] {
+		uint32_t thread_id = i;
+		uint32_t my_mod = thread_id % num_threads;
+		uint32_t pid = 0;
+
+		bar_patterns.arrive_and_wait();
+		bar_patterns.arrive_and_wait();
+
+		while (true)
+		{
+			if (patternsBuffer_cur.empty())
+				break;
+
+//			LOG_NORMAL << to_string(thread_id) + " ";
+
+			for (const auto& pat : pattern_ptrs_cur)
+			{
+				uint32_t to_add = patterns[pid++].get_num_kmers();
+
+				for (uint32_t j = 0; j < pat.first; ++j)
+				{
+					uint32_t *pat_data = pat.second;
+					uint32_t row_id = pat_data[j];
+
+					if (row_id % num_threads != my_mod)
+						continue;
+
+					auto& row_data = matrix[row_id];
+
+					for (uint32_t k = 0; k < j; ++k)
+						row_data[pat_data[k]] += to_add;
+				}
+			}
+
+			bar_patterns.arrive_and_wait();
+			bar_patterns.arrive_and_wait();
+		}
+			});
+
+	thr_pattern_decompress.join();
+	for (auto& t : thr_workers)
+		t.join();
+
+	auto t2 = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> dt1 = t2 - t1;
+
+	LOG_NORMAL << "\r100%" << std::flush << "\r" << std::flush;
+
+	//LOG_VERBOSE << "All2All Sparse computation time: " << dt1.count() << endl;
 }
 
 // *****************************************************************************************
@@ -485,12 +659,19 @@ void  SimilarityCalculator::one2all<true>(const PrefixKmerDb& db, const kmer_t* 
 
 			for (size_t id = lo; id < hi; ++id) {
 				if (id + 1 < hi)
+//					_mm_prefetch((const char*)(patterns.data() + patterns2countVector[id + 1].first), _MM_HINT_T0);
+#ifdef WIN32
 					_mm_prefetch((const char*)(patterns.data() + patterns2countVector[id + 1].first), _MM_HINT_T0);
+#else
+					__builtin_prefetch((const char*)(patterns.data() + patterns2countVector[id + 1].first));
+#endif
 
-				auto pid = patterns2countVector[id].first;
-				const auto& pattern = patterns[pid];
-				int num_samples = pattern.get_num_samples();
 				int to_add = patterns2countVector[id].second;
+				auto pid = patterns2countVector[id].first;
+
+				int num_samples = decode_pattern_samples(patterns, pid, samples.data());
+/*				const auto& pattern = patterns[pid];
+				int num_samples = pattern.get_num_samples();
 
 				uint32_t* out = samples.data() + pattern.get_num_samples(); // start from the end
 
@@ -502,7 +683,7 @@ void  SimilarityCalculator::one2all<true>(const PrefixKmerDb& db, const kmer_t* 
 					cur.decodeSamples(out);
 
 					current_id = cur.get_parent_id();
-				}
+				}*/
 
 				auto *p = samples.data();
 
@@ -609,7 +790,12 @@ void SimilarityCalculator::one2all<false>(const PrefixKmerDb& db, const kmer_t* 
 		
 	for (size_t id = lo; id < hi; ++id) {
 		if (id + 1 < hi)
+//			_mm_prefetch((const char*)(patterns.data() + patterns2countVector[id + 1].first), _MM_HINT_T0);
+#ifdef WIN32
 			_mm_prefetch((const char*)(patterns.data() + patterns2countVector[id + 1].first), _MM_HINT_T0);
+#else
+			__builtin_prefetch((const char*)(patterns.data() + patterns2countVector[id + 1].first));
+#endif
 
 		auto pid = patterns2countVector[id].first;
 		const auto& pattern = patterns[pid];
@@ -651,4 +837,436 @@ void SimilarityCalculator::one2all<false>(const PrefixKmerDb& db, const kmer_t* 
 
 	dt = std::chrono::high_resolution_clock::now() - start;
 	LOG_VERBOSE << "Pattern unpacking time: " << dt.count() << endl ;
+}
+
+// *****************************************************************************************
+//
+void SimilarityCalculator::db2db(const PrefixKmerDb& db1, const PrefixKmerDb& db2, LowerTriangularMatrix<uint32_t>& matrix) const
+{
+	// Just part of the code
+
+/*	auto& ht1 = db1.getHashtables();
+	auto& ht2 = db2.getHashtables();
+
+	vector<thread> threads;
+	vector<vector<pair<pattern_id_t, pattern_id_t>>> kmer_matchings(num_threads);
+
+	vector<pair<size_t, int>> prefix_order;
+
+	prefix_order.reserve(ht1.size());
+
+	for (size_t i = 0; i < ht1.size(); ++i)
+		prefix_order.emplace_back(ht1[i].get_size() + ht2[i].get_size(), i);
+
+	sort(prefix_order.rbegin(), prefix_order.rend());
+
+	atomic<int> prefix = 0;
+
+	// Find pairs of same k-mers in both databases
+	for (int i = 0; i < num_threads; ++i)
+		threads.emplace_back([&, i] {
+			int thread_id = i;
+
+			vector<pair<suffix_t, pattern_id_t>> kp1, kp2;
+
+			auto& my_res = kmer_matchings[thread_id];
+
+			while (true)
+			{
+				int c_id = prefix.fetch_add(1);
+				if (c_id >= ht1.size())
+					break;
+
+				int h_id = prefix_order[c_id].second;
+				const auto& sht1 = ht1[h_id];
+				const auto& sht2 = ht2[h_id];
+
+				kp1.clear();
+				kp2.clear();
+				kp1.reserve(sht1.get_size());
+				kp2.reserve(sht2.get_size());
+
+				for (auto p = sht1.cbegin(); p != sht1.cend(); ++p)
+					if (p->val != sht1.empty_value)
+						kp1.emplace_back(p->key, p->val);
+
+				for (auto p = sht2.cbegin(); p != sht2.cend(); ++p)
+					if (p->val != sht2.empty_value)
+						kp2.emplace_back(p->key, p->val);
+
+				sort(kp1.begin(), kp1.end());
+				sort(kp2.begin(), kp2.end());
+
+				size_t i1 = 0;
+				size_t i2 = 0;
+				
+				while (i1 < kp1.size() && i2 < kp2.size())
+				{
+					if (kp1[i1].first == kp2[i2].first)
+						my_res.emplace_back(kp1[i1++].second, kp2[i2++].second);
+					else if (kp1[i1].first < kp2[i2].first)
+						++i1;
+					else
+						++i2;
+				}
+			}
+			});
+
+	for (auto& t : threads)
+		t.join();
+	threads.clear();
+
+	// Gather kmer matchings
+	vector<pair<pattern_id_t, pattern_id_t>> global_kmer_matchings;
+	vector<pair<pair<pattern_id_t, pattern_id_t>, size_t>> global_kmer_matchings_counts;
+	size_t n_pairs = 0;
+	for (const auto& x : kmer_matchings)
+		n_pairs += x.size();
+
+	global_kmer_matchings.reserve(n_pairs);
+
+	for (const auto& x : kmer_matchings)
+		global_kmer_matchings.insert(global_kmer_matchings.end(), x.begin(), x.end());
+
+	kmer_matchings.clear();
+	kmer_matchings.shrink_to_fit();
+
+	sort(global_kmer_matchings.begin(), global_kmer_matchings.end());
+
+	if (!global_kmer_matchings.empty())
+	{
+		global_kmer_matchings_counts.emplace_back(global_kmer_matchings.front(), 1);
+		for (size_t i = 1; i < global_kmer_matchings.size(); ++i)
+			if (global_kmer_matchings[i] == global_kmer_matchings_counts.back().first)
+				++global_kmer_matchings_counts.back().second;
+			else
+				global_kmer_matchings_counts.emplace_back(global_kmer_matchings[i], 1);
+	}
+
+	// Calculate matrix
+	auto no_samples1 = db1.getKmersCount();
+	auto no_samples2 = db2.getKmersCount();
+	matrix.resize(no_samples1 + no_samples2);
+//	matrix.clear();
+
+	size_t buf_size = cacheBufferMb * 1000000 / sizeof(uint32_t);
+	std::vector<uint32_t> patternsBuffer_cur(buf_size);
+	std::vector<uint32_t> patternsBuffer_next(buf_size);
+
+	vector<tuple<uint32_t, uint32_t, uint32_t*, uint32_t*>> pattern_ptrs_cur;
+	vector<tuple<uint32_t, uint32_t, uint32_t*, uint32_t*>> pattern_ptrs_next;
+
+	barrier bar_patterns(num_threads + 1);
+
+	thread thr_pattern_decompress([&]{
+		auto& patterns1 = db1.getPatterns();
+		auto& patterns2 = db2.getPatterns();
+		size_t buf_pos = 0;
+
+		for (size_t i = 0; i < global_kmer_matchings_counts.size(); ++i)
+		{
+			auto pid1 = global_kmer_matchings_counts[i].first.first;
+			auto pid2 = global_kmer_matchings_counts[i].first.second;
+
+			const auto &ps1 = patterns1[pid1];
+			const auto &ps2 = patterns2[pid2];
+
+			if (buf_pos + ps1.get_num_samples() + ps1.get_num_samples() >= buf_size)
+			{
+				bar_patterns.arrive_and_wait();
+				bar_patterns.arrive_and_wait();
+				buf_pos = 0;
+//				pattern_ptr
+			}
+
+			uint32_t* buf_ptr1 = patternsBuffer_next.data() + buf_pos;
+			uint32_t* buf_ptr2 = patternsBuffer_next.data() + buf_pos + ps1.get_num_samples();
+			decode_pattern_samples(patterns1, pid1, buf_ptr1);
+			decode_pattern_samples(patterns1, pid1, buf_ptr2);
+
+			pattern_ptrs_cur.emplace_back(ps1.get_num_samples(), ps2.get_num_samples(), buf_ptr1, buf_ptr2);
+		}
+		});
+
+	vector<thread> thr_workers;
+	thr_workers.reserve(num_threads);
+
+	for (int i = 0; i < num_threads; ++i)
+		thr_workers.emplace_back([&] {
+			while (true)
+			{
+				bar_patterns.arrive_and_wait();
+
+				if (patternsBuffer_cur.empty())
+					break;
+
+			}
+		});
+
+
+	atomic<size_t> km_idx = 0;
+*/
+}
+
+// *****************************************************************************************
+//
+void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, SparseMatrix<uint32_t>& matrix) const
+{
+//	auto& ht1 = db1.getHashtables();
+//	auto& ht2 = db2.getHashtables();
+	auto& sk1 = db1.getSuffixKmers();
+	auto& sk2 = db2.getSuffixKmers();
+
+	size_t samples_count1 = db1.getSamplesCount();
+	size_t samples_count2 = db2.getSamplesCount();
+
+	matrix.resize(samples_count1 + samples_count2);
+
+	vector<thread> threads;
+	vector<vector<pair<pattern_id_t, pattern_id_t>>> kmer_matchings(num_threads);
+
+	vector<pair<size_t, int>> prefix_order;
+
+//	prefix_order.reserve(ht1.size());
+	prefix_order.reserve(sk1.size());
+
+//	for (size_t i = 0; i < ht1.size(); ++i)
+//		prefix_order.emplace_back(ht1[i].get_size() + ht2[i].get_size(), i);
+	for (size_t i = 0; i < sk1.size(); ++i)
+		prefix_order.emplace_back(sk1[i].size() + sk2[i].size(), i);
+
+//	sort(prefix_order.rbegin(), prefix_order.rend());
+	refresh::sort::pdqsort_branchless(prefix_order.rbegin(), prefix_order.rend());
+
+	atomic<int> prefix = 0;
+
+//	LOG_NORMAL << "\nK-mer comparing: " + to_string(0) + " of " + to_string(ht1.size()) << "\r";
+
+	// Find pairs of same k-mers in both databases
+	for (int i = 0; i < num_threads; ++i)
+		threads.emplace_back([&, i] {
+		int thread_id = i;
+
+		vector<pair<suffix_t, pattern_id_t>> kp1, kp2;
+
+		auto& my_res = kmer_matchings[thread_id];
+
+		while (true)
+		{
+			int c_id = prefix.fetch_add(1);
+//			if (c_id >= ht1.size())
+			if (c_id >= (int)sk1.size())
+				break;
+
+			int h_id = prefix_order[c_id].second;
+//			const auto& sht1 = ht1[h_id];
+//			const auto& sht2 = ht2[h_id];
+			auto& lsk1 = sk1[h_id];
+			auto& lsk2 = sk2[h_id];
+
+//			sort(lsk1.begin(), lsk1.end());
+//			sort(lsk2.begin(), lsk2.end());
+			refresh::sort::pdqsort_branchless(lsk1.begin(), lsk1.end());
+			refresh::sort::pdqsort_branchless(lsk2.begin(), lsk2.end());
+
+			size_t i1 = 0;
+			size_t i2 = 0;
+
+			while (i1 < lsk1.size() && i2 < lsk2.size())
+			{
+				if (lsk1[i1].first == lsk2[i2].first)
+					my_res.emplace_back(lsk1[i1++].second, lsk2[i2++].second);
+				else if (lsk1[i1].first < lsk2[i2].first)
+					++i1;
+				else
+					++i2;
+			}
+
+//			if (sht1.get_size() < sht2.get_size())
+/* {
+				for (auto p = sht1.cbegin(); p != sht1.cend(); ++p)
+					if (p->val != sht1.empty_value)
+					{
+						auto q = sht2.find(p->key);
+						if (q != nullptr)
+							my_res.emplace_back(p->val, *q);
+					}
+			}*/
+/*			else
+			{
+				for (auto q = sht2.cbegin(); q != sht2.cend(); ++q)
+					if (q->val != sht2.empty_value)
+					{
+						auto p = sht1.find(q->key);
+						if (p != nullptr)
+							my_res.emplace_back(*p, q->val);
+					}
+			}*/
+
+		}
+			});
+
+	for (auto& t : threads)
+		t.join();
+
+//	LOG_NORMAL << "K-mer comparing: " + to_string(ht1.size()) + " of " + to_string(ht1.size()) << "\n";
+
+	threads.clear();
+
+	// Gather kmer matchings
+	vector<pair<pattern_id_t, pattern_id_t>> global_kmer_matchings;
+	vector<pair<pair<pattern_id_t, pattern_id_t>, size_t>> global_kmer_matchings_counts;
+	size_t n_pairs = 0;
+	for (const auto& x : kmer_matchings)
+		n_pairs += x.size();
+
+	LOG_DEBUG << "No. of matched pairs: " << n_pairs << endl;
+
+	global_kmer_matchings.reserve(n_pairs);
+
+	for (const auto& x : kmer_matchings)
+		global_kmer_matchings.insert(global_kmer_matchings.end(), x.begin(), x.end());
+
+	kmer_matchings.clear();
+	kmer_matchings.shrink_to_fit();
+
+//	sort(global_kmer_matchings.begin(), global_kmer_matchings.end());
+	ParallelSort(global_kmer_matchings.data(), global_kmer_matchings.size(), num_threads);
+
+	if (!global_kmer_matchings.empty())
+	{
+		global_kmer_matchings_counts.emplace_back(global_kmer_matchings.front(), 1);
+		for (size_t i = 1; i < global_kmer_matchings.size(); ++i)
+			if (global_kmer_matchings[i] == global_kmer_matchings_counts.back().first)
+				++global_kmer_matchings_counts.back().second;
+			else
+				global_kmer_matchings_counts.emplace_back(global_kmer_matchings[i], 1);
+	}
+
+	// Calculate matrix
+	auto no_samples1 = db1.getSamplesCount();
+	auto no_samples2 = db2.getSamplesCount();
+//	matrix.resize(no_samples1 + no_samples2);
+	matrix.resize(no_samples1);
+	//	matrix.clear();
+
+	size_t buf_size = max<size_t>(2*(no_samples1 + no_samples2), cacheBufferMb * 1000000) / sizeof(uint32_t);
+	std::vector<uint32_t> patternsBuffer_cur(buf_size);
+	std::vector<uint32_t> patternsBuffer_next(buf_size);
+
+	vector<tuple<uint32_t, uint32_t, uint32_t*, uint32_t*>> pattern_ptrs_cur;
+	vector<tuple<uint32_t, uint32_t, uint32_t*, uint32_t*>> pattern_ptrs_next;
+
+	auto t1 = std::chrono::high_resolution_clock::now();
+
+	barrier bar_patterns(num_threads + 1);
+
+	thread thr_pattern_decompress([&] {
+		auto& patterns1 = db1.getPatterns();
+		auto& patterns2 = db2.getPatterns();
+		size_t buf_pos = 0;
+
+		LOG_DEBUG << "Pattern pairs: " << 0 << " of " << global_kmer_matchings_counts.size() << "\r" << std::flush;
+
+		for (size_t i = 0; i < global_kmer_matchings_counts.size(); ++i)
+		{
+			auto pid1 = global_kmer_matchings_counts[i].first.first;
+			auto pid2 = global_kmer_matchings_counts[i].first.second;
+
+			const auto& ps1 = patterns1[pid1];
+			const auto& ps2 = patterns2[pid2];
+
+			if (buf_pos + ps1.get_num_samples() + ps2.get_num_samples() >= buf_size)
+			{
+				bar_patterns.arrive_and_wait();
+				swap(pattern_ptrs_cur, pattern_ptrs_next);
+				swap(patternsBuffer_cur, patternsBuffer_next);
+				bar_patterns.arrive_and_wait();
+
+				pattern_ptrs_next.clear();
+
+				buf_pos = 0;
+
+				LOG_DEBUG << "Pattern pairs: " << i << " of " << global_kmer_matchings_counts.size() << "\r" << std::flush;
+	
+			}
+
+			uint32_t* buf_ptr1 = patternsBuffer_next.data() + buf_pos;
+			buf_pos += ps1.get_num_samples();
+			uint32_t* buf_ptr2 = patternsBuffer_next.data() + buf_pos;
+			buf_pos += ps2.get_num_samples();
+
+			decode_pattern_samples(patterns1, pid1, buf_ptr1);
+			decode_pattern_samples(patterns2, pid2, buf_ptr2);
+
+			pattern_ptrs_next.emplace_back(ps1.get_num_samples(), ps2.get_num_samples(), buf_ptr1, buf_ptr2);
+		}
+
+		bar_patterns.arrive_and_wait();
+		swap(pattern_ptrs_cur, pattern_ptrs_next);
+		swap(patternsBuffer_cur, patternsBuffer_next);
+		bar_patterns.arrive_and_wait();
+
+		LOG_DEBUG << "Pattern: " << global_kmer_matchings_counts.size() << 
+			" of " << global_kmer_matchings_counts.size() << "\r" << std::flush;
+		
+		if (!patternsBuffer_cur.empty())
+		{
+			bar_patterns.arrive_and_wait();
+			patternsBuffer_cur.clear();
+			bar_patterns.arrive_and_wait();
+		}
+		});
+
+	vector<thread> thr_workers;
+	thr_workers.reserve(num_threads);
+
+	for (int i = 0; i < num_threads; ++i)
+		thr_workers.emplace_back([&, i] {
+			uint32_t thread_id = i;
+			uint32_t my_mod = thread_id % num_threads;
+			uint32_t pid = 0;
+
+			bar_patterns.arrive_and_wait();
+			bar_patterns.arrive_and_wait();
+
+			while (true)
+			{
+				if (patternsBuffer_cur.empty())
+					break;
+
+				for (const auto &pat : pattern_ptrs_cur)
+				{
+					uint32_t to_add = global_kmer_matchings_counts[pid++].second; 
+					uint32_t* pat_data1 = get<2>(pat);
+
+					for (uint32_t j = 0; j < get<0>(pat); ++j)
+					{
+						uint32_t row_id = pat_data1[j];
+
+						if (row_id % num_threads != my_mod)
+							continue;
+
+						uint32_t* pat_data2 = get<3>(pat);
+						auto& row_data = matrix[row_id];
+
+						for (uint32_t k = 0; k < get<1>(pat); ++k)
+							row_data[pat_data2[k]] += to_add;
+					}
+				}
+
+				bar_patterns.arrive_and_wait();
+				bar_patterns.arrive_and_wait();
+			}
+			});
+
+
+	thr_pattern_decompress.join();
+	for (auto& t : thr_workers)
+		t.join();
+
+	auto t2 = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> dt1 = t2 - t1;
+
+	LOG_VERBOSE << "Db2Db Sparse computation time: " << dt1.count() << endl;
 }

@@ -258,7 +258,7 @@ protected:
 	}
 public:
 	static const char char_codes[];
-	static char num_codes[256];
+	static signed char num_codes[256];
 	static uchar rev_comp_bytes_LUT[];
 	static uint64 alignment_mask[];
 	struct _si  

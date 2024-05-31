@@ -47,6 +47,13 @@ protected:
 
 public:
 
+	enum class DeserializationMode {
+		Everything,
+		SamplesOnly,
+		SkipHashtables,
+		CompactedHashtables
+	};
+
 	AbstractKmerDb() : kmerLength(0), isInitialized(false), fraction(0), startFraction(0)  {}
 
 	virtual ~AbstractKmerDb() {}
@@ -75,7 +82,7 @@ public:
 
 	virtual void serialize(std::ofstream& file, bool rawHashtables) const = 0;
 
-	virtual bool deserialize(std::ifstream& file, bool skipHashtables = false) = 0;
+	virtual bool deserialize(std::ifstream& file, DeserializationMode mode = DeserializationMode::Everything) = 0;
 
 	virtual std::string printStats() const = 0;
 

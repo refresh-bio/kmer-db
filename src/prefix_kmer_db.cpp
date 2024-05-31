@@ -1,4 +1,7 @@
 #include "prefix_kmer_db.h"
+#include "prefix_kmer_db.h"
+
+#include "../libs/refresh/pdqsort_par.h"
 
 #include "log.h"
 
@@ -44,12 +47,14 @@ PrefixKmerDb::PrefixKmerDb(int _num_threads) : AbstractKmerDb(),
 // *****************************************************************************************
 //
 PrefixKmerDb::~PrefixKmerDb() {
-	queues.hashtableAddition.MarkCompleted();
+//	queues.hashtableAddition.MarkCompleted();
+	queues.hashtableAddition.AddTasks(std::vector<HashtableTask>());
 	for (auto& t : workers.hashtableAddition) {
 		t.join();
 	}
 
-	queues.patternExtension.MarkCompleted();
+//	queues.patternExtension.MarkCompleted();
+	queues.patternExtension.AddTasks(std::vector<PatternTask>());
 	for (auto& t : workers.patternExtension) {
 		t.join();
 	}
@@ -76,10 +81,11 @@ void PrefixKmerDb::initialize(uint32_t kmerLength, double fraction) {
 //
 void PrefixKmerDb::hashtableJob() {
 
-	while (!this->queues.hashtableAddition.IsCompleted()) {
+//	while (!this->queues.hashtableAddition.IsCompleted()) {
 		HashtableTask task;
 
-		if (this->queues.hashtableAddition.Pop(task)) {
+//		if (this->queues.hashtableAddition.Pop(task)) {
+		while (this->queues.hashtableAddition.Pop(task)) {
 			// determine ranges
 			const kmer_t* kmers = task.kmers;
 		
@@ -98,25 +104,38 @@ void PrefixKmerDb::hashtableJob() {
 
 				std::fill(prefixHistogram.begin() + lo_prefix, prefixHistogram.begin() + hi_prefix + 1, 0);
 
+				// resize hastables
+				size_t htBytes = 0;
+				int reallocsCount = 0;
+
 				for (uint32_t i = lo + 1; i < hi; ++i) {
 					kmer_t prefix = GET_PREFIX_SHIFTED(kmers[i]);
 					if (prefix != prevPrefix) {
 						prefixHistogram[prevPrefix] = i - begin;
+
+						// ---
+						reallocsCount += hashtables[prevPrefix].reserve_for_additional(prefixHistogram[prevPrefix]);
+						htBytes += hashtables[prevPrefix].get_bytes();
+						// ---
+
 						begin = i;
 						prevPrefix = prefix;
+
 					}
 				}
 
 				// add remanining
 				prefixHistogram[hi_prefix] = hi - begin;
 
-				// resize hastables
-				size_t htBytes = 0;
-				int reallocsCount = 0;
-				for (auto i = lo_prefix; i <= hi_prefix; ++i) {
-					reallocsCount += hashtables[i].reserve_for_additional(prefixHistogram[i]);
+				reallocsCount += hashtables[hi_prefix].reserve_for_additional(prefixHistogram[hi_prefix]);
+				htBytes += hashtables[hi_prefix].get_bytes();
+
+
+/*				for (auto i = lo_prefix; i <= hi_prefix; ++i) {
+					if(prefixHistogram[i] && hashtables[i].need_reserve_for_additional(prefixHistogram[i]))
+						reallocsCount += hashtables[i].reserve_for_additional(prefixHistogram[i]);
 					htBytes += hashtables[i].get_bytes();
-				}
+				}*/
 
 				// update memory statistics (atomic - no sync needed)
 				stats.hashtableBytes += htBytes;
@@ -167,18 +186,20 @@ void PrefixKmerDb::hashtableJob() {
 				times.hashtableFind_worker += std::chrono::high_resolution_clock::now() - start;
 			}
 
-			this->semaphore.dec();
+//			this->semaphore.dec();
+			this->queues.hashtableAddition.MarkProcessed();
 		}
-	}
+//	}
 }
 
 // *****************************************************************************************
 //
 void PrefixKmerDb::patternJob() {
-	while (!this->queues.patternExtension.IsCompleted()) {
+//	while (!this->queues.patternExtension.IsCompleted()) {
 		PatternTask task;
 
-		if (this->queues.patternExtension.Pop(task)) {
+//		if (this->queues.patternExtension.Pop(task)) {
+		while (this->queues.patternExtension.Pop(task)) {
 			uint32_t lo = task.lo;
 			uint32_t hi = task.hi;
 			
@@ -231,9 +252,10 @@ void PrefixKmerDb::patternJob() {
 			stats.patternBytes += deltaSize;
 
 		//	LOG_DEBUG << "Pattern job " << task.block_id << " finished" << endl ;
-			this->semaphore.dec();
+//			this->semaphore2.dec();
+			this->queues.patternExtension.MarkProcessed();
 		}
-	}
+//	}
 }
 
 
@@ -256,7 +278,9 @@ sample_id_t PrefixKmerDb::addKmers(
 	// get prefix histogram (parallel)
 	LOG_DEBUG << "Hashtable resizing, searching, and adding (parallel)..." << endl ;
 	auto start = std::chrono::high_resolution_clock::now();
-	std::fill(prefixHistogram.begin(), prefixHistogram.end(), 0);
+
+	// !!! TODO: Jest czyszczony w hashTableJob, wiêc tu chyba nie trzeba go czyœciæ
+//	std::fill(prefixHistogram.begin(), prefixHistogram.end(), 0);
 	samplePatterns.resize(n_kmers);
 
 	stats.hashtableBytes = 0;
@@ -264,6 +288,8 @@ sample_id_t PrefixKmerDb::addKmers(
 	// prepare tasks
 	uint32_t num_blocks = (uint32_t)num_threads * 8;
 	uint32_t block = std::max(n_kmers / num_blocks, 1u);
+
+	bool use_busy_wait = num_threads >= 8;
 
 	// prepare tasks
 	std::vector<HashtableTask> hashtableTasks(num_blocks, HashtableTask{0, 0, n_kmers, kmers, n_kmers });
@@ -292,19 +318,31 @@ sample_id_t PrefixKmerDb::addKmers(
 
 	hashtableTasks.resize(tid);
 
-	std::sort(hashtableTasks.begin(), hashtableTasks.end(), [](const HashtableTask& x, const HashtableTask& y)->bool {
-		return (x.hi - x.lo) > (y.hi - y.lo);
-	});
+	// Queue works like a stack, so large items should be at the end
+/*	std::sort(hashtableTasks.begin(), hashtableTasks.end(), [](const HashtableTask& x, const HashtableTask& y)->bool {
+		return (x.hi - x.lo) < (y.hi - y.lo);
+	});*/
+
+	refresh::sort::pdqsort(hashtableTasks.begin(), hashtableTasks.end(), [](const HashtableTask& x, const HashtableTask& y)->bool {
+		return (x.hi - x.lo) < (y.hi - y.lo);
+		});
 
 	stats.hashtableJobsImbalance += (double)(hashtableTasks.front().hi - hashtableTasks.front().lo) * num_blocks / n_kmers;
 
-	semaphore.inc((int)hashtableTasks.size());
-	for (size_t tid = 0; tid < hashtableTasks.size(); ++tid) {
+//	semaphore.inc((int)hashtableTasks.size());
+/*	for (size_t tid = 0; tid < hashtableTasks.size(); ++tid) {
 		// LOG_DEBUG << "Hashtable job " << tid << " scheduled (" << hashtableTasks[tid].lo << "-" << hashtableTasks[tid].hi << ")" << endl ;
 		queues.hashtableAddition.Push(hashtableTasks[tid]);
-	}
+	}*/
+//	queues.hashtableAddition.PushRange(hashtableTasks);
+	queues.hashtableAddition.AddTasks(hashtableTasks);
 
-	semaphore.waitForZero();
+	if(use_busy_wait)
+		queues.hashtableAddition.BusyWait();
+	else
+		queues.hashtableAddition.Wait();
+
+//	semaphore.waitForZero();
 	times.hashtableProcess += std::chrono::high_resolution_clock::now() - start;
 	
 #ifdef _DEBUG
@@ -375,6 +413,9 @@ sample_id_t PrefixKmerDb::addKmers(
 
 		patternTasks[tid + 1].lo = patternTasks[tid].hi = range;
 		patternTasks[tid + 1].block_id = tid + 1;
+		
+		block = std::max((n_kmers - range) / (num_blocks - tid - 1), 1u);
+		
 		currentIndex = range + block;
 
 		if (currentIndex >= samplePatterns.size()) {
@@ -386,14 +427,25 @@ sample_id_t PrefixKmerDb::addKmers(
 		std::find_if(patternTasks.begin(), patternTasks.end(), [](const PatternTask& t)->bool { return t.hi == t.lo;  }),
 		patternTasks.end());
 
-	semaphore.inc((int)patternTasks.size());
-	for (size_t tid = 0; tid < patternTasks.size(); ++tid) {
+//	std::sort(patternTasks.begin(), patternTasks.end(), [](const auto& x, const auto& y) {return x.hi - x.lo < y.hi - y.lo; });
+	refresh::sort::pdqsort(patternTasks.begin(), patternTasks.end(), [](const auto& x, const auto& y) {return x.hi - x.lo < y.hi - y.lo; });
+
+//	LOG_NORMAL << patternTasks.size() << endl;
+
+//	semaphore2.inc((int)patternTasks.size());
+/*	for (size_t tid = 0; tid < patternTasks.size(); ++tid) {
 		// LOG_DEBUG << "Pattern job " << tid << " scheduled" << endl ;
 		queues.patternExtension.Push(patternTasks[tid]);
-	}
+	}*/
+//	queues.patternExtension.PushRange(patternTasks);
+	queues.patternExtension.AddTasks(patternTasks);
+	if(use_busy_wait)
+		queues.patternExtension.BusyWait();
+	else
+		queues.patternExtension.Wait();
 
 	// wait for the task to complete
-	semaphore.waitForZero();
+//	semaphore2.waitForZero();
 	times.extension += std::chrono::high_resolution_clock::now() - start;
 
 	//--------------------------------------------------------------------------
@@ -431,6 +483,13 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 	}
 	save(file, formatWord);
 	
+	// save kmer length and fraction
+	save(file, kmerLength);
+	save(file, fraction);
+	save(file, startFraction);
+	save(file, isInitialized);
+	save(file, kmersCount);
+
 	// store number of samples
 	size_t temp = getSamplesCount();
 	save(file, temp);
@@ -447,7 +506,7 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 	}
 
 	// store number of hashmaps
-	cout << "Storing k-mer hashtables (" << (rawHashtables ? "raw" : "compressed") << ")..." << endl;
+	LOG_NORMAL << "Storing k-mer hashtables (" << (rawHashtables ? "raw" : "compressed") << ")..." << endl;
 	auto time = std::chrono::high_resolution_clock::now();
 
 	temp = hashtables.size();
@@ -459,7 +518,7 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 	for (size_t i = 0; i < hashtables.size(); ++i) {
 		
 		if (i * 100 / hashtables.size() > percent) {
-			cout << "\r" << percent << "%" << std::flush;
+			LOG_NORMAL << "\r" << percent << "%" << std::flush;
 			++percent;
 		}
 
@@ -503,11 +562,11 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 		}
 	}
 	std::chrono::duration<double> dt = std::chrono::high_resolution_clock::now() - time;
-	cout << "\r" << hashtables.size() << "/" << hashtables.size() << " hashtables stored in " << dt.count() << " s" <<  std::flush;
-	cout << endl;
+	LOG_NORMAL << "\r" << hashtables.size() << "/" << hashtables.size() << " hashtables stored in " << dt.count() << " s" <<  std::flush;
+	LOG_NORMAL << endl;
 
 	// write patterns in portions
-	cout << "Storing patterns..." << endl;
+	LOG_NORMAL << "Storing patterns..." << endl;
 
 	time = std::chrono::high_resolution_clock::now();
 	temp = patterns.size();
@@ -520,7 +579,7 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 	for (size_t pid = 0; pid < patterns.size(); ++pid) {
 		
 		if (pid * 100 / patterns.size() > percent) {
-			cout << "\r" << percent << "%" << std::flush;
+			LOG_NORMAL << "\r" << percent << "%" << std::flush;
 			++percent;
 		}
 		
@@ -544,15 +603,8 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 	file.write(buffer, blockSize);
 
 	dt = std::chrono::high_resolution_clock::now() - time;
-	cout << "\r" << patterns.size() << "/" << patterns.size() << " patterns stored in " << dt.count() << " s" << std::flush;
-	cout << endl;
-
-	// save kmer length and fraction
-	save(file, kmerLength); 
-	save(file, fraction);
-	save(file, startFraction);
-	save(file, isInitialized);
-	save(file, kmersCount);
+	LOG_NORMAL << "\r" << patterns.size() << "/" << patterns.size() << " patterns stored in " << dt.count() << " s" << std::flush;
+	LOG_NORMAL << endl;
 
 	// save prefix histogram
 	save(file, prefixHistogram.size());
@@ -561,7 +613,7 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 
 // *****************************************************************************************
 //
-bool PrefixKmerDb::deserialize(std::ifstream& file, bool skipHashtables) {
+bool PrefixKmerDb::deserialize(std::ifstream& file, DeserializationMode mode) {
 
 	size_t numHastableElements = IO_BUFFER_BYTES / sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t);
 	std::vector <hash_map_lp<suffix_t, pattern_id_t>::item_t> hashtableBuffer(numHastableElements);
@@ -576,6 +628,12 @@ bool PrefixKmerDb::deserialize(std::ifstream& file, bool skipHashtables) {
 		rawHashtables = true;
 	}
 
+	// load kmer length and fraction
+	load(file, kmerLength);
+	load(file, fraction);
+	load(file, startFraction);
+	load(file, isInitialized);
+	load(file, kmersCount);
 
 	// load sample info
 	size_t temp;
@@ -590,37 +648,48 @@ bool PrefixKmerDb::deserialize(std::ifstream& file, bool skipHashtables) {
 		string& s = sampleNames[i];
 		load(file, temp);  // load sample name
 		file.read(buffer, temp);
-		s.assign(buffer, temp);
+		s.assign(buffer, temp); 
 	}
 
 	if (!file) {
 		return false;
 	}
 
-	if (!skipHashtables) {
-		cout << "Loading k-mer hashtables (" << (rawHashtables ? "raw" : "compressed") << ")..." << endl;
+	if (mode == DeserializationMode::SamplesOnly) {
+		return true;
+	}
+
+	if (mode != DeserializationMode::SkipHashtables) {
+		LOG_NORMAL << "Loading k-mer hashtables (" << (rawHashtables ? "raw" : "compressed") << ")..." << endl;
 	}
 	
 	auto time = std::chrono::high_resolution_clock::now();
 
 	// load number of hashmaps
 	load(file, temp);
-	hashtables.resize(temp);
+	suffix_kmers.resize(temp);
+	hashtables.resize(temp);			
 
 	size_t percent = 0;
 
 	// load all hashtables
 	for (size_t i = 0; i < hashtables.size(); ++i) {
 		
-		if (!skipHashtables && (i * 100 / hashtables.size() > percent)) {
-			cout << "\r" << percent << "%" << std::flush;
+		if (mode != DeserializationMode::SkipHashtables && (i * 100 / hashtables.size() > percent)) {
+			LOG_NORMAL << "\r" << percent << "%" << std::flush;
 			++percent;
 		}
 
 		auto& ht = hashtables[i];
 
 		if (rawHashtables) {
-			ht.deserialize(file, hashtableBuffer.data(), hashtableBuffer.size(), skipHashtables);
+
+			if (mode == DeserializationMode::CompactedHashtables) {
+				ht.deserialize_into_vector(file, hashtableBuffer.data(), hashtableBuffer.size(), suffix_kmers[i], false);
+			}
+			else {
+				ht.deserialize(file, hashtableBuffer.data(), hashtableBuffer.size(), (mode == DeserializationMode::SkipHashtables));
+			}
 		}
 		else {
 			// load ht size
@@ -628,36 +697,56 @@ bool PrefixKmerDb::deserialize(std::ifstream& file, bool skipHashtables) {
 			load(file, temp);
 
 			if (temp > 0) {
+
 				// load ht elements
-				ht.clear();
-				ht.reserve_for_additional(temp);
+				if (mode == DeserializationMode::CompactedHashtables) {
+					suffix_kmers[i].reserve(temp);
+				}
+				else {
+					ht.clear();
+					ht.reserve_for_additional(temp);
+				}
 
 				size_t readCount = 0;
 				while (readCount < temp) {
 					size_t portion = 0;
 					load(file, portion);
-					file.read(reinterpret_cast<char*>(buffer), portion * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
 
-					for (size_t j = 0; j < portion; ++j) {
-						ht.insert(hashtableBuffer[j].key, hashtableBuffer[j].val);
+					if (mode == DeserializationMode::SkipHashtables) {
+						file.seekg(portion, ios_base::cur);
+					}
+					else {
+						file.read(reinterpret_cast<char*>(buffer), portion * sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t));
+
+						if (mode == DeserializationMode::CompactedHashtables) {
+							for (size_t j = 0; j < portion; ++j) {
+								suffix_kmers[i].emplace_back(hashtableBuffer[j].key, hashtableBuffer[j].val);
+							}
+						}
+						else {
+							for (size_t j = 0; j < portion; ++j) {
+								ht.insert(hashtableBuffer[j].key, hashtableBuffer[j].val);
+							}
+						}
 					}
 					readCount += portion;
 				}
+				
 			}
 		}
 	}
 	
 	std::chrono::duration<double> dt = std::chrono::high_resolution_clock::now() - time;
-	if (!skipHashtables) {
-		cout << "\r" << hashtables.size() << "/" << hashtables.size() << " hashtables loaded in " << dt.count() << " s" << std::flush;
-		cout << endl;
+	if (mode != DeserializationMode::SkipHashtables) {
+		LOG_NORMAL << "\r" << hashtables.size() << "/" << hashtables.size() << " hashtables loaded in " << dt.count() << " s" << std::flush;
+		LOG_NORMAL << endl;
 	}
 
 	if (!file) {
 		return false;
 	}
 
-	cout << "Loading patterns..." << endl;
+	LOG_NORMAL << "Loading patterns..." << endl;
 	time = std::chrono::high_resolution_clock::now();
 
 	// load patterns
@@ -677,7 +766,7 @@ bool PrefixKmerDb::deserialize(std::ifstream& file, bool skipHashtables) {
 		while (currentPtr < buffer + blockSize) {
 
 			if (pid * 100 / patterns.size() > percent) {
-				cout << "\r" << percent << "%" << std::flush;
+				LOG_NORMAL << "\r" << percent << "%" << std::flush;
 				++percent;
 			}
 
@@ -686,19 +775,12 @@ bool PrefixKmerDb::deserialize(std::ifstream& file, bool skipHashtables) {
 		}
 	}
 	dt = std::chrono::high_resolution_clock::now() - time;
-	cout << "\r" << patterns.size() << "/" << patterns.size() << " patterns loaded in " << dt.count() << " s" << std::flush;
-	cout << endl;
+	LOG_NORMAL << "\r" << patterns.size() << "/" << patterns.size() << " patterns loaded in " << dt.count() << " s" << std::flush;
+	LOG_NORMAL << endl;
 
 	if (!file) {
 		return false;
 	}
-
-	// load kmer length and fraction
-	load(file, kmerLength);
-	load(file, fraction);
-	load(file, startFraction);
-	load(file, isInitialized);
-	load(file, kmersCount);
 
 	// load prefix histogram
 	load(file, temp);
@@ -707,7 +789,6 @@ bool PrefixKmerDb::deserialize(std::ifstream& file, bool skipHashtables) {
 
 	return true;
 }
-
 
 // *****************************************************************************************
 //

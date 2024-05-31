@@ -22,7 +22,7 @@
     <ProjectGuid>{E196ABDC-0F62-4E7A-8714-C10BAD223FC3}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>kmer_db</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -41,13 +41,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -75,7 +75,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <LibraryPath>../libs;$(LibraryPath)</LibraryPath>
-    <IncludePath>../libs;$(IncludePath)</IncludePath>
+    <IncludePath>..\libs\mimalloc\include;../libs;$(IncludePath)</IncludePath>
     <TargetName>kmer-db</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -84,8 +84,11 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <LibraryPath>../libs;$(LibraryPath)</LibraryPath>
-    <IncludePath>../libs;$(IncludePath)</IncludePath>
+    <IncludePath>..\libs\mimalloc\include;../libs;$(IncludePath)</IncludePath>
     <TargetName>kmer-db</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Label="Vcpkg">
+    <VcpkgEnabled>false</VcpkgEnabled>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -106,14 +109,18 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalOptions>/DWIN32 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DWIN32 /DARCH_X64 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>zlibstat.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>../libs/zlib-ng/build-vs/Debug/zlibstaticd.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PreBuildEvent>
+      <Command>call $(SolutionDir)..\libs\prebuild.bat $(SolutionDir) $(Configuration)</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -140,10 +147,11 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalOptions>/DWIN32 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DWIN32 /DARCH_X64 %(AdditionalOptions)</AdditionalOptions>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -151,12 +159,15 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>Debug</GenerateDebugInformation>
       <Profile>true</Profile>
-      <AdditionalDependencies>zlibstat.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>../libs/zlib-ng/build-vs/Release/zlibstatic.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PreBuildEvent>
+      <Command>call $(SolutionDir)..\libs\prebuild.bat $(SolutionDir) $(Configuration)</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\libs\refresh\pdqsort_par.h" />
     <ClInclude Include="aligned_vector.h" />
-    <ClInclude Include="analyzer.h" />
     <ClInclude Include="array.h" />
     <ClInclude Include="console.h" />
     <ClInclude Include="conversion.h" />
@@ -164,7 +175,7 @@
     <ClInclude Include="filter.h" />
     <ClInclude Include="hashmap_lp.h" />
     <ClInclude Include="input_file.h" />
-    <ClInclude Include="instrset.h" />
+    <ClInclude Include="instr_set_detect.h" />
     <ClInclude Include="kmer_db.h" />
     <ClInclude Include="kmc_api\kmc_file.h" />
     <ClInclude Include="kmc_api\kmer_api.h" />
@@ -175,6 +186,7 @@
     <ClInclude Include="loader_tasks.h" />
     <ClInclude Include="log.h" />
     <ClInclude Include="parallel_sorter.h" />
+    <ClInclude Include="params.h" />
     <ClInclude Include="pattern.h" />
     <ClInclude Include="prefix_kmer_db.h" />
     <ClInclude Include="queue.h" />
@@ -184,10 +196,17 @@
     <ClInclude Include="version.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="analyzer.cpp" />
-    <ClCompile Include="console.cpp" />
+    <ClCompile Include="..\libs\mimalloc\src\static.c" />
+    <ClCompile Include="console_all2all.cpp" />
+    <ClCompile Include="console_all2all_parts.cpp" />
+    <ClCompile Include="console_all2all_sparse.cpp" />
+    <ClCompile Include="console_build.cpp" />
+    <ClCompile Include="console_db2db.cpp" />
+    <ClCompile Include="console_distance.cpp" />
+    <ClCompile Include="console_minhash.cpp" />
+    <ClCompile Include="console_new2all.cpp" />
+    <ClCompile Include="console_one2all.cpp" />
     <ClCompile Include="input_file.cpp" />
-    <ClCompile Include="instrset_detect.cpp" />
     <ClCompile Include="kmc_api\kmc_file.cpp" />
     <ClCompile Include="kmc_api\kmer_api.cpp" />
     <ClCompile Include="kmc_api\mmer.cpp" />
@@ -195,12 +214,14 @@
     <ClCompile Include="log.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="parallel_sorter.cpp" />
+    <ClCompile Include="params.cpp" />
     <ClCompile Include="pattern.cpp" />
     <ClCompile Include="prefix_kmer_db.cpp" />
     <ClCompile Include="row_add_avx.cpp" />
     <ClCompile Include="row_add_avx2.cpp">
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
+    <ClCompile Include="row_add_neon.cpp" />
     <ClCompile Include="similarity_calculator.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -102,7 +102,8 @@ public:
 	CMmer(uint32 _len);
 	inline void insert(uchar symb);
 	inline uint32 get() const;
-	inline bool operator==(const CMmer& x);
+//	inline bool operator==(const CMmer& x);			// fixme: does not compile in C++20
+	inline bool operator==(CMmer& x);
 	inline bool operator<(const CMmer& x);
 	inline void clear();
 	inline bool operator<=(const CMmer& x);
@@ -130,7 +131,8 @@ inline uint32 CMmer::get() const
 }
 
 //--------------------------------------------------------------------------
-inline bool CMmer::operator==(const CMmer& x)
+//inline bool CMmer::operator==(const CMmer& x)
+inline bool CMmer::operator==(CMmer& x)
 {
 	return current_val == x.current_val;
 }

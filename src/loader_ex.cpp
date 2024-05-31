@@ -82,6 +82,10 @@ LoaderEx::~LoaderEx() {
 int LoaderEx::configure(const std::string& multipleSamples) {
 	std::ifstream ifs(multipleSamples);
 
+	if (!ifs) {
+		throw std::runtime_error("Unable to open input file " + multisampleFasta);
+	}
+
 	string fname;
 	
 	while (ifs >> fname) {
@@ -120,7 +124,7 @@ void LoaderEx::prefetcherJob(std::shared_ptr<AbstractFilter> filter) {
 				LOG_DEBUG << "(file " << task->fileId + 1 << ", " << task->filePath << ") -> readers queue " << endl ;
 			}
 			else {
-				cout << "failed:" << task->filePath << endl;
+				LOG_NORMAL << "failed:" << task->filePath << endl;
 			}
 		}
 	}
@@ -151,7 +155,7 @@ void LoaderEx::readerJob(int tid) {
 
 			ok = inputTask->file->load(
 				kmersCollections[bufferId], positionsCollections[bufferId],
-				sampleTask->kmers, sampleTask->kmersCount, sampleTask->kmerLength, sampleTask->fraction);
+				sampleTask->kmers, sampleTask->kmersCount, sampleTask->kmerLength, sampleTask->fraction, false);
 
 			if (ok) {
 				++bufferRefCounters[bufferId];
@@ -160,7 +164,7 @@ void LoaderEx::readerJob(int tid) {
 				LOG_VERBOSE << "File loaded successfully: " << inputTask->fileId + 1 << endl ;
 			}
 			else {
-				cout << "File load failed: " << inputTask->fileId + 1 << endl << std::flush;
+				LOG_NORMAL << "File load failed: " << inputTask->fileId + 1 << endl << std::flush;
 			}
 		}
 	}
@@ -206,7 +210,7 @@ void LoaderEx::multifastaReaderJob() {
 
 				bool ok = genomicFile->loadNext(
 					kmersCollections[bufferId], positionsCollections[bufferId],
-					sampleTask->kmers, sampleTask->kmersCount, sampleTask->kmerLength, sampleTask->fraction, sampleTask->sampleName);
+					sampleTask->kmers, sampleTask->kmersCount, sampleTask->kmerLength, sampleTask->fraction, false, sampleTask->sampleName);
 
 				++sample_id;
 				++bufferRefCounters[bufferId];
@@ -226,7 +230,7 @@ void LoaderEx::multifastaReaderJob() {
 			LOG_VERBOSE << "File loaded successfully: " << inputTask->fileId + 1 << endl ;
 		}
 		else {
-			cout << "File load failed: " << inputTask->fileId + 1 << endl << std::flush;
+			LOG_NORMAL << "File load failed: " << inputTask->fileId + 1 << endl << std::flush;
 		}
 	}
 	queues.output.MarkCompleted();

@@ -1,7 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="console.cpp" />
     <ClCompile Include="kmc_api\kmc_file.cpp" />
     <ClCompile Include="kmc_api\kmer_api.cpp" />
     <ClCompile Include="kmc_api\mmer.cpp" />
@@ -12,11 +11,21 @@
     <ClCompile Include="row_add_avx2.cpp" />
     <ClCompile Include="instrset_detect.cpp" />
     <ClCompile Include="parallel_sorter.cpp" />
-    <ClCompile Include="analyzer.cpp" />
     <ClCompile Include="similarity_calculator.cpp" />
     <ClCompile Include="prefix_kmer_db.cpp" />
     <ClCompile Include="loader_ex.cpp" />
     <ClCompile Include="input_file.cpp" />
+    <ClCompile Include="..\libs\mimalloc\src\static.c" />
+    <ClCompile Include="params.cpp" />
+    <ClCompile Include="console_all2all.cpp" />
+    <ClCompile Include="console_all2all_parts.cpp" />
+    <ClCompile Include="console_all2all_sparse.cpp" />
+    <ClCompile Include="console_build.cpp" />
+    <ClCompile Include="console_db2db.cpp" />
+    <ClCompile Include="console_distance.cpp" />
+    <ClCompile Include="console_minhash.cpp" />
+    <ClCompile Include="console_new2all.cpp" />
+    <ClCompile Include="console_one2all.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="aligned_vector.h" />
@@ -38,7 +47,6 @@
     <ClInclude Include="parallel_sorter.h" />
     <ClInclude Include="version.h" />
     <ClInclude Include="kmer_extract.h" />
-    <ClInclude Include="analyzer.h" />
     <ClInclude Include="similarity_calculator.h" />
     <ClInclude Include="prefix_kmer_db.h" />
     <ClInclude Include="types.h" />
@@ -46,5 +54,6 @@
     <ClInclude Include="input_file.h" />
     <ClInclude Include="loader_tasks.h" />
     <ClInclude Include="conversion.h" />
+    <ClInclude Include="params.h" />
   </ItemGroup>
 </Project>

@@ -6,31 +6,22 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 
 */
 
-#include "row_add.h"
-#include <emmintrin.h>
-#include <immintrin.h>
+#if defined(ARCH_ARM)
 
-// prevent from compiling following functions when NO_AVX2 is defined
-#ifndef NO_AVX2
+#include "row_add.h"
+#include <arm_neon.h>
 
 // *****************************************************************************************
 //
-void row_add(uint32_t *row, uint32_t *src_ids, uint32_t num_elems, uint32_t to_add, bool avx2_present) {
-#if defined(ARCH_X64)
-	if (avx2_present)
-		row_add_avx2(row, src_ids, num_elems, to_add);
-	else
-		row_add_avx(row, src_ids, num_elems, to_add);
-#else
+void row_add(uint32_t* row, uint32_t* src_ids, uint32_t num_elems, uint32_t to_add, bool avx2_present) {
 	row_add_neon(row, src_ids, num_elems, to_add);
-#endif
 }
 
 // *****************************************************************************************
 //
-void row_add_avx2(uint32_t *row, uint32_t *src_ids, uint32_t num_elems, uint32_t to_add)
+void row_add_neon(uint32_t *row, uint32_t *src_ids, uint32_t num_elems, uint32_t to_add)
 {
-	__m256i _to_add = _mm256_set1_epi32((int)to_add);
+	uint32x4_t _to_add = vdupq_n_u32(to_add);
 	auto p = src_ids;
 
 	int j;
@@ -45,10 +36,13 @@ void row_add_avx2(uint32_t *row, uint32_t *src_ids, uint32_t num_elems, uint32_t
 	{
 		if (*p + 15 == *(p + 15))
 		{
-			auto _q = (__m256i*) (row + *p);
+			auto _q = (row + *p);
 
-			_mm256_storeu_si256(_q, _mm256_add_epi32(_mm256_loadu_si256(_q), _to_add));
-			_mm256_storeu_si256(_q+1, _mm256_add_epi32(_mm256_loadu_si256(_q+1), _to_add));
+//			_mm_storeu_si128(_q, _mm_add_epi32(_mm_loadu_si128(_q), _to_add));
+			vst1q_u32(_q, vaddq_u32(vld1q_u32(_q), _to_add));
+			vst1q_u32(_q + 1, vaddq_u32(vld1q_u32(_q + 1), _to_add));
+			vst1q_u32(_q + 2, vaddq_u32(vld1q_u32(_q + 2), _to_add));
+			vst1q_u32(_q + 3, vaddq_u32(vld1q_u32(_q + 3), _to_add));
 
 			p += 16;
 		}
@@ -75,10 +69,12 @@ void row_add_avx2(uint32_t *row, uint32_t *src_ids, uint32_t num_elems, uint32_t
 	inner_start:
 		if (*p + 15 == *(p + 15))
 		{
-			auto _q = (__m256i*) (row + *p);
+			auto _q = (row + *p);
 
-			_mm256_storeu_si256(_q, _mm256_add_epi32(_mm256_loadu_si256(_q), _to_add));
-			_mm256_storeu_si256(_q + 1, _mm256_add_epi32(_mm256_loadu_si256(_q + 1), _to_add));
+			vst1q_u32(_q, vaddq_u32(vld1q_u32(_q), _to_add));
+			vst1q_u32(_q + 1, vaddq_u32(vld1q_u32(_q + 1), _to_add));
+			vst1q_u32(_q + 2, vaddq_u32(vld1q_u32(_q + 2), _to_add));
+			vst1q_u32(_q + 3, vaddq_u32(vld1q_u32(_q + 3), _to_add));
 
 			p += 16;
 		}
@@ -123,5 +119,4 @@ void row_add_avx2(uint32_t *row, uint32_t *src_ids, uint32_t num_elems, uint32_t
 	case 1:		row[*p++] += to_add;
 	}
 }
-
 #endif

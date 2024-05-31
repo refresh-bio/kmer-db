@@ -16,7 +16,7 @@
 using namespace std;
 
 const char CKmerAPI::char_codes[] = {'A','C', 'G', 'T'};	
-char CKmerAPI::num_codes[];
+signed char CKmerAPI::num_codes[];
 CKmerAPI::_si CKmerAPI::_init; 
 uchar CKmerAPI::rev_comp_bytes_LUT[] = {
     0xff, 0xbf, 0x7f, 0x3f, 0xef, 0xaf, 0x6f, 0x2f, 0xdf, 0x9f, 0x5f, 0x1f, 0xcf, 0x8f, 0x4f, 0x0f,

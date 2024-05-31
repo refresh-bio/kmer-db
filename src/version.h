@@ -1,11 +1,17 @@
 #pragma once
 
-#define VERSION "1.11.1"
-#define DATE "07.03.2023"
+#define VERSION "2.0.0"
+#define DATE "31.05.2024"
 
 /* 
 
 Version history
+
+2.0.0 (31.05.2024)
+- Added new modes:  all2all_sparse, all2all_parts,
+- Serious time and memory optimizations,
+- Support of MacOS (Apple and x86 CPUs) and ARM platforms.
+
 
 1.11.1 (07.03.2023)
 - Removed deadlock in the -multisample-fasta mode.

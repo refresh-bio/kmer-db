@@ -90,7 +90,7 @@ jobs:
 
     - name: minhash (default k, fraction 0.1) + build + all2all 
       run: |
-        ./kmer-db minhash 0.1 ${INPUT_DIR}/seqs.list
+        ./kmer-db minhash -f 0.1 ${INPUT_DIR}/seqs.list
         ./kmer-db build -from-minhash -k 25 ${INPUT_DIR}/seqs.list k18.minhash.db
         ./kmer-db all2all k18.minhash.db k18.minhash.csv
         cmp k18.minhash.csv ${INPUT_DIR}/k18.frac.csv

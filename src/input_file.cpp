@@ -12,58 +12,79 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include "kmer_extract.h"
 #include "parallel_sorter.h"
 
-#include <zlib.h>
+#include "../libs/refresh/file_wrapper.h"
 
 #include <memory>
 #include <fstream>
 #include <string>
 #include <cassert>
 #include <bitset>
+#include <filesystem>
 
 #ifdef USE_RADULS
 	#include <raduls.h>
 #endif
 
+using namespace std;
+
 // *****************************************************************************************
 //
  bool GenomeInputFile::open(const std::string& filename) {
 
+	vector<string> extensions { 
+		"", ".fa", ".fna", ".fasta", ".fastq",
+		".gz", ".fa.gz", ".fna.gz", ".fasta.gz", ".fastq.gz"};
+
+	string extname;
+	for (const auto& ext : extensions) {
+		if (filesystem::exists(filename + ext)) {
+			extname = filename + ext;
+			break;
+		}
+	}
+
 	status = false;
 
-	FILE * in;
-	
-	// try to open without adding extension
-	if ((in = fopen(filename.c_str(), "rb"))) {
-		isGzipped = filename.substr(filename.length() - 3) == ".gz";
+	refresh::stream_in_file input(extname);
+
+	if (!input.is_open()) {
+		return false;
 	}
-	else {
-		// try adding an extension
-		if (
-			(in = fopen((filename + ".gz").c_str(), "rb")) ||
-			(in = fopen((filename + ".fa.gz").c_str(), "rb")) ||
-			(in = fopen((filename + ".fna.gz").c_str(), "rb")) ||
-			(in = fopen((filename + ".fasta.gz").c_str(), "rb"))) {
-			isGzipped = true;
+
+	size_t fsize = filesystem::file_size(extname);
+	refresh::stream_decompression stream(&input);
+
+	auto format = stream.get_format();
+	// assume compression ratio of max 5
+	size_t multiplier = (format == refresh::stream_decompression::format_t::text) ? 1 : 5;
+	// !!! TODO: why allocate in parts? 
+	size_t block_size = std::min(fsize * multiplier + 1, (size_t)(100ULL << 20));  // for null termination
+
+	size_t buf_size = block_size;
+	rawData = reinterpret_cast<char*>(malloc(buf_size)); 
+	rawSize = 0;
+
+	size_t n_read = 0;
+	for (;;) {
+		stream.read(rawData + rawSize, block_size, n_read);
+
+		rawSize += n_read;
+
+		// more data is coming...
+		if (n_read > 0 && n_read == block_size) {
+			block_size = static_cast<size_t>(block_size * 1.5);
+
+			buf_size += block_size;
+			rawData = reinterpret_cast<char*>(realloc(rawData, buf_size));
 		}
 		else {
-			(in = fopen((filename + ".fa").c_str(), "rb")) ||
-			(in = fopen((filename + ".fna").c_str(), "rb")) ||
-			(in = fopen((filename + ".fasta").c_str(), "rb"));
+			break;
 		}
-	}
+	} 
 
-	if (in) {
-		my_fseek(in, 0, SEEK_END);
-		rawSize = my_ftell(in);
-		my_fseek(in, 0, SEEK_SET);
+	rawData[rawSize] = 0; // add null termination
 
-		rawData = reinterpret_cast<char*>(malloc(rawSize + 1));
-		size_t blocksRead = fread(rawData, rawSize, 1, in);
-		rawData[rawSize] = 0; // add null termination 
-		fclose(in);
-		status = blocksRead;
-	}
-
+	status = true;
 	return status;
 }
 
@@ -75,7 +96,8 @@ bool GenomeInputFile::load(
 	kmer_t*& kmers,
 	size_t& kmersCount,
 	uint32_t& kmerLength,
-	double& filterValue) {
+	double& filterValue,
+	bool nonCanonical) {
 	
 	if (!status) {
 		return false;
@@ -84,14 +106,9 @@ bool GenomeInputFile::load(
 	char* data;
 	size_t total = 0;
 
-	if (isGzipped) {
-		status = unzip(rawData, rawSize, data, total);
-	}
-	else {
-		data = rawData;
-		total = rawSize;
-	}
-
+	data = rawData;
+	total = rawSize;
+	
 	if (status) {
 		std::vector<char*> chromosomes;
 		std::vector<size_t> lengths;
@@ -139,10 +156,6 @@ bool GenomeInputFile::load(
 		//LOG_DEBUG << "Extraction: " << kmersCount << " kmers, " << chromosomes.size() << " chromosomes, " << totalLen << " bases" << endl ;
 	}
 	
-	// free memory
-	if (data != rawData) {
-		free(reinterpret_cast<void*>(data));
-	}
 	free(reinterpret_cast<void*>(rawData));
 	
 	return status;
@@ -161,19 +174,12 @@ bool GenomeInputFile::initMultiFasta() {
 	char* data;
 	size_t total = 0;
 
-	if (isGzipped) {
-		status = unzip(rawData, rawSize, data, total);
-	}
-	else {
-		data = rawData;
-		total = rawSize;
-	}
+	data = rawData;
+	total = rawSize;
 
-	if (status) {
-		size_t totalLen = total;
-		extractSubsequences(data, totalLen, chromosomes, lengths, headers);
-	}
-
+	size_t totalLen = total;
+	extractSubsequences(data, totalLen, chromosomes, lengths, headers);
+	
 	return status;
 }
 
@@ -186,6 +192,7 @@ bool GenomeInputFile::loadNext(
 	size_t& kmersCount,
 	uint32_t& kmerLength,
 	double& filterValue,
+	bool nonCanonical,
 	std::string& sampleName
 ) {
 	
@@ -197,6 +204,7 @@ bool GenomeInputFile::loadNext(
 
 	filterValue = minhashFilter->getFraction();
 	kmerLength = minhashFilter->getLength();
+
 	sampleName = headers[multifastaIndex];
 
 	kmersBuffer.clear();
@@ -216,78 +224,6 @@ bool GenomeInputFile::loadNext(
 
 	// no more sequences in multifasta
 	return multifastaIndex < chromosomes.size();
-}
-
-
-// *****************************************************************************************
-//
-bool GenomeInputFile::unzip(char* compressedData, size_t compressedSize, char*&outData, size_t &outSize) {
-	bool ok = true;
-	size_t blockSize = 10000000;
-	outData = reinterpret_cast<char*>(malloc(blockSize));
-
-	// Init stream structure
-	z_stream stream;
-	stream.zalloc = Z_NULL;
-	stream.zfree = Z_NULL;
-	stream.opaque = Z_NULL;
-	stream.avail_in = compressedSize;
-	stream.next_in = reinterpret_cast<Bytef*>(compressedData);
-
-	if (inflateInit2(&stream, 31) == Z_OK) {
-
-		// read data in portions
-		char *ptr = outData;
-
-		size_t allocated = blockSize;
-
-		// decompress file in portions
-		for (;;) {
-			stream.avail_out = blockSize;
-			stream.next_out = reinterpret_cast<Bytef*>(ptr);
-			int ret = inflate(&stream, Z_NO_FLUSH);
-
-			switch (ret)
-			{
-			case Z_NEED_DICT:
-			case Z_DATA_ERROR:
-			case Z_MEM_ERROR:
-				ok = false;
-				ret = Z_STREAM_END;
-				break;
-			}
-
-			if (ret == Z_OK && stream.avail_out == 0) {
-				outSize = stream.total_out;
-			}
-
-			if (ret == Z_STREAM_END) {
-				outSize = stream.total_out;
-				//multistream detection
-				if (stream.avail_in >= 2 && stream.next_in[0] == 0x1f && stream.next_in[1] == 0x8b) {
-					if (inflateReset(&stream) != Z_OK) {
-						LOG_NORMAL << "Error while reading gzip file\n" ;
-						exit(1);
-					}
-				}
-				else
-					break;
-			}
-
-			// reallocate only when some data left
-			allocated += blockSize;
-			outData = reinterpret_cast<char*>(realloc(outData, allocated + 1)); // allocate for null termination
-			ptr = outData + outSize;
-		}
-
-		inflateEnd(&stream);
-		outData[outSize] = 0;
-	}
-	else {
-		ok = false;
-	}
-
-	return ok;
 }
 
 // *****************************************************************************************
@@ -316,7 +252,15 @@ bool GenomeInputFile::extractSubsequences(
 		if (*(ptr - 1) == '\r') { // on Windows
 			*(ptr - 1) = 0;
 		}
+
+		// !!! sd
+
 		*ptr = 0; // put 0 as separator
+
+		auto ptr_space = strchr(header, ' '); // find space in the header
+		if (ptr_space)
+			*ptr_space = 0;				// trim header to the first space
+
 		++ptr; // move to next character (begin of chromosome)
 		subsequences.push_back(ptr); // store chromosome
 	}
@@ -375,7 +319,8 @@ bool MihashedInputFile::load(
 	kmer_t*& kmers,
 	size_t& kmersCount,
 	uint32_t& kmerLength,
-	double& filterValue) {
+	double& filterValue,
+	bool nonCanonical) {
 	if (!status) {
 		return false;
 	}
@@ -409,7 +354,8 @@ bool KmcInputFile::load(
 	kmer_t*& kmers,
 	size_t& kmersCount,
 	uint32_t& kmerLength,
-	double& filterValue) {
+	double& filterValue,
+	bool nonCanonical) {
 
 	uint32_t counter;
 

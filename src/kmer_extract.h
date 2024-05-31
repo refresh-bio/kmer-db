@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <memory>
+#include <cinttypes>
 
 class KmerHelper {
 
@@ -16,8 +17,8 @@ public:
 		uint32_t* positions) {
 
 
-		static char* map = []() {
-			static char _map[256];
+		static int8_t * map = []() {
+			static int8_t _map[256];
 			std::fill_n(_map, 256, -1);
 			_map['a'] = _map['A'] = 0;
 			_map['c'] = _map['C'] = 1;
@@ -54,7 +55,7 @@ public:
 
 		for (i = 0; i < kmerLength - 1; ++i, str_pos -= 2, rev_pos += 2)
 		{
-			char symb = map[static_cast<unsigned char>(sequence[i])];
+			int8_t symb = map[static_cast<unsigned char>(sequence[i])];
 			if (symb < 0)
 			{
 				symb = 0;
@@ -66,7 +67,7 @@ public:
 
 		for (; i < sequenceLength; ++i)
 		{
-			char symb = map[static_cast<unsigned char>(sequence[i])];
+			int8_t symb = map[static_cast<unsigned char>(sequence[i])];
 			if (symb < 0)
 			{
 				symb = 0;
@@ -105,12 +106,12 @@ public:
 	}
 
 
-	static void sort(kmer_t* kmers, size_t count) {
-		ParallelSort(kmers, count);
+	static void sort(kmer_t* kmers, size_t count, uint32_t n_threads = 1) {
+		ParallelSort(kmers, count, n_threads);
 	}
 
-	static void sortAndUnique(kmer_t* kmers, size_t& count) {
-		ParallelSort(kmers, count);
+	static void sortAndUnique(kmer_t* kmers, size_t& count, uint32_t n_threads = 1) {
+		ParallelSort(kmers, count, n_threads);
 		auto it = std::unique(kmers, kmers + count);
 
 		count = it - kmers;

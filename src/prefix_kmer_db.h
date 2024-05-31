@@ -54,6 +54,7 @@ public:
 	size_t getHashtableEntrySize() const override { return sizeof(hash_map_lp<suffix_t, pattern_id_t>::item_t); };
 	
 	const std::vector<hash_map_lp<suffix_t, pattern_id_t>>& getHashtables() const { return hashtables; }
+	std::vector<std::vector<pair<suffix_t, pattern_id_t>>>& getSuffixKmers() { return suffix_kmers; }
 
 	const std::vector<pattern_t>& getPatterns() const { return patterns; }
 
@@ -71,7 +72,7 @@ public:
 
 	void serialize(std::ofstream& file, bool rawHashtables) const override;
 
-	bool deserialize(std::ifstream& file, bool skipHashtables = false) override;
+	bool deserialize(std::ifstream& file, DeserializationMode mode = DeserializationMode::Everything) override;
 
 	std::string printProgress() const override {
 		std::ostringstream oss;
@@ -114,8 +115,8 @@ public:
 	void savePatterns(std::ofstream& file) const;
 
 protected:
-
-	static const size_t IO_BUFFER_BYTES = (2 << 29); //512MB buffer 
+//	static const size_t IO_BUFFER_BYTES = (2 << 29); // 1GB buffer 
+	static const size_t IO_BUFFER_BYTES = (64 << 20); // 64MB buffer 
 	static const int PREFETCH_DIST = 48;
 
 	static const uint64_t SERIALIZATION_RAW_HASHTABLES = 0x01;
@@ -127,6 +128,7 @@ protected:
 	std::vector<uint32_t> prefixHistogram;
 
 	std::vector<hash_map_lp<suffix_t, pattern_id_t>> hashtables;
+	std::vector<std::vector<pair<suffix_t, pattern_id_t>>> suffix_kmers;
 
 	std::vector<pattern_t> patterns;
 
@@ -137,9 +139,16 @@ protected:
 
 	// struct for storing queues
 	struct {
-		RegisteringQueue<HashtableTask> hashtableAddition{ 1 };
+//#ifdef USE_CPP20
+//		TwoPassQueue<HashtableTask> hashtableAddition{ 1 };
+//		TwoPassQueue<PatternTask> patternExtension{ 1 };
+//#else
+//		RegisteringQueue<HashtableTask> hashtableAddition{ 1 };
+//		RegisteringQueue<PatternTask> patternExtension{ 1 };
+//#endif
 
-		RegisteringQueue<PatternTask> patternExtension{ 1 };
+		TaskManager<HashtableTask> hashtableAddition;
+		TaskManager<PatternTask> patternExtension;
 	} queues;
 
 	// struct for storing workers
@@ -149,7 +158,8 @@ protected:
 		std::vector<std::thread> patternExtension;
 	} workers;
 
-	Semaphore semaphore;
+//	Semaphore semaphore;
+//	Semaphore semaphore2;
 
 	// structure for storing all the times
 	struct {
@@ -158,7 +168,6 @@ protected:
 		std::chrono::duration<double> hashtableResize_worker{ 0 };
 		std::chrono::duration<double> hashtableFind_worker{ 0 };
 		std::chrono::duration<double> hashtableAdd_worker{ 0 };
-
 
 		std::chrono::duration<double> sort { 0 };
 		std::chrono::duration<double> extension{ 0 };
@@ -182,5 +191,4 @@ protected:
 
 	void hashtableJob();
 	void patternJob();
-
 };

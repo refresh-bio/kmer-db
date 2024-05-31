@@ -42,7 +42,8 @@ public:
 		kmer_t*& kmers,
 		size_t& kmersCount, 
 		uint32_t& kmerLength, 
-		double& filterValue) = 0;
+		double& filterValue,
+		bool nonCanonical) = 0;
 
 
 	static std::string removePathFromFile(const std::string& filePath) {
@@ -66,7 +67,7 @@ protected:
 class GenomeInputFile : public InputFile {
 public:
 	GenomeInputFile(std::shared_ptr<AbstractFilter> filter, bool storePositions)
-		: InputFile(filter), status(false), isGzipped(false), storePositions(storePositions) {}
+		: InputFile(filter), status(false), storePositions(storePositions) {}
 
 	bool open(const std::string& filename) override;
 	
@@ -76,7 +77,8 @@ public:
 		kmer_t*& kmers,
 		size_t& kmersCount,
 		uint32_t& kmerLength,
-		double& filterValue) override;
+		double& filterValue,
+		bool nonCanonical) override;
 
 	bool initMultiFasta();
 	
@@ -87,6 +89,7 @@ public:
 		size_t& kmersCount,
 		uint32_t& kmerLength,
 		double& filterValue,
+		bool nonCanonical,
 		std::string& sampleName
 	);
 
@@ -96,7 +99,6 @@ protected:
 	char* rawData;
 
 	bool status;
-	bool isGzipped;
 	bool storePositions;
 
 	// multifasta fields
@@ -106,7 +108,6 @@ protected:
 
 	size_t multifastaIndex;
 	
-	bool unzip(char* compressedData, size_t compressedSize, char*&outData, size_t &outSize);
 	bool extractSubsequences(
 		char* data,
 		size_t& totalLen,
@@ -129,7 +130,8 @@ public:
 		kmer_t*& kmers,
 		size_t& kmersCount,
 		uint32_t& kmerLength,
-		double& filterValue) override;
+		double& filterValue,
+		bool nonCanonical) override;
 
 	bool store(const std::string& filename, const kmer_t* kmers, size_t kmersCount, uint32_t kmerLength, double filterValue);
 
@@ -163,7 +165,8 @@ public:
 		kmer_t*& kmers,
 		size_t& kmersCount,
 		uint32_t& kmerLength,
-		double& filterValue) override;
+		double& filterValue,
+		bool nonCanonical) override;
 
 protected:
 	std::shared_ptr<CKMCFile> kmcfile{ nullptr };

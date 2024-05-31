@@ -7,6 +7,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 */
 
 #include <memory>
+#include <cassert>
 #include <string>
 #include <cstdint>
 #include <cstring>
@@ -49,6 +50,52 @@ public:
 			: (v < 1000000 ? (v < 100000 ? 5 : 6) : (v < 10000000 ? 7 : 8));
 	}
 
+	// Works only for len <= 5
+	static void short_str_cpy_upto_5(char* dest, char* src, size_t len)
+	{
+		assert(len <= 5);
+
+		if (len == 1)
+			dest[0] = src[0];
+		else if (len == 2)
+		{
+			dest[0] = src[0];
+			dest[1] = src[1];
+		}
+		else if (len == 3)
+		{
+			dest[0] = src[0];
+			dest[1] = src[1];
+			dest[2] = src[2];
+		}
+		else if (len == 4)
+		{
+			dest[0] = src[0];
+			dest[1] = src[1];
+			dest[2] = src[2];
+			dest[3] = src[3];
+		}
+		else
+		{
+			dest[0] = src[0];
+			dest[1] = src[1];
+			dest[2] = src[2];
+			dest[3] = src[3];
+			dest[4] = src[4];
+		}
+
+		return;
+	}
+
+	static void short_str_cpy_5(char* dest, char* src)
+	{
+		dest[0] = src[0];
+		dest[1] = src[1];
+		dest[2] = src[2];
+		dest[3] = src[3];
+		dest[4] = src[4];
+	}
+
 	static int Int2PChar(uint64_t val, char *str)
 	{
 		if (val >= 1000000000000000ull)
@@ -62,10 +109,14 @@ public:
 
 			int ndig = NDigits(dig1);
 
-			std::memcpy(str, digits + dig1 * 5 + (5 - ndig), ndig);
+/*			std::memcpy(str, digits + dig1 * 5 + (5 - ndig), ndig);
 			std::memcpy(str + ndig, digits + dig2 * 5, 5);
 			std::memcpy(str + ndig + 5, digits + dig3 * 5, 5);
-			std::memcpy(str + ndig + 10, digits + dig4 * 5, 5);
+			std::memcpy(str + ndig + 10, digits + dig4 * 5, 5);*/
+			short_str_cpy_upto_5(str, digits + dig1 * 5 + (5 - ndig), ndig);
+			short_str_cpy_5(str + ndig, digits + dig2 * 5);
+			short_str_cpy_5(str + ndig + 5, digits + dig3 * 5);
+			short_str_cpy_5(str + ndig + 10, digits + dig4 * 5);
 
 			return ndig + 15;
 		}
@@ -78,9 +129,12 @@ public:
 
 			int ndig = NDigits(dig1);
 
-			std::memcpy(str, digits + dig1 * 5 + (5 - ndig), ndig);
+/*			std::memcpy(str, digits + dig1 * 5 + (5 - ndig), ndig);
 			std::memcpy(str + ndig, digits + dig2 * 5, 5);
-			std::memcpy(str + ndig + 5, digits + dig3 * 5, 5);
+			std::memcpy(str + ndig + 5, digits + dig3 * 5, 5);*/
+			short_str_cpy_upto_5(str, digits + dig1 * 5 + (5 - ndig), ndig);
+			short_str_cpy_5(str + ndig, digits + dig2 * 5);
+			short_str_cpy_5(str + ndig + 5, digits + dig3 * 5);
 
 			return ndig + 10;
 		}
@@ -91,8 +145,11 @@ public:
 
 			int ndig = NDigits(dig1);
 
-			memcpy(str, digits + dig1 * 5 + (5 - ndig), ndig);
-			memcpy(str + ndig, digits + dig2 * 5, 5);
+//			memcpy(str, digits + dig1 * 5 + (5 - ndig), ndig);
+//			memcpy(str + ndig, digits + dig2 * 5, 5);
+			short_str_cpy_upto_5(str, digits + dig1 * 5 + (5 - ndig), ndig);
+//			short_str_cpy(str + ndig, digits + dig2 * 5, 5);
+			short_str_cpy_5(str + ndig, digits + dig2 * 5);
 
 			return ndig + 5;
 		}
@@ -100,7 +157,8 @@ public:
 		{
 			int ndig = NDigits(val);
 
-			memcpy(str, digits + val * 5 + (5 - ndig), ndig);
+//			memcpy(str, digits + val * 5 + (5 - ndig), ndig);
+			short_str_cpy_upto_5(str, digits + val * 5 + (5 - ndig), ndig);
 
 			return ndig;
 		}
@@ -108,14 +166,56 @@ public:
 
 	static int Double2PChar(double val, uint32_t prec, char *str)
 	{
-		int64_t a = (int64_t)val;
+/*		int64_t a = (int64_t)val;
 		int64_t b = (int64_t)((1.0 + (val - (double)a)) * powers10[prec] + 0.5);
 
 		int r1 = Int2PChar(a, str);
 		int r2 = Int2PChar(b, str + r1);
 		str[r1] = '.';
 
-		return r1 + r2;
+		return r1 + r2;*/
+
+		int neg = 0;
+
+		if (val < 0)
+		{
+			*str++ = '-';
+			val = -val;
+			neg = 1;
+		}
+
+		uint64_t x = (uint64_t) (val * powers10[prec] + 0.5);
+
+		if (x < powers10[prec])						// |val| < 1.0
+		{
+			*str++ = '0';
+			*str++ = '.';
+
+			int to_move = Int2PChar(x, str);
+			int shift = prec - to_move;
+
+			if (shift)
+			{
+				for (int i = 0; i < to_move; ++i)
+					str[prec - i - 1] = str[prec - i - 1 - shift];
+				for (int i = 0; i < shift; ++i)
+					str[i] = '0';
+			}
+
+			return prec + 2 + neg;
+		}
+		else
+		{
+			int r = Int2PChar(x, str + 1);
+
+			int to_move = r - prec;
+
+			for (int i = 0; i < to_move; ++i)
+				str[i] = str[i+1];
+			str[to_move] = '.';
+
+			return r + 1 + neg;
+		}
 	}
 
 	static long int strtol(const char* str, char** endptr) {
@@ -183,10 +283,10 @@ int num2str(const T* collection, size_t size, char delim, char* out) {
 }
 
 template <typename T>
-int num2str_sparse(const T* collection, size_t size, char delim, char* out) {
+int num2str_sparse(const T* collection, size_t size, char delim, char* out, const T sparse_val = 0) {
 	char* ptr = out;
 	for (size_t i = 0; i < size; ++i, collection++) {
-		if (*collection != 0) {
+		if (*collection != sparse_val) {
 			ptr += num2str(i + 1, ptr);
 			*ptr++ = ':';
 			ptr += num2str(*collection, ptr);

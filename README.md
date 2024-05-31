@@ -4,6 +4,12 @@
 [![GitHub Actions CI](../../workflows/GitHub%20Actions%20CI/badge.svg)](../../actions/workflows/main.yml)
 [![License](https://anaconda.org/bioconda/famsa/badges/license.svg)](https://www.gnu.org/licenses/gpl-3.0.html)
 
+![x86-64](https://img.shields.io/static/v1?label=%E2%80%8B&message=x86-64&color=yellow&logo=PCGamingWiki&logoColor=white)
+![ARM](https://img.shields.io/static/v1?label=%E2%80%8B&message=ARM&color=yellow&logo=Raspberry%20Pi&logoColor=white)
+![Apple M](https://img.shields.io/static/v1?label=%E2%80%8B&message=Apple%20M&color=yellow&logo=Apple&logoColor=white)
+![Windows](https://img.shields.io/badge/%E2%80%8B-Windows-00A98F?logo=windows)
+![Linux](https://img.shields.io/static/v1?label=%E2%80%8B&message=Linux&color=00A98F&logo=linux&logoColor=white)
+![macOS](https://img.shields.io/badge/%E2%80%8B-macOS-00A98F?logo=apple)
 
 Kmer-db is a fast and memory-efficient tool for large-scale k-mer analyses (indexing, querying, estimating evolutionary relationships, etc.). 
 
@@ -218,13 +224,13 @@ This mode generates a file with similarity/distance table for each selected meas
 
 This is an optional analysis step which stores minhashed k-mers on the hard disk to be later consumed by `build`, `new2all`, or `one2all` modes with `-from-minhash` switch. It can be skipped if one wants to use all k-mers from samples for distance estimation or employs minhashing during database construction. Syntax:
 
-`kmer-db minhash [-k <kmer-length>] [-multisample-fasta] <fraction> <sample_list>`
+`kmer-db minhash [-f <fraction>] [-k <kmer-length>] [-multisample-fasta] <sample_list>`
 
-`kmer-db minhash -from-kmers <fraction> <sample_list>`
+`kmer-db minhash -from-kmers [-f <fraction>] <sample_list>`
 
 Parameters:
- * `fraction` (input) - fraction of all k-mers to be accepted by the minhash filter.
  * `sample_list` (input) - file containing list of samples in one of the supported formats (see `build` mode). 
+ * `-f <fraction>` - fraction of all k-mers to be accepted by the minhash filter (default: 0.01).
  * `-k <kmer-length>` - length of k-mers (default: 18; maximum: 30); ignored when `-from-kmers` switch is specified.
  * `-multisample-fasta` / `-from-kmers` - see `build` mode for details.
 

@@ -12,8 +12,14 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 // uncomment this to disable AVX2 compilation
 //#define NO_AVX2
 
+
 void row_add(uint32_t *row, uint32_t *src_ids, uint32_t num_elems, uint32_t to_add, bool avx2_present);
 
+#if defined(ARCH_X64)
 void row_add_avx(uint32_t *row, uint32_t *src_ids, uint32_t num_elems, uint32_t to_add);
 void row_add_avx2(uint32_t *row, uint32_t *src_ids, uint32_t num_elems, uint32_t to_add);
+#endif
 
+#if defined(ARCH_ARM)
+void row_add_neon(uint32_t* row, uint32_t* src_ids, uint32_t num_elems, uint32_t to_add);
+#endif

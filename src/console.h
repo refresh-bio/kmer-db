@@ -7,108 +7,101 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 */
 
 #pragma once
-#include "input_file.h"
+#include "params.h"
 #include <stdexcept>
 #include <functional>
+#include <memory>
 
 // *****************************************************************************************
-//
-
-class Params {
+class usage_error : public std::runtime_error {
+	Params::Mode mode;
 public:
-	static const string MODE_BUILD;
-	static const string MODE_MINHASH;
-	static const string MODE_ALL_2_ALL;
-	static const string MODE_NEW_2_ALL;
-	static const string MODE_ONE_2_ALL;
-	static const string MODE_DISTANCE;
-
-	static const string SWITCH_HELP;
-	static const string SWITCH_KMC_SAMPLES;
-	static const string SWITCH_MINHASH_SAMPLES;
-	static const string SWITCH_MULTISAMPLE_FASTA;
-	static const string SWITCH_PHYLIP_OUT;
-	static const string SWITCH_EXTEND_DB;
-	static const string SWITCH_SPARSE;
-	
-	static const string OPTION_FRACTION;
-	static const string OPTION_FRACTION_START;
-	static const string OPTION_LENGTH;
-	static const string OPTION_VERBOSE;
-	static const string OPTION_DEBUG;
-	static const string OPTION_THREADS;
-	static const string OPTION_READER_THREADS;
-	static const string OPTION_BUFFER;
-	static const string OPTION_BELOW;
-	static const string OPTION_ABOVE;
-
+	usage_error(Params::Mode mode) : std::runtime_error(""), mode(mode) {}
+	Params::Mode getMode() const { return mode; }
 };
 
+// *****************************************************************************************
 class Console
 {
 public:
-	using metric_fun_t = std::function<double(size_t, size_t, size_t, int)>;
+
+	virtual void run(const Params& params) = 0;
+	virtual ~Console() {}
+};
 	
-	Console();
+// *****************************************************************************************
+class BuildConsole : public Console {
+public:
+	virtual void run(const Params& params) override;
+};
 
-	int parse(int argc, char** argv);
+class All2AllConsole : public Console {
+public:
+	virtual void run(const Params& params) override;
+};
 
-protected:
-	int numThreads;
-	int numReaderThreads;
-	int cacheBufferMb;
-	bool multisampleFasta;
-	double fraction; 
-	double fractionStart;
-	uint32_t kmerLength;
-	bool sparse;
 
-	std::map<std::string, metric_fun_t> availableMetrics;
+class All2AllSparseConsole : public Console {
+public:
+	virtual void run(const Params& params) override;
+};
 
-	int runBuildDatabase(const std::string& multipleSamples, const std::string dbFilename, InputFile::Format inputFormat, bool extendDb);
+class All2AllPartsConsole : public Console {
+public:
+	virtual void run(const Params& params) override;
+};
+
+class New2AllConsole : public Console {
+public:
+	virtual void run(const Params& params) override;
+};
+
+class One2AllConsole : public Console {
+public:
+	virtual void run(const Params& params) override;
+};
+
+class Db2DbConsole : public Console {
+public:
+	virtual void run(const Params& params) override;
+};
+
+class MinhashConsole : public Console {
+public:
+	virtual void run(const Params& params) override;
+};
+
+class DistanceConsole : public Console {
+public:
+	virtual void run(const Params& params) override;
+};
+
+// *****************************************************************************************
+class ConsoleFactory {
+public:
 	
-	int runAllVsAll(const std::string& dbFilename, const std::string& similarityFile, uint32_t below, uint32_t above);
-	
-	int runNewVsAll(const std::string& dbFilename, const std::string& multipleSamples, const std::string& similarityFilename, InputFile::Format inputFormat, uint32_t below, uint32_t above);
-	
-	int runOneVsAll(const std::string& dbFilename, const std::string& singleFasta, const std::string& similarityFilename, InputFile::Format inputFormat);
+	static std::unique_ptr<Console> create(Params::Mode mode) {
 
-	int runMinHash(const std::string& multipleSamples, InputFile::Format inputFormat);
-	int runDistanceCalculation(
-		const std::string& similarityFilename, 
-		const std::vector<string>& metricNames, 
-		bool usePhylip, 
-		bool sparseOut,
-		double below,
-		double above);
-	
-	int runListPatterns(const std::string& dbFilename, const std::string& patternFile);
-	int runAnalyzeDatabase(const std::string& multipleKmcSamples, const std::string& dbFilename);
+		Console* p = nullptr;
 
-	void showInstructions(const std::string& mode);
+		if (mode == Params::Mode::build) {
+			p = new BuildConsole();
+		} else if (mode == Params::Mode::all2all) {
+			p = new All2AllConsole();
+		} else if (mode == Params::Mode::all2all_parts) {
+			p = new All2AllPartsConsole();
+		} else if (mode == Params::Mode::all2all_sparse) {
+			p = new All2AllSparseConsole();
+		} else if (mode == Params::Mode::new2all) {
+			p = new New2AllConsole();
+		} else if (mode == Params::Mode::one2all) {
+			p = new One2AllConsole();
+		} else if (mode == Params::Mode::distance) {
+			p = new DistanceConsole();
+		} else if (mode == Params::Mode::minhash) {
+			p = new MinhashConsole();
+		} 
 
-	bool findSwitch(std::vector<std::string>& params, const std::string& name) {
-		auto it = find(params.begin(), params.end(), name); // verbose mode
-		if (it != params.end()) {
-			params.erase(it);
-			return true;
-		}
-
-		return false;
-	}
-
-	template <typename T>
-	bool findOption(std::vector<std::string>& params, const std::string& name, T& v) {
-		auto prevToEnd = std::prev(params.end());
-		auto it = find(params.begin(), prevToEnd, name); // verbose mode
-		if (it != prevToEnd) {
-			std::istringstream iss(*std::next(it));
-			if (iss >> v) {
-				params.erase(it, it + 2);
-				return true;
-			}
-		}
-
-		return false;
+		return std::unique_ptr<Console>(p);
 	}
 };
