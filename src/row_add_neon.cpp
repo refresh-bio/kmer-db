@@ -40,9 +40,9 @@ void row_add_neon(uint32_t *row, uint32_t *src_ids, uint32_t num_elems, uint32_t
 
 //			_mm_storeu_si128(_q, _mm_add_epi32(_mm_loadu_si128(_q), _to_add));
 			vst1q_u32(_q, vaddq_u32(vld1q_u32(_q), _to_add));
-			vst1q_u32(_q + 1, vaddq_u32(vld1q_u32(_q + 1), _to_add));
-			vst1q_u32(_q + 2, vaddq_u32(vld1q_u32(_q + 2), _to_add));
-			vst1q_u32(_q + 3, vaddq_u32(vld1q_u32(_q + 3), _to_add));
+			vst1q_u32(_q + 4, vaddq_u32(vld1q_u32(_q + 4), _to_add));
+			vst1q_u32(_q + 8, vaddq_u32(vld1q_u32(_q + 8), _to_add));
+			vst1q_u32(_q + 12, vaddq_u32(vld1q_u32(_q + 12), _to_add));
 
 			p += 16;
 		}
@@ -72,9 +72,9 @@ void row_add_neon(uint32_t *row, uint32_t *src_ids, uint32_t num_elems, uint32_t
 			auto _q = (row + *p);
 
 			vst1q_u32(_q, vaddq_u32(vld1q_u32(_q), _to_add));
-			vst1q_u32(_q + 1, vaddq_u32(vld1q_u32(_q + 1), _to_add));
-			vst1q_u32(_q + 2, vaddq_u32(vld1q_u32(_q + 2), _to_add));
-			vst1q_u32(_q + 3, vaddq_u32(vld1q_u32(_q + 3), _to_add));
+			vst1q_u32(_q + 4, vaddq_u32(vld1q_u32(_q + 4), _to_add));
+			vst1q_u32(_q + 8, vaddq_u32(vld1q_u32(_q + 8), _to_add));
+			vst1q_u32(_q + 12, vaddq_u32(vld1q_u32(_q + 12), _to_add));
 
 			p += 16;
 		}

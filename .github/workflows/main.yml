@@ -8,17 +8,54 @@ on:
   workflow_dispatch:
 
 jobs:
-  
-  linux-test:
-    name: Linux test
-    runs-on: ubuntu-latest
-    env: 
-      INPUT_DIR: ./test/virus
- 
+
+########################################################################################
+  make:
+    name: Make
+    strategy:
+      fail-fast: false
+      matrix:
+        machine: [ubuntu-latest, macOS-12]
+    runs-on: ['${{ matrix.machine }}']   
+   
     steps:
     - uses: actions/checkout@v2
+      with:
+        submodules: recursive
     - name: make
-      run: make -j2
+      run: | 
+        g++ --version
+        make -j CXX=g++-11
+
+    - name: tar artifacts
+      run: tar -cvf kmer-db.tar ./kmer-db ./test/virus
+    
+    - uses: actions/upload-artifact@v2
+      with:
+        name: executable-artifact-${{ matrix.machine }}
+        path: ./kmer-db.tar    
+
+########################################################################################
+  virus:
+    needs: make
+    name: Virus data
+    strategy:
+      fail-fast: false
+      matrix:
+        machine: [ubuntu-latest, macOS-12]
+    runs-on: ['${{ matrix.machine }}']
+    env: 
+      INPUT_DIR: ./test/virus
+    
+    steps:
+    - uses: actions/download-artifact@v2
+      with:
+        name: executable-artifact-${{ matrix.machine }}
+        path: ./
+        
+    - name: untar artifacts
+      run: |
+        tar -xf kmer-db.tar
     
     - name: build 
       run: |
@@ -112,14 +149,4 @@ jobs:
         ./kmer-db new2all k18.db ${INPUT_DIR}/seqs.list k18.n2a.itself.csv
         cmp k18.n2a.itself.csv ${INPUT_DIR}/k18.n2a.itself.csv
 
-   
-        
-  macos-build:
-    name: macOS test
-    runs-on: macOS-latest
-
-    steps:
-    - uses: actions/checkout@v2
-    - name: make
-      run: make
 
