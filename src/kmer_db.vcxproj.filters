@@ -9,7 +9,6 @@
     <ClCompile Include="pattern.cpp" />
     <ClCompile Include="row_add_avx.cpp" />
     <ClCompile Include="row_add_avx2.cpp" />
-    <ClCompile Include="instrset_detect.cpp" />
     <ClCompile Include="parallel_sorter.cpp" />
     <ClCompile Include="similarity_calculator.cpp" />
     <ClCompile Include="prefix_kmer_db.cpp" />
@@ -26,6 +25,7 @@
     <ClCompile Include="console_minhash.cpp" />
     <ClCompile Include="console_new2all.cpp" />
     <ClCompile Include="console_one2all.cpp" />
+    <ClCompile Include="row_add_neon.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="aligned_vector.h" />
@@ -43,7 +43,6 @@
     <ClInclude Include="queue.h" />
     <ClInclude Include="filter.h" />
     <ClInclude Include="row_add.h" />
-    <ClInclude Include="instrset.h" />
     <ClInclude Include="parallel_sorter.h" />
     <ClInclude Include="version.h" />
     <ClInclude Include="kmer_extract.h" />
@@ -55,5 +54,7 @@
     <ClInclude Include="loader_tasks.h" />
     <ClInclude Include="conversion.h" />
     <ClInclude Include="params.h" />
+    <ClInclude Include="..\libs\refresh\pdqsort_par.h" />
+    <ClInclude Include="instr_set_detect.h" />
   </ItemGroup>
 </Project>

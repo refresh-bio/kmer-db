@@ -1,6 +1,6 @@
 #pragma once
 #include "kmer_db.h"
-
+#include <refresh/active_thread_pool/lib/active_thread_pool.h>
 #include <atomic>
 #include <numeric>
 
@@ -68,7 +68,8 @@ public:
 		const kmer_t* kmers,
 		size_t kmersCount,
 		uint32_t kmerLength,
-		double fraction) override;
+		double fraction,
+		refresh::active_thread_pool &atp) override;
 
 	void serialize(std::ofstream& file, bool rawHashtables) const override;
 
@@ -103,7 +104,7 @@ public:
 
 	std::string printDetailedTimes() const override {
 		std::ostringstream oss;
-		oss << "\tHashatable processing (parallel): " << times.hashtableProcess.count() <<  endl 
+		oss << "\tHashtable processing (parallel): " << times.hashtableProcess.count() <<  endl 
 		//	<< "\timbalance: " << stats.hashtableJobsImbalance / getSamplesCount() <<  endl
 			<< "\t\tResize: " << (times.hashtableResize_worker.count() / num_threads) << endl
 			<< "\t\tFind'n'add: " << (times.hashtableFind_worker.count() / num_threads) << endl
@@ -149,12 +150,13 @@ protected:
 
 		TaskManager<HashtableTask> hashtableAddition;
 		TaskManager<PatternTask> patternExtension;
+		AtomicStack<HashtableTask> hashtableAdditionATP;
+		AtomicStack<PatternTask> patternExtensionATP;
 	} queues;
 
 	// struct for storing workers
 	struct {
 		std::vector<std::thread> hashtableAddition;
-
 		std::vector<std::thread> patternExtension;
 	} workers;
 
@@ -191,4 +193,7 @@ protected:
 
 	void hashtableJob();
 	void patternJob();
+
+	void hashtableJobATP();
+	void patternJobATP();
 };

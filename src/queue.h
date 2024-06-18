@@ -241,6 +241,43 @@ public:
 };
 
 // ************************************************************************************
+template<typename T> class AtomicStack
+{
+	vector<T> items;
+	atomic<int64_t> n;
+
+public:
+	AtomicStack() :
+		n(0)
+	{}
+
+	void Push(const vector<T>& _items)
+	{
+		items = _items;
+		n = (int64_t)items.size();
+	}
+
+	void Emplace(vector<T>&& _items)
+	{
+		items = move(_items);
+		n = (int64_t)items.size();
+	}
+
+	bool Pop(T& item)
+	{
+		int64_t id = n.fetch_sub(1) - 1;
+
+		if (id >= 0)
+		{
+			item = items[id];
+			return true;
+		}
+
+		return false;
+	}
+};
+
+// ************************************************************************************
 // Multithreading queue with registering mechanism:
 //   * The queue can report whether it is in wainitng for new data state or there will be no new data
 template<typename T> class RegisteringQueue

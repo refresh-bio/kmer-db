@@ -1,11 +1,16 @@
 #pragma once
 
-#define VERSION "2.0.0"
-#define DATE "31.05.2024"
+#define VERSION "2.0.1"
+#define DATE "19.06.2024"
 
 /* 
 
 Version history
+
+
+2.0.1 (19.06.2024)
+- Improved parallelization scheme.
+
 
 2.0.0 (31.05.2024)
 - Added new modes:  all2all_sparse, all2all_parts,

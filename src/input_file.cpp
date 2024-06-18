@@ -12,7 +12,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include "kmer_extract.h"
 #include "parallel_sorter.h"
 
-#include "../libs/refresh/file_wrapper.h"
+#include "../libs/refresh/compression/lib/file_wrapper.h"
 
 #include <memory>
 #include <fstream>
@@ -210,13 +210,20 @@ bool GenomeInputFile::loadNext(
 	kmersBuffer.clear();
 	kmersBuffer.resize(lengths[multifastaIndex]);
 
-	kmersCount = KmerHelper::extract(
-		chromosomes[multifastaIndex], 
-		lengths[multifastaIndex], 
-		kmerLength, 
-		minhashFilter, 
-		kmersBuffer.data(), 
-		nullptr);
+	if(filterValue < 1.0)
+		kmersCount = KmerHelper::extract(
+			chromosomes[multifastaIndex], 
+			lengths[multifastaIndex], 
+			kmerLength, 
+			minhashFilter, 
+			kmersBuffer.data(), 
+			nullptr);
+	else
+		kmersCount = KmerHelper::extractAll(
+			chromosomes[multifastaIndex],
+			lengths[multifastaIndex],
+			kmerLength,
+			kmersBuffer.data());
 
 	kmers = kmersBuffer.data();
 		

@@ -96,7 +96,8 @@ public:
 		const kmer_t* kmers,
 		size_t kmersCount,
 		uint32_t kmerLength, 
-		double fraction) {
+		double fraction,
+		refresh::active_thread_pool& atp) {
 		LOG_VERBOSE << "Adding sample " << sampleNames.size() + 1 << ": " << sampleName << " (" << kmersCount << " kmers)" << endl ;
 		
 		if (!isInitialized) {

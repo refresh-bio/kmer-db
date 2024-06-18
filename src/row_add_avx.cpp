@@ -26,7 +26,7 @@ void row_add_avx(uint32_t *row, uint32_t *src_ids, uint32_t num_elems, uint32_t 
 	__m128i _to_add = _mm_set1_epi32((int)to_add);
 	auto p = src_ids;
 
-	int j;
+	uint32_t j;
 
 	if (num_elems % 32 >= 16)
 	{

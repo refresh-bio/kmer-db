@@ -83,10 +83,10 @@ LIBS_DIR = libs
 ISAL_DIR = libs/isa-l
 ZLIB_DIR = libs/zlib-ng
 
-INC_DIRS =. libs/mimalloc/include $(GZ_INCLUDE)
+INC_DIRS =. libs/mimalloc/include $(GZ_INCLUDE) libs
 INCLUDE_DIR=$(foreach d, $(INC_DIRS), -I$d)
 
-CFLAGS	+= -Wall -O3 -std=c++20 -static -pthread
+CFLAGS	+= -Wall -O3 -std=c++20 -static -pthread -g
 CFLAGS_AVX2	+= $(CFLAGS) -mavx2 -I $(KMER_DB_LIBS_DIR) $(INCLUDE_DIR)
 CFLAGS += -I $(KMER_DB_LIBS_DIR) $(INCLUDE_DIR)
 CLINK	= -lm -O3 -std=c++20 $(ABI_FLAGS) 
@@ -139,7 +139,7 @@ isa-l:
 	cp $(ISAL_DIR)/bin/libisal.* $(LIBS_DIR)
 
 $(KMER_DB_MAIN_DIR)/parallel_sorter.o: $(KMER_DB_MAIN_DIR)/parallel_sorter.cpp
-	$(CXX) -O3 $(ARCH_FLAGS) -std=c++20 -pthread -c $< -o $@
+	$(CXX) -O3 $(ARCH_FLAGS) -std=c++20 $(INCLUDE_DIR) -pthread -c $< -o $@
 
 ifeq ($(uname_M),x86_64)
 SIMD_OBJS := $(KMER_DB_MAIN_DIR)/row_add_avx.o \
@@ -170,6 +170,7 @@ clean:
 	-rm $(LIBS_DIR)/libz.*
 	-rm $(LIBS_DIR)/isa-l.*
 	-rm $(LIBS_DIR)/libisal.*
+	-rm $(MIMALLOC_OBJ)
 	cd $(ZLIB_DIR) && $(MAKE) -f Makefile.in clean
 	cd $(ISAL_DIR) && $(MAKE) -f Makefile.unx clean
 	

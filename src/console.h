@@ -11,6 +11,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include <stdexcept>
 #include <functional>
 #include <memory>
+#include <refresh/active_thread_pool/lib/active_thread_pool.h>
 
 // *****************************************************************************************
 class usage_error : public std::runtime_error {
@@ -23,8 +24,10 @@ public:
 // *****************************************************************************************
 class Console
 {
+protected:
+	refresh::active_thread_pool atp;
 public:
-
+	Console() : atp(4, 1024, std::chrono::milliseconds(2)) {};
 	virtual void run(const Params& params) = 0;
 	virtual ~Console() {}
 };

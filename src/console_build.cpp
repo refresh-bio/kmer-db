@@ -25,7 +25,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include "prefix_kmer_db.h"
 #include "kmer_extract.h"
 
-#include "../libs/refresh/pdqsort_par.h"
+#include "../libs/refresh/sort/lib/pdqsort_par.h"
 
 using namespace std;
 
@@ -87,11 +87,13 @@ void BuildConsole::run(const Params& params){
 			auto start = std::chrono::high_resolution_clock::now();
 
 			// postprocess k-mers if neccessary
-			// !!! TODO: pewnie trzeba jakoœ lepiej dobraæ tê liczbê w¹tków
 			if (params.inputFormat == InputFile::Format::GENOME) {
 //				KmerHelper::sortAndUnique(task->kmers, task->kmersCount, params.numThreads);
 
-				refresh::sort::pdqsort_branchless(refresh::sort::pdqsort_adjust_threads(task->kmersCount, params.numThreads), task->kmers, task->kmers + task->kmersCount);
+				refresh::sort::pdqsort_branchless_tp(refresh::sort::pdqsort_adjust_threads(task->kmersCount, params.numThreads), task->kmers, task->kmers + task->kmersCount, atp);
+//				refresh::sort::pdqsort_branchless(refresh::sort::pdqsort_adjust_threads(task->kmersCount, params.numThreads), task->kmers, task->kmers + task->kmersCount);
+//				refresh::sort::pdqsort_branchless(task->kmers, task->kmers + task->kmersCount);
+//				stable_sort(task->kmers, task->kmers + task->kmersCount);
 				auto it = std::unique(task->kmers, task->kmers + task->kmersCount);
 				task->kmersCount = it - task->kmers;
 			}
@@ -102,7 +104,7 @@ void BuildConsole::run(const Params& params){
 			auto start2 = std::chrono::high_resolution_clock::now();
 			sortingTime += start2 - start;
 
-			db->addKmers(task->sampleName, task->kmers, task->kmersCount, task->kmerLength, task->fraction);
+			db->addKmers(task->sampleName, task->kmers, task->kmersCount, task->kmerLength, task->fraction, atp);
 			processingTime += std::chrono::high_resolution_clock::now() - start2;
 			
 			loader.releaseTask(*task);

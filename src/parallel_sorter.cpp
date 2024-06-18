@@ -12,7 +12,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include "types.h"
 
 #ifdef USE_PDQSORT
-#include "../libs/refresh/pdqsort_par.h"
+#include "../libs/refresh/sort/lib/pdqsort_par.h"
 #else
 #ifdef WIN32
 #include <ppl.h>
@@ -23,15 +23,21 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #endif
 #endif
 
+#if 0
+
 // *****************************************************************************************
 //
-void ParallelSort(kmer_t *arr, size_t arr_size, uint32_t max_n_threads)
+void ParallelSort(kmer_t *arr, size_t arr_size, uint32_t max_n_threads, refresh::active_thread_pool* atp)
 {
 #ifdef USE_PDQSORT
-	refresh::sort::pdqsort_branchless(refresh::sort::pdqsort_adjust_threads(arr_size, max_n_threads), arr, arr + arr_size);
+	if(atp)
+		refresh::sort::pdqsort_branchless_tp(refresh::sort::pdqsort_adjust_threads(arr_size, max_n_threads), arr, arr + arr_size, *atp);
+	else
+		refresh::sort::pdqsort_branchless(refresh::sort::pdqsort_adjust_threads(arr_size, max_n_threads), arr, arr + arr_size);
 #else
 #ifdef WIN32
-	concurrency::parallel_sort(arr, arr + arr_size);
+//	concurrency::parallel_sort(arr, arr + arr_size);
+	std::stable_sort(arr, arr + arr_size);
 	//std::stable_sort(samplePatterns.begin(), samplePatterns.end(), pid_comparer);
 #elif defined __APPLE__
 	std:: stable_sort(arr, arr + arr_size);
@@ -43,18 +49,21 @@ void ParallelSort(kmer_t *arr, size_t arr_size, uint32_t max_n_threads)
 
 // *****************************************************************************************
 //
-void ParallelSort(pair<pattern_id_t, pattern_id_t*> *arr, size_t arr_size, pair<pattern_id_t, pattern_id_t*> *tmp, int rec_size, int key_size, int n_threads)
+void ParallelSort(pair<pattern_id_t, pattern_id_t*> *arr, size_t arr_size, pair<pattern_id_t, pattern_id_t*> *tmp, int rec_size, int key_size, int n_threads, refresh::active_thread_pool* atp)
 {
 	auto pid_comparer = [](const std::pair<pattern_id_t, pattern_id_t*>& a, const std::pair<pattern_id_t, pattern_id_t*>& b)->bool {
 		return a.first < b.first;
 	};
 
 #ifdef USE_PDQSORT
-	refresh::sort::pdqsort_branchless(refresh::sort::pdqsort_adjust_threads(arr_size, n_threads), arr, arr + arr_size, pid_comparer);
+	if(atp)
+		refresh::sort::pdqsort_branchless_tp(refresh::sort::pdqsort_adjust_threads(arr_size, n_threads), arr, arr + arr_size, pid_comparer, *atp);
+	else
+		refresh::sort::pdqsort_branchless(refresh::sort::pdqsort_adjust_threads(arr_size, n_threads), arr, arr + arr_size, pid_comparer);
 #else
 #ifdef WIN32
-	concurrency::parallel_sort(arr, arr + arr_size, pid_comparer);
-	//std::stable_sort(samplePatterns.begin(), samplePatterns.end(), pid_comparer);
+//	concurrency::parallel_sort(arr, arr + arr_size, pid_comparer);
+	std::stable_sort(arr, arr + arr_size, pid_comparer);
 #elif defined __APPLE__
 	std:: stable_sort(arr, arr + arr_size, pid_comparer);
 #else
@@ -65,18 +74,21 @@ void ParallelSort(pair<pattern_id_t, pattern_id_t*> *arr, size_t arr_size, pair<
 
 // *****************************************************************************************
 //
-void ParallelSort(pair<int, int>* arr, size_t arr_size, int n_threads)
+void ParallelSort(pair<int, int>* arr, size_t arr_size, int n_threads, refresh::active_thread_pool* atp)
 {
 	auto pid_comparer = [](const std::pair<int, int>& a, const std::pair<int, int>& b)->bool {
 		return a < b;
 		};
 
 #ifdef USE_PDQSORT
-	refresh::sort::pdqsort_branchless(refresh::sort::pdqsort_adjust_threads(arr_size, n_threads), arr, arr + arr_size, pid_comparer);
+	if(atp)
+		refresh::sort::pdqsort_branchless_tp(refresh::sort::pdqsort_adjust_threads(arr_size, n_threads), arr, arr + arr_size, pid_comparer, *atp);
+	else
+		refresh::sort::pdqsort_branchless(refresh::sort::pdqsort_adjust_threads(arr_size, n_threads), arr, arr + arr_size, pid_comparer);
 #else
 #ifdef WIN32
-	concurrency::parallel_sort(arr, arr + arr_size, pid_comparer);
-	//std::stable_sort(samplePatterns.begin(), samplePatterns.end(), pid_comparer);
+//	concurrency::parallel_sort(arr, arr + arr_size, pid_comparer);
+	std::stable_sort(arr, arr + arr_size, pid_comparer);
 #elif defined __APPLE__
 	std::stable_sort(arr, arr + arr_size, pid_comparer);
 #else
@@ -87,18 +99,22 @@ void ParallelSort(pair<int, int>* arr, size_t arr_size, int n_threads)
 
 // *****************************************************************************************
 //
-void ParallelSort(pair<kmer_or_pattern_t, pattern_id_t*> *arr, size_t arr_size, pair<kmer_or_pattern_t, pattern_id_t*> *tmp, int rec_size, int key_size, int n_threads)
+void ParallelSort(pair<kmer_or_pattern_t, pattern_id_t*> *arr, size_t arr_size, pair<kmer_or_pattern_t, pattern_id_t*> *tmp, int rec_size, int key_size, int n_threads, refresh::active_thread_pool* atp)
 {
 	auto pid_comparer = [](const std::pair<kmer_or_pattern_t, pattern_id_t*>& a, const std::pair<kmer_or_pattern_t, pattern_id_t*>& b)->bool {
 		return a.first.pattern_id < b.first.pattern_id;
 	};
 
 #ifdef USE_PDQSORT
-	refresh::sort::pdqsort_branchless(refresh::sort::pdqsort_adjust_threads(arr_size, n_threads), arr, arr + arr_size, pid_comparer);
+	if(atp)
+		refresh::sort::pdqsort_branchless_tp(refresh::sort::pdqsort_adjust_threads(arr_size, n_threads), arr, arr + arr_size, pid_comparer, *atp);
+//		refresh::sort::pdqsort_tp(refresh::sort::pdqsort_adjust_threads(arr_size, n_threads), arr, arr + arr_size, pid_comparer, *atp);
+	else
+		refresh::sort::pdqsort_branchless(refresh::sort::pdqsort_adjust_threads(arr_size, n_threads), arr, arr + arr_size, pid_comparer);
 #else
 #ifdef WIN32
-	concurrency::parallel_sort(arr, arr + arr_size, pid_comparer);
-	//std::stable_sort(samplePatterns.begin(), samplePatterns.end(), pid_comparer);
+//	concurrency::parallel_sort(arr, arr + arr_size, pid_comparer);
+	std::stable_sort(arr, arr + arr_size, pid_comparer);
 #elif defined __APPLE__
 	std:: stable_sort(arr, arr + arr_size, pid_comparer);
 #else
@@ -106,3 +122,4 @@ void ParallelSort(pair<kmer_or_pattern_t, pattern_id_t*> *arr, size_t arr_size, 
 #endif
 #endif
 }
+#endif

@@ -45,6 +45,10 @@
 #include <emmintrin.h>
 #endif
 
+#include "../../active_thread_pool/lib/active_thread_pool.h"
+
+#define REFRESH_USE_THREAD_POOLS
+
 //#define REFRESH_ATOMIC_QUEUE_VECTOR
 #define REFRESH_ATOMIC_QUEUE_MAP
 //#define REFRESH_ATOMIC_QUEUE_LIST
@@ -200,44 +204,61 @@ namespace refresh
         // *****************************************************************************
         //
         // *****************************************************************************
-        template<typename Iter, typename Compare, bool Branchless>
+        template<typename Iter, typename Compare, typename ThreadPool, bool Branchless>
         class pdq_sorter
         {
             Compare comp;
+            ThreadPool& thread_pool;
 
             using job_t = std::tuple<Iter, Iter, int, bool>;
 
             details::atomic_queue<job_t> jobs;
-            std::vector<std::future<void>> workers;
 
-            std::atomic<int> active_threads;
-            std::atomic_flag threads_ready;
+#ifdef REFRESH_USE_THREAD_POOLS
+            ThreadPool::pool_state_t pool_state;
+#else
+            std::vector<std::future<void>> workers;
+#endif
+
+            std::atomic<int> active_threads{};
+            std::atomic_flag threads_ready{};
 
             std::atomic<size_t> no_started_workers = 0;
             size_t max_started_workers = 0;
 
-            void local_adjust_n_threads(size_t& n_threads, size_t no_items)
-            {
-                if (n_threads == 0)
-                    n_threads = std::thread::hardware_concurrency();
-
-                if (n_threads * min_par_job_size > no_items)
-                    n_threads = no_items / min_par_job_size;
-
-                if (n_threads == 0)
-                    n_threads = 1;
-            }
-
             void join_workers()
             {
+#ifdef REFRESH_USE_THREAD_POOLS
+                pool_state.heavy_wait();
+#else
                 for (size_t i = 0; i < std::min<size_t>(max_started_workers, no_started_workers); ++i)
                     workers[i].wait();
 
                 workers.clear();
+#endif
             }
 
             void add_worker(size_t id)
             {
+#ifdef REFRESH_USE_THREAD_POOLS
+                thread_pool.launch([&]
+                    {
+                        job_t job;
+
+                        bool is_active = thread_pool.is_active();
+
+                        while (true)
+                        {
+                            if (!jobs.wait_and_pop(job))
+                                break;
+
+                            pdqsort_loop_par(std::get<0>(job), std::get<1>(job), comp, std::get<2>(job), std::get<3>(job), is_active);
+                            if (!decrease_active_threads())
+                                break;
+                        }
+                    },
+                    & pool_state);
+#else
                 workers[id] = std::async(std::launch::async, [&]
                     {
                         job_t job;
@@ -247,11 +268,12 @@ namespace refresh
                             if (!jobs.wait_and_pop(job))
                                 break;
 
-                            pdqsort_loop_par(std::get<0>(job), std::get<1>(job), comp, std::get<2>(job), std::get<3>(job));
+                            pdqsort_loop_par(std::get<0>(job), std::get<1>(job), comp, std::get<2>(job), std::get<3>(job), false);
                             if (!decrease_active_threads())
                                 break;
                         }
                     });
+#endif
             }
 
             void increase_active_threads()
@@ -267,8 +289,8 @@ namespace refresh
                 {
                     jobs.set_completed();
 
-                    threads_ready.test_and_set();
-                    threads_ready.notify_one();
+//                    threads_ready.test_and_set();
+//                    threads_ready.notify_one();
 
                     return false;
                 }
@@ -293,7 +315,8 @@ namespace refresh
             static constexpr size_t cacheline_size = 64;
 
             // Min job size for parallel processing
-            static constexpr size_t min_par_job_size = 1024;
+//            static constexpr size_t min_par_job_size = 1024;
+            static constexpr size_t min_par_job_size[2] = { 1024, 768 };
 
             // Sorts [begin, end) using insertion sort with the given comparison function.
             static inline void insertion_sort(Iter begin, Iter end, Compare comp) {
@@ -620,7 +643,7 @@ namespace refresh
                 return pivot_pos;
             }
 
-            static inline void pdqsort_loop(Iter begin, Iter end, Compare comp, int bad_allowed, bool leftmost = true) {
+            static inline void pdqsort_loop(Iter begin, Iter end, Compare comp, int bad_allowed, bool leftmost, bool is_active) {
                 typedef typename std::iterator_traits<Iter>::difference_type diff_t;
 
                 // Use a while loop for tail recursion elimination.
@@ -628,7 +651,7 @@ namespace refresh
                     diff_t size = end - begin;
 
                     // Insertion sort is faster for small arrays.
-                    if (size < insertion_sort_threshold) {
+                    if (size < (diff_t) insertion_sort_threshold) {
                         if (leftmost) insertion_sort(begin, end, comp);
                         else unguarded_insertion_sort(begin, end, comp);
                         return;
@@ -636,7 +659,7 @@ namespace refresh
 
                     // Choose pivot as median of 3 or pseudomedian of 9.
                     diff_t s2 = size / 2;
-                    if (size > ninther_threshold) {
+                    if (size > (diff_t) ninther_threshold) {
                         sort3(begin, begin + s2, end - 1, comp);
                         sort3(begin + 1, begin + (s2 - 1), end - 2, comp);
                         sort3(begin + 2, begin + (s2 + 1), end - 3, comp);
@@ -676,11 +699,11 @@ namespace refresh
                             return;
                             }
 
-                            if (l_size >= insertion_sort_threshold) {
+                            if (l_size >= (diff_t)insertion_sort_threshold) {
                                 std::iter_swap(begin, begin + l_size / 4);
                                 std::iter_swap(pivot_pos - 1, pivot_pos - l_size / 4);
 
-                                if (l_size > ninther_threshold) {
+                                if (l_size > (diff_t) ninther_threshold) {
                                     std::iter_swap(begin + 1, begin + (l_size / 4 + 1));
                                     std::iter_swap(begin + 2, begin + (l_size / 4 + 2));
                                     std::iter_swap(pivot_pos - 2, pivot_pos - (l_size / 4 + 1));
@@ -688,11 +711,11 @@ namespace refresh
                                 }
                             }
 
-                            if (r_size >= insertion_sort_threshold) {
+                            if (r_size >= (diff_t) insertion_sort_threshold) {
                                 std::iter_swap(pivot_pos + 1, pivot_pos + (1 + r_size / 4));
                                 std::iter_swap(end - 1, end - r_size / 4);
 
-                                if (r_size > ninther_threshold) {
+                                if (r_size > (diff_t) ninther_threshold) {
                                     std::iter_swap(pivot_pos + 2, pivot_pos + (2 + r_size / 4));
                                     std::iter_swap(pivot_pos + 3, pivot_pos + (3 + r_size / 4));
                                     std::iter_swap(end - 2, end - (1 + r_size / 4));
@@ -709,13 +732,13 @@ namespace refresh
 
                     // Sort the left partition first using recursion and do tail recursion elimination for
                     // the right-hand partition.
-                    pdqsort_loop(begin, pivot_pos, comp, bad_allowed, leftmost);
+                    pdqsort_loop(begin, pivot_pos, comp, bad_allowed, leftmost, is_active);
                     begin = pivot_pos + 1;
                     leftmost = false;
                 }
             }
 
-            inline void pdqsort_loop_par(Iter begin, Iter end, Compare comp, int bad_allowed, bool leftmost = true) {
+            inline void pdqsort_loop_par(Iter begin, Iter end, Compare comp, int bad_allowed, bool leftmost, bool is_active) {
                 typedef typename std::iterator_traits<Iter>::difference_type diff_t;
 
                 // Use a while loop for tail recursion elimination.
@@ -723,7 +746,7 @@ namespace refresh
                     diff_t size = end - begin;
 
                     // Insertion sort is faster for small arrays.
-                    if (size < insertion_sort_threshold) {
+                    if (size < (diff_t)insertion_sort_threshold) {
                         if (leftmost) insertion_sort(begin, end, comp);
                         else unguarded_insertion_sort(begin, end, comp);
                         return;
@@ -731,7 +754,7 @@ namespace refresh
 
                     // Choose pivot as median of 3 or pseudomedian of 9.
                     diff_t s2 = size / 2;
-                    if (size > ninther_threshold) {
+                    if (size > (diff_t) ninther_threshold) {
                         sort3(begin, begin + s2, end - 1, comp);
                         sort3(begin + 1, begin + (s2 - 1), end - 2, comp);
                         sort3(begin + 2, begin + (s2 + 1), end - 3, comp);
@@ -771,11 +794,11 @@ namespace refresh
                             return;
                             }
 
-                            if (l_size >= insertion_sort_threshold) {
+                            if (l_size >= (diff_t)insertion_sort_threshold) {
                                 std::iter_swap(begin, begin + l_size / 4);
                                 std::iter_swap(pivot_pos - 1, pivot_pos - l_size / 4);
 
-                                if (l_size > ninther_threshold) {
+                                if (l_size > (diff_t)ninther_threshold) {
                                     std::iter_swap(begin + 1, begin + (l_size / 4 + 1));
                                     std::iter_swap(begin + 2, begin + (l_size / 4 + 2));
                                     std::iter_swap(pivot_pos - 2, pivot_pos - (l_size / 4 + 1));
@@ -783,11 +806,11 @@ namespace refresh
                                 }
                             }
 
-                            if (r_size >= insertion_sort_threshold) {
+                            if (r_size >= (diff_t)insertion_sort_threshold) {
                                 std::iter_swap(pivot_pos + 1, pivot_pos + (1 + r_size / 4));
                                 std::iter_swap(end - 1, end - r_size / 4);
 
-                                if (r_size > ninther_threshold) {
+                                if (r_size > (diff_t)ninther_threshold) {
                                     std::iter_swap(pivot_pos + 2, pivot_pos + (2 + r_size / 4));
                                     std::iter_swap(pivot_pos + 3, pivot_pos + (3 + r_size / 4));
                                     std::iter_swap(end - 2, end - (1 + r_size / 4));
@@ -806,7 +829,7 @@ namespace refresh
                     // the right-hand partition.
 
     //                if (size >= min_par_job_size && jobs.size() <= 4 * max_started_workers)
-                    if (size >= min_par_job_size)
+                    if (size >= (diff_t)min_par_job_size[(int) is_active])
                     {
                         increase_active_threads();
                         size_t priority = pivot_pos - begin;
@@ -815,7 +838,7 @@ namespace refresh
 
                         jobs.push(std::make_tuple(begin, pivot_pos, bad_allowed, leftmost), priority);
 
-                        if (size >= 2 * min_par_job_size)
+                        if (size >= (2 - (int) is_active) * (diff_t)min_par_job_size[(int) is_active])
                         {
                             auto worker_id = no_started_workers.fetch_add(1);
                             if (worker_id < max_started_workers)
@@ -823,7 +846,7 @@ namespace refresh
                         }
                     }
                     else
-                        pdqsort_loop(begin, pivot_pos, comp, bad_allowed, leftmost);
+                        pdqsort_loop(begin, pivot_pos, comp, bad_allowed, leftmost, is_active);
 
                     begin = pivot_pos + 1;
                     leftmost = false;
@@ -831,25 +854,51 @@ namespace refresh
             }
 
         public:
-            pdq_sorter(const Compare& comp) : comp(comp)
-            {
-            }
+            pdq_sorter(const Compare& comp, ThreadPool &thread_pool) : 
+                comp(comp),
+                thread_pool(thread_pool)
+            {}
 
             ~pdq_sorter()
             {
-                jobs.set_completed();
+ //               jobs.set_completed();
+            }
+
+            static void local_adjust_n_threads(size_t& n_threads, size_t no_items, bool is_active)
+            {
+                if (n_threads == 0)
+                    n_threads = std::thread::hardware_concurrency();
+
+                if (n_threads * min_par_job_size[(int) is_active] > no_items)
+                    n_threads = no_items / min_par_job_size[(int) is_active];
+
+                if (n_threads == 0)
+                    n_threads = 1;
             }
 
             static void sort(Iter begin, Iter end, Compare comp)
             {
                 auto bad_allowed = details::log2(end - begin);
 
-                pdqsort_loop(begin, end, comp, bad_allowed, true);
+//                cerr << "\t\t"s + std::to_string(std::distance(begin, end)) + "                    \r";
+//                fflush(stderr);
+
+                pdqsort_loop(begin, end, comp, bad_allowed, true, false);
             }
 
             void sort(size_t n_threads, Iter begin, Iter end)
             {
-                local_adjust_n_threads(n_threads, std::distance(begin, end));
+//                local_adjust_n_threads(n_threads, std::distance(begin, end));
+
+//                cerr << "\t\t"s + std::to_string(std::distance(begin, end)) + "                    \r";
+//                fflush(stderr);
+
+                    
+                if (n_threads == 1)
+                {
+                    sort(begin, end, comp);
+                    return;
+                }
 
                 active_threads = 1;
                 auto bad_allowed = details::log2(end - begin);
@@ -857,11 +906,17 @@ namespace refresh
                 jobs.restart(n_threads - 1);
 
                 //            workers.clear();
+#ifdef REFRESH_USE_THREAD_POOLS
+                pool_state.reserve(n_threads - 1);
+#else
                 workers.resize(n_threads - 1);
+#endif
                 max_started_workers = n_threads - 1;
                 no_started_workers = 0;
 
-                pdqsort_loop_par(begin, end, comp, bad_allowed, true);
+                bool is_active_tp = thread_pool.is_active();
+
+                pdqsort_loop_par(begin, end, comp, bad_allowed, true, is_active_tp);
                 decrease_active_threads();
 
                 job_t job;
@@ -871,11 +926,11 @@ namespace refresh
                     if (!jobs.wait_and_pop(job))
                         break;
 
-                    pdqsort_loop_par(std::get<0>(job), std::get<1>(job), comp, std::get<2>(job), std::get<3>(job));
+                    pdqsort_loop_par(std::get<0>(job), std::get<1>(job), comp, std::get<2>(job), std::get<3>(job), is_active_tp);
                     decrease_active_threads();
                 }
 
-                threads_ready.wait(false);
+//                threads_ready.wait(false);
 
                 join_workers();
             }
@@ -937,7 +992,7 @@ namespace refresh
             if (begin == end)
                 return;
 
-            pdq_sorter<Iter, Compare,
+            pdq_sorter<Iter, Compare, typename refresh::async_pool,
                 details::is_default_compare<typename std::decay<Compare>::type>::value&&
                 std::is_arithmetic<typename std::iterator_traits<Iter>::value_type>::value>::sort(begin, end, comp);
         }
@@ -954,6 +1009,17 @@ namespace refresh
         template<class Iter, class Compare>
         inline void pdqsort(size_t n_threads, Iter begin, Iter end, Compare comp)
         {
+            refresh::async_pool ap;
+            pdsqort_tp(n_threads, begin, end, comp, ap);
+        }
+            
+        // *****************************************************************************
+        template<class Iter, class Compare, class ThreadPool>
+        inline void pdqsort_tp(size_t n_threads, Iter begin, Iter end, Compare comp, ThreadPool &thread_pool)
+        {
+            pdq_sorter<Iter, Compare, ThreadPool, details::is_default_compare<typename std::decay<Compare>::type>::value&&
+                std::is_arithmetic<typename std::iterator_traits<Iter>::value_type>::value>::local_adjust_n_threads(n_threads, std::distance(begin, end), thread_pool.is_active());
+
             if (n_threads == 1)
                 pdqsort<Iter, Compare>(begin, end, comp);
             else
@@ -961,18 +1027,26 @@ namespace refresh
                 if (begin == end)
                     return;
 
-                pdq_sorter<Iter, Compare,
+                pdq_sorter<Iter, Compare, ThreadPool,
                     details::is_default_compare<typename std::decay<Compare>::type>::value&&
-                    std::is_arithmetic<typename std::iterator_traits<Iter>::value_type>::value>(comp).sort(n_threads, begin, end);
+                    std::is_arithmetic<typename std::iterator_traits<Iter>::value_type>::value>(comp, thread_pool).sort(n_threads, begin, end);
             }
+        }
+
+        // *****************************************************************************
+        template<class Iter, class ThreadPool>
+        inline void pdqsort_tp(size_t n_threads, Iter begin, Iter end, ThreadPool &thread_pool)
+        {
+            typedef typename std::iterator_traits<Iter>::value_type T;
+            pdqsort_tp(n_threads, begin, end, std::less<T>(), thread_pool);
         }
 
         // *****************************************************************************
         template<class Iter>
         inline void pdqsort(size_t n_threads, Iter begin, Iter end)
         {
-            typedef typename std::iterator_traits<Iter>::value_type T;
-            pdqsort(n_threads, begin, end, std::less<T>());
+            refresh::async_pool ap;
+            pdqsort_tp(n_threads, begin, end, ap);
         }
 
         // *****************************************************************************
@@ -982,7 +1056,7 @@ namespace refresh
             if (begin == end)
                 return;
 
-            pdq_sorter<Iter, Compare, true>::sort(begin, end, comp);
+            pdq_sorter<Iter, Compare, typename refresh::async_pool, true>::sort(begin, end, comp);
         }
 
         // *****************************************************************************
@@ -994,9 +1068,11 @@ namespace refresh
         }
 
         // *****************************************************************************
-        template<class Iter, class Compare>
-        inline void pdqsort_branchless(size_t n_threads, Iter begin, Iter end, Compare comp)
+        template<class Iter, class Compare, class ThreadPool>
+        inline void pdqsort_branchless_tp(size_t n_threads, Iter begin, Iter end, Compare comp, ThreadPool &thread_pool)
         {
+            pdq_sorter<Iter, Compare, ThreadPool, true>::local_adjust_n_threads(n_threads, std::distance(begin, end), thread_pool.is_active());
+
             if (n_threads == 1)
                 pdqsort_branchless(begin, end, comp);
             else
@@ -1004,16 +1080,32 @@ namespace refresh
                 if (begin == end)
                     return;
 
-                pdq_sorter<Iter, Compare, true>(comp).sort(n_threads, begin, end);
+                pdq_sorter<Iter, Compare, ThreadPool, true>(comp, thread_pool).sort(n_threads, begin, end);
             }
+        }
+
+        // *****************************************************************************
+        template<class Iter, class Compare>
+        inline void pdqsort_branchless(size_t n_threads, Iter begin, Iter end, Compare comp)
+        {
+            refresh::async_pool ap;
+            pdqsort_branchless_tp(n_threads, begin, end, comp, ap);
+        }
+
+        // *****************************************************************************
+        template<class Iter, class ThreadPool>
+        inline void pdqsort_branchless_tp(size_t n_threads, Iter begin, Iter end, ThreadPool &thread_pool)
+        {
+            typedef typename std::iterator_traits<Iter>::value_type T;
+            pdqsort_branchless_tp(n_threads, begin, end, std::less<T>(), thread_pool);
         }
 
         // *****************************************************************************
         template<class Iter>
         inline void pdqsort_branchless(size_t n_threads, Iter begin, Iter end)
         {
-            typedef typename std::iterator_traits<Iter>::value_type T;
-            pdqsort_branchless(n_threads, begin, end, std::less<T>());
+            refresh::async_pool ap;
+            pdqsort_branchless_tp(n_threads, begin, end, ap);
         }
     }
 }

@@ -3,7 +3,7 @@
 
 #include "similarity_calculator.h"
 #include "parallel_sorter.h"
-#include "../libs/refresh/pdqsort_par.h"
+#include "../libs/refresh/sort/lib/pdqsort_par.h"
 
 #if defined(ARCH_X64)
 #include <emmintrin.h>
@@ -24,7 +24,9 @@
 SimilarityCalculator::SimilarityCalculator(int _num_threads, size_t cacheBufferMb) : 
 	// hardware_concurrency may return 0
 	num_threads(_num_threads > 0 ? _num_threads : std::max((int)std::thread::hardware_concurrency(), 1)),
-	cacheBufferMb(cacheBufferMb) {
+	cacheBufferMb(cacheBufferMb),
+	atp(4, 1024)
+{
 
 #if defined(ARCH_X64)
 	// !!! TODO: do zmiany ten instrset_detect()
@@ -1010,7 +1012,7 @@ void SimilarityCalculator::db2db(const PrefixKmerDb& db1, const PrefixKmerDb& db
 
 // *****************************************************************************************
 //
-void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, SparseMatrix<uint32_t>& matrix) const
+void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, SparseMatrix<uint32_t>& matrix) 
 {
 //	auto& ht1 = db1.getHashtables();
 //	auto& ht2 = db2.getHashtables();
@@ -1131,7 +1133,8 @@ void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, Sparse
 	kmer_matchings.shrink_to_fit();
 
 //	sort(global_kmer_matchings.begin(), global_kmer_matchings.end());
-	ParallelSort(global_kmer_matchings.data(), global_kmer_matchings.size(), num_threads);
+//	ParallelSort(global_kmer_matchings.data(), global_kmer_matchings.size(), num_threads, &atp);
+	refresh::sort::pdqsort_branchless_tp(num_threads, global_kmer_matchings.begin(), global_kmer_matchings.end(), atp);
 
 	if (!global_kmer_matchings.empty())
 	{
@@ -1187,8 +1190,7 @@ void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, Sparse
 
 				buf_pos = 0;
 
-				LOG_DEBUG << "Pattern pairs: " << i << " of " << global_kmer_matchings_counts.size() << "\r" << std::flush;
-	
+				LOG_DEBUG << "Pattern pairs: " << i << " of " << global_kmer_matchings_counts.size() << "\r" << std::flush;	
 			}
 
 			uint32_t* buf_ptr1 = patternsBuffer_next.data() + buf_pos;

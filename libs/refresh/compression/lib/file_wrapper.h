@@ -1,6 +1,11 @@
 #ifndef _FILE_WRAPPER_H
 #define _FILE_WRAPPER_H
 
+// *** History of updates
+// *** v. 1.0.1 (2024-03-11) - bug fix (wrong zlib initialization)
+// *** v. 1.0.2 (2024-05-01) - bug fix (wrong reading from file)
+// ***
+
 #include <cstdint>
 #include <cstring>
 #include <cstdio>
@@ -36,9 +41,9 @@
 
 #ifdef REFRESH_STREAM_DECOMPRESSION_ENABLE_ZLIB
 #ifdef _WIN32
-#include "../libs/zlib-ng/build-vs/zlib.h"
+#include <zlib-ng/build-vs/zlib.h>
 #else
-#include "../zlib-ng/zlib.h"
+#include <zlib-ng/zlib.h>
 #endif
 #endif
 

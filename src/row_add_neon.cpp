@@ -24,7 +24,7 @@ void row_add_neon(uint32_t *row, uint32_t *src_ids, uint32_t num_elems, uint32_t
 	uint32x4_t _to_add = vdupq_n_u32(to_add);
 	auto p = src_ids;
 
-	int j;
+	uint32_t j;
 
 	if (num_elems % 32 >= 16)
 	{

@@ -1,7 +1,7 @@
 #include "prefix_kmer_db.h"
 #include "prefix_kmer_db.h"
 
-#include "../libs/refresh/pdqsort_par.h"
+#include "../libs/refresh/sort/lib/pdqsort_par.h"
 
 #include "log.h"
 
@@ -29,7 +29,7 @@ PrefixKmerDb::PrefixKmerDb(int _num_threads) : AbstractKmerDb(),
 		tp.reserve(2 << 10); 
 	}
 	
-	workers.hashtableAddition.resize(num_threads);
+/*	workers.hashtableAddition.resize(num_threads);
 	workers.patternExtension.resize(num_threads);
 
 	for (auto& t : workers.hashtableAddition) {
@@ -38,7 +38,7 @@ PrefixKmerDb::PrefixKmerDb(int _num_threads) : AbstractKmerDb(),
 
 	for (auto& t : workers.patternExtension) {
 		t = std::thread(&PrefixKmerDb::patternJob, this);
-	}
+	}*/
 
 	//stats.workerAdditions.resize(num_threads);
 	//stats.workerReallocs.resize(num_threads);
@@ -102,7 +102,8 @@ void PrefixKmerDb::hashtableJob() {
 				uint32_t begin = lo;
 				kmer_t prevPrefix = lo_prefix;
 
-				std::fill(prefixHistogram.begin() + lo_prefix, prefixHistogram.begin() + hi_prefix + 1, 0);
+				// !!! TODO: ten histogram chyba do niczego nie jest potrzebny. Nie wiem te¿ po co siê to serializuje
+//				std::fill(prefixHistogram.begin() + lo_prefix, prefixHistogram.begin() + hi_prefix + 1, 0);
 
 				// resize hastables
 				size_t htBytes = 0;
@@ -194,6 +195,122 @@ void PrefixKmerDb::hashtableJob() {
 
 // *****************************************************************************************
 //
+void PrefixKmerDb::hashtableJobATP() {
+
+	HashtableTask task;
+
+	while (this->queues.hashtableAdditionATP.Pop(task)) 
+	{
+		// determine ranges
+		const kmer_t* kmers = task.kmers;
+
+		uint32_t lo = task.lo;
+		uint32_t hi = task.hi;
+
+		if (lo != hi) {
+
+			kmer_t lo_prefix = GET_PREFIX_SHIFTED(kmers[lo]);
+			kmer_t hi_prefix = GET_PREFIX_SHIFTED(kmers[hi - 1]);
+
+			auto start = std::chrono::high_resolution_clock::now();
+			// generate histogram
+			uint32_t begin = lo;
+			kmer_t prevPrefix = lo_prefix;
+
+			// !!! TODO: ten histogram chyba do niczego nie jest potrzebny. Nie wiem te¿ po co siê to serializuje
+//			std::fill(prefixHistogram.begin() + lo_prefix, prefixHistogram.begin() + hi_prefix + 1, 0);
+
+			// resize hastables
+			size_t htBytes = 0;
+			int reallocsCount = 0;
+
+			uint32_t dif = 0;
+
+			for (uint32_t i = lo + 1; i < hi; ++i) {
+				kmer_t prefix = GET_PREFIX_SHIFTED(kmers[i]);
+				if (prefix != prevPrefix) {
+//					prefixHistogram[prevPrefix] = i - begin;
+					dif = i - begin;
+
+					// ---
+//					reallocsCount += hashtables[prevPrefix].reserve_for_additional(prefixHistogram[prevPrefix]);
+					reallocsCount += hashtables[prevPrefix].reserve_for_additional(dif);
+					htBytes += hashtables[prevPrefix].get_bytes();
+					// ---
+
+					begin = i;
+					prevPrefix = prefix;
+				}
+			}
+
+			// add remanining
+//			prefixHistogram[hi_prefix] = hi - begin;
+			dif  = hi - begin;
+
+//			reallocsCount += hashtables[hi_prefix].reserve_for_additional(prefixHistogram[hi_prefix]);
+			reallocsCount += hashtables[hi_prefix].reserve_for_additional(dif);
+			htBytes += hashtables[hi_prefix].get_bytes();
+
+
+			/*				for (auto i = lo_prefix; i <= hi_prefix; ++i) {
+								if(prefixHistogram[i] && hashtables[i].need_reserve_for_additional(prefixHistogram[i]))
+									reallocsCount += hashtables[i].reserve_for_additional(prefixHistogram[i]);
+								htBytes += hashtables[i].get_bytes();
+							}*/
+
+							// update memory statistics (atomic - no sync needed)
+			stats.hashtableBytes += htBytes;
+			//	stats.workerReallocs[task.block_id] += reallocsCount;
+
+			times.hashtableResize_worker += std::chrono::high_resolution_clock::now() - start;
+
+			//	LOG_DEBUG << "Block: " << task.block_id << ", lo_prefix: " << lo_prefix << ", hi_prefix: " << hi_prefix << endl ;
+
+			start = std::chrono::high_resolution_clock::now();
+
+			uint32_t existing_id = lo;
+			uint32_t to_add = 0;
+			kmer_t u_kmer;
+#ifdef USE_PREFETCH
+			kmer_t prefetch_kmer;
+#endif
+
+			for (uint32_t i = lo; i < hi; ++i) {
+				u_kmer = kmers[i];
+				kmer_t prefix = GET_PREFIX_SHIFTED(u_kmer);
+				suffix_t suffix = GET_SUFFIX(u_kmer);
+
+#ifdef USE_PREFETCH
+
+				if (i + PREFETCH_DIST < hi) {
+					prefetch_kmer = kmers[i + PREFETCH_DIST];
+					kmer_t prefetch_prefix = GET_PREFIX_SHIFTED(prefetch_kmer);
+					suffix_t suffix = GET_SUFFIX(prefetch_kmer);
+					hashtables[prefetch_prefix].prefetch(suffix);
+				}
+#endif
+				// Check whether k-mer exists in a dictionary
+				auto& ht = hashtables[prefix];
+				auto* entry = ht.find_item(suffix);
+
+				if (entry->val == ht.empty_value) {
+					ht.insert(suffix, 0, entry);
+					++to_add;
+				}
+
+				samplePatterns[existing_id].first.pattern_id = entry->val;
+				samplePatterns[existing_id].second = &(entry->val);
+				existing_id++;
+			}
+
+			kmersCount += to_add;
+			times.hashtableFind_worker += std::chrono::high_resolution_clock::now() - start;
+		}
+	}
+}
+
+// *****************************************************************************************
+//
 void PrefixKmerDb::patternJob() {
 //	while (!this->queues.patternExtension.IsCompleted()) {
 		PatternTask task;
@@ -258,6 +375,66 @@ void PrefixKmerDb::patternJob() {
 //	}
 }
 
+// *****************************************************************************************
+//
+void PrefixKmerDb::patternJobATP() {
+	PatternTask task;
+
+	while (this->queues.patternExtensionATP.Pop(task)) 
+	{
+		uint32_t lo = task.lo;
+		uint32_t hi = task.hi;
+			
+	//	LOG_DEBUG << "Pattern job " << task.block_id << " started (" << lo << "-" << hi << ")" << endl ;
+			
+		sample_id_t sampleId = (sample_id_t)(task.sample_id);
+			
+		threadPatterns[task.block_id].clear();
+		int64_t deltaSize = 0; // get current pattern memory size (atomic)
+
+		for (uint32_t i = lo; i < hi;) {
+			uint32_t j;
+			auto p_id = samplePatterns[i].first.pattern_id;
+
+			// count k-mers from current sample with considered template 
+			for (j = i + 1; j < hi; ++j) {
+				if (p_id != samplePatterns[j].first.pattern_id) {
+					break;
+				}
+			}
+			uint32_t pid_count = j - i;
+
+			if (patterns[p_id].get_num_kmers() == pid_count && !patterns[p_id].get_is_parrent()) {
+				// Extend pattern - all k-mers with considered template exist in the analyzed sample
+				deltaSize -= patterns[p_id].get_bytes();
+				patterns[p_id].expand(sampleId);
+				deltaSize += patterns[p_id].get_bytes();
+			}
+			else
+			{
+				// Generate new template 
+				pattern_id_t local_pid = task.new_pid->fetch_add(1);
+
+				threadPatterns[task.block_id].emplace_back( local_pid, pattern_t(patterns[p_id], p_id, sampleId, pid_count) );
+				deltaSize += threadPatterns[task.block_id].back().second.get_bytes();
+
+				if (p_id) {
+					patterns[p_id].set_num_kmers(patterns[p_id].get_num_kmers() - pid_count);
+				}
+
+				for (uint32_t k = i; k < j; ++k) {
+					*(samplePatterns[k].second) = local_pid;
+				}
+			}
+
+			i = j;
+		}
+
+		// update memory statistics (atomic - no sync needed)
+		stats.patternBytes += deltaSize;
+	}
+}
+
 
 // *****************************************************************************************
 //
@@ -266,9 +443,10 @@ sample_id_t PrefixKmerDb::addKmers(
 	const kmer_t* kmers,
 	size_t kmersCount,
 	uint32_t kmerLength,
-	double fraction)
+	double fraction,
+	refresh::active_thread_pool& atp)
 {
-	sample_id_t sampleId = AbstractKmerDb::addKmers(sampleName, kmers, kmersCount, kmerLength, fraction);
+	sample_id_t sampleId = AbstractKmerDb::addKmers(sampleName, kmers, kmersCount, kmerLength, fraction, atp);
 	uint32_t n_kmers = static_cast<uint32_t>(kmersCount);
 	
 //	std::fill(stats.workerReallocs.begin(), stats.workerReallocs.end(), 0);
@@ -287,9 +465,10 @@ sample_id_t PrefixKmerDb::addKmers(
 	
 	// prepare tasks
 	uint32_t num_blocks = (uint32_t)num_threads * 8;
-	uint32_t block = std::max(n_kmers / num_blocks, 1u);
+//	uint32_t block = std::max(n_kmers / num_blocks, 1u);
+	uint32_t block = std::max(n_kmers / num_blocks, 64u);
 
-	bool use_busy_wait = num_threads >= 8;
+//	bool use_busy_wait = num_threads >= 8;
 
 	// prepare tasks
 	std::vector<HashtableTask> hashtableTasks(num_blocks, HashtableTask{0, 0, n_kmers, kmers, n_kmers });
@@ -324,6 +503,7 @@ sample_id_t PrefixKmerDb::addKmers(
 	});*/
 
 	refresh::sort::pdqsort(hashtableTasks.begin(), hashtableTasks.end(), [](const HashtableTask& x, const HashtableTask& y)->bool {
+//	stable_sort(hashtableTasks.begin(), hashtableTasks.end(), [](const HashtableTask& x, const HashtableTask& y)->bool {
 		return (x.hi - x.lo) < (y.hi - y.lo);
 		});
 
@@ -335,12 +515,25 @@ sample_id_t PrefixKmerDb::addKmers(
 		queues.hashtableAddition.Push(hashtableTasks[tid]);
 	}*/
 //	queues.hashtableAddition.PushRange(hashtableTasks);
-	queues.hashtableAddition.AddTasks(hashtableTasks);
 
+//	queues.hashtableAddition.AddTasks(hashtableTasks);
+
+	refresh::active_thread_pool_state hashtableAddition_state;
+
+	queues.hashtableAdditionATP.Push(hashtableTasks);
+
+	int n_ht_jobs = std::min<int>(num_threads - 1, hashtableTasks.size() - 1);
+
+	for (int i = 0; i < n_ht_jobs; ++i)
+		atp.launch([&, this] {hashtableJobATP(); }, &hashtableAddition_state);
+	hashtableJobATP();
+	hashtableAddition_state.busy_wait();
+
+	/*
 	if(use_busy_wait)
 		queues.hashtableAddition.BusyWait();
 	else
-		queues.hashtableAddition.Wait();
+		queues.hashtableAddition.Wait();*/
 
 //	semaphore.waitForZero();
 	times.hashtableProcess += std::chrono::high_resolution_clock::now() - start;
@@ -357,7 +550,13 @@ sample_id_t PrefixKmerDb::addKmers(
 	LOG_DEBUG << "Sorting (parallel)..." << endl ;
 	start = std::chrono::high_resolution_clock::now();
 
-	ParallelSort(samplePatterns.data(), samplePatterns.size(), nullptr, 0, 0, num_threads);
+//	ParallelSort(samplePatterns.data(), samplePatterns.size(), nullptr, 0, 0, num_threads, &atp);
+//	ParallelSort(samplePatterns.data(), samplePatterns.size(), nullptr, 0, 0, 1, &atp);
+//	ParallelSort(samplePatterns.data(), samplePatterns.size(), nullptr, 0, 0, 1, &atp);
+
+	refresh::sort::pdqsort_branchless_tp(refresh::sort::pdqsort_adjust_threads(samplePatterns.size(), num_threads), samplePatterns.begin(), samplePatterns.end(), 
+		[](const auto& a, const auto& b) {return a.first.pattern_id < b.first.pattern_id; }, atp);
+
 	times.sort += std::chrono::high_resolution_clock::now() - start;
 	
 	//--------------------------------------------------------------------------
@@ -429,6 +628,7 @@ sample_id_t PrefixKmerDb::addKmers(
 
 //	std::sort(patternTasks.begin(), patternTasks.end(), [](const auto& x, const auto& y) {return x.hi - x.lo < y.hi - y.lo; });
 	refresh::sort::pdqsort(patternTasks.begin(), patternTasks.end(), [](const auto& x, const auto& y) {return x.hi - x.lo < y.hi - y.lo; });
+//	stable_sort(patternTasks.begin(), patternTasks.end(), [](const auto& x, const auto& y) {return x.hi - x.lo < y.hi - y.lo; });
 
 //	LOG_NORMAL << patternTasks.size() << endl;
 
@@ -438,11 +638,25 @@ sample_id_t PrefixKmerDb::addKmers(
 		queues.patternExtension.Push(patternTasks[tid]);
 	}*/
 //	queues.patternExtension.PushRange(patternTasks);
-	queues.patternExtension.AddTasks(patternTasks);
+
+	queues.patternExtensionATP.Push(patternTasks);
+
+	refresh::active_thread_pool_state patternExtension_state;
+	
+	int n_pat_jobs = std::min<int>(num_threads - 1, patternTasks.size() - 1);
+
+//	for (int i = 0; i < num_threads - 1; ++i)
+	for (int i = 0; i < n_pat_jobs; ++i)
+		atp.launch([&, this] {patternJobATP(); }, &patternExtension_state);
+	patternJobATP(); 
+	patternExtension_state.busy_wait();
+
+
+/*	queues.patternExtension.AddTasks(patternTasks);
 	if(use_busy_wait)
 		queues.patternExtension.BusyWait();
 	else
-		queues.patternExtension.Wait();
+		queues.patternExtension.Wait();*/
 
 	// wait for the task to complete
 //	semaphore2.waitForZero();

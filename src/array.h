@@ -8,7 +8,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 */
 
 #include "conversion.h"
-#include "../libs/refresh/pdqsort_par.h"
+#include "../libs/refresh/sort/lib/pdqsort_par.h"
 
 #include <vector>
 #include <iostream>
