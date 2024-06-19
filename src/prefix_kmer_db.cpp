@@ -73,7 +73,7 @@ void PrefixKmerDb::initialize(uint32_t kmerLength, double fraction) {
 
 	size_t binsCount = 1 << prefixBits;
 
-	prefixHistogram.resize(binsCount + 1);
+	//prefixHistogram.resize(binsCount + 1);
 	hashtables.resize(binsCount);
 }
 
@@ -112,10 +112,10 @@ void PrefixKmerDb::hashtableJob() {
 				for (uint32_t i = lo + 1; i < hi; ++i) {
 					kmer_t prefix = GET_PREFIX_SHIFTED(kmers[i]);
 					if (prefix != prevPrefix) {
-						prefixHistogram[prevPrefix] = i - begin;
+						//prefixHistogram[prevPrefix] = i - begin;
 
 						// ---
-						reallocsCount += hashtables[prevPrefix].reserve_for_additional(prefixHistogram[prevPrefix]);
+						reallocsCount += hashtables[prevPrefix].reserve_for_additional(i - begin);
 						htBytes += hashtables[prevPrefix].get_bytes();
 						// ---
 
@@ -126,9 +126,9 @@ void PrefixKmerDb::hashtableJob() {
 				}
 
 				// add remanining
-				prefixHistogram[hi_prefix] = hi - begin;
+				//prefixHistogram[hi_prefix] = hi - begin;
 
-				reallocsCount += hashtables[hi_prefix].reserve_for_additional(prefixHistogram[hi_prefix]);
+				reallocsCount += hashtables[hi_prefix].reserve_for_additional(hi - begin);
 				htBytes += hashtables[hi_prefix].get_bytes();
 
 
@@ -539,10 +539,12 @@ sample_id_t PrefixKmerDb::addKmers(
 	times.hashtableProcess += std::chrono::high_resolution_clock::now() - start;
 	
 #ifdef _DEBUG
+	/*
 	uint32_t histoSum = std::accumulate(prefixHistogram.begin(), prefixHistogram.end(), 0);
 	if (histoSum != n_kmers) {
 		throw std::runtime_error("PrefixKmerDb::addKmers() - invalid histogram sum");
 	}
+	*/
 #endif
 
 	//--------------------------------------------------------------------------
@@ -821,8 +823,8 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 	LOG_NORMAL << endl;
 
 	// save prefix histogram
-	save(file, prefixHistogram.size());
-	file.write(reinterpret_cast<const char*>(prefixHistogram.data()), prefixHistogram.size() * sizeof(uint32_t));
+	//save(file, prefixHistogram.size());
+	//file.write(reinterpret_cast<const char*>(prefixHistogram.data()), prefixHistogram.size() * sizeof(uint32_t));
 }
 
 // *****************************************************************************************
@@ -997,9 +999,9 @@ bool PrefixKmerDb::deserialize(std::ifstream& file, DeserializationMode mode) {
 	}
 
 	// load prefix histogram
-	load(file, temp);
-	prefixHistogram.resize(temp);
-	file.read(reinterpret_cast<char*>(prefixHistogram.data()), prefixHistogram.size() * sizeof(uint32_t));
+	//load(file, temp);
+	//prefixHistogram.resize(temp);
+	//file.read(reinterpret_cast<char*>(prefixHistogram.data()), prefixHistogram.size() * sizeof(uint32_t));
 
 	return true;
 }

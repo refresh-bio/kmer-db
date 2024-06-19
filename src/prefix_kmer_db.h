@@ -79,7 +79,7 @@ public:
 		std::ostringstream oss;
 
 		size_t otherBytes =
-			prefixHistogram.capacity() * sizeof(uint32_t) +
+			//prefixHistogram.capacity() * sizeof(uint32_t) +
 			hashtables.capacity() * sizeof(hash_map_lp<suffix_t, pattern_id_t>) +
 			samplePatterns.get_bytes();
 	
@@ -126,7 +126,7 @@ protected:
 	
 	std::atomic<size_t> kmersCount{ 0 };
 
-	std::vector<uint32_t> prefixHistogram;
+	//std::vector<uint32_t> prefixHistogram;
 
 	std::vector<hash_map_lp<suffix_t, pattern_id_t>> hashtables;
 	std::vector<std::vector<pair<suffix_t, pattern_id_t>>> suffix_kmers;

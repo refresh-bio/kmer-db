@@ -1,6 +1,6 @@
 #pragma once
 
-#define VERSION "2.0.1"
+#define VERSION "2.0.2"
 #define DATE "19.06.2024"
 
 /* 
@@ -8,7 +8,10 @@
 Version history
 
 
-2.0.1 (19.06.2024)
+2.0.2 (19.06.2024)
+- Some unneccessary stuff removed from the database.
+
+2.0.1 (18.06.2024)
 - Improved parallelization scheme.
 
 
