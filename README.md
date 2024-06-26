@@ -44,6 +44,17 @@ mkdir $OUTPUT
 # establish number of common 25-mers between single sequence and the database 
 # (minhash filtering that retains 10% of MT159713 k-mers is done automatically prior to the comparison)  
 ./kmer-db one2all $OUTPUT/k25.db $INPUT/data/MT159713.fasta $OUTPUT/MT159713.csv
+
+# build two partial databases
+./kmer-db build $INPUT/seqs.part1.list  $OUTPUT/k18.parts1.db
+./kmer-db build $INPUT/seqs.part2.list  $OUTPUT/k18.parts2.db
+
+# establish numbers of common k-mers between all sequences in the databases,
+# computations are done in the sparse mode, the output matrix is also sparse
+echo $OUTPUT/k18.parts1.db > $OUTPUT/db.list
+echo $OUTPUT/k18.parts2.db >> $OUTPUT/db.list
+./kmer-db all2all-parts $OUTPUT/db.list $OUTPUT/k18.parts.csv
+
 ```
 
 
@@ -68,18 +79,25 @@ conda install -c bioconda kmer-db
 For detailed instructions how to set up Bioconda, please refer to the [Bioconda manual](https://bioconda.github.io/user/install.html#install-conda).
 Kmer-db can be also built from the sources distributed as:
 
-* MAKE project (G++ 5.5.0 tested) for Linux and OS X,
+* MAKE project (G++ 11 tested) for Linux and OS X,
 * Visual Studio 2015 solution for Windows.
 
 
+## Vector extensions
 
-## *zlib* linking
+Kmer-db can be built for x86-64 and ARM64 8 architectures (including Apple Mx based on ARM64 8.4 core) and takes advantage of AVX2 (x86-64) and NEON (ARM) CPU extensions. The default target platform is x86-64 with AVX2 extensions. This, however, can be changed by setting `PLATFORM` variable for `make`:
 
-Kmer-db uses *zlib* for handling gzipped inputs. Under Linux, the software is by default linked against system-installed *zlib*. Due to issues with some library versions, precompiled *zlib* is also present the repository. In order to use it, one needs to modify variable INTERNAL_ZLIB at the top of the makefile. Under Windows, the repository library is always used.
+```bash
+make PLATFORM=none    # unspecified platform, no extensions
+make PLATFORM=sse2    # x86-64 with SSE2 
+make PLATFORM=avx     # x86-64 with AVX 
+make PLATFORM=avx2    # x86-64 with AVX2 (default)
+make PLATFORM=native  # x86-64 with AVX2 and native architecture
+make PLATFORM=arm8    # ARM64 8 with NEON  
+make PLATFORM=m1      # ARM64 8.4 (especially Apple M1) with NEON 
+```   
 
-## AVX and AVX2 support
-
-Kmer-db, by default, takes advantage of AVX (required) and AVX2 (optional) CPU extensions. The pre-built binary determines supported instructions at runtime, thus it is multiplatform. When compiling the sources under Linux and OS X, the support of AVX2 is also established automatically. Under Windows, the program is by default built with AVX2 instructions. To prevent this, Kmer-db must be compiled with NO_AVX2 symbolic constant defined.
+Note, that x86-64 binaries determine the supported extensions at runtime, which makes them backwards-compatible. For instance, the AVX executable will also work on SSE-only platform, but with limited performance.
 
 # 2. Usage
 
@@ -89,6 +107,8 @@ Kmer-db operates in one of the following modes:
 
 * `build` - building a database from samples,
 * `all2all` - counting common k-mers - all samples in the database,
+* `all2all-sp` - counting common k-mers - all samples in the database (sparse computation)
+* `all2all-parts` - counting common k-mers - all samples in the database parts (sparse computation)
 * `new2all` - counting common k-mers - set of new samples versus database,
 * `one2all` - counting common k-mers - single sample versus database,
 * `distance` - calculating similarities/distances,
@@ -132,21 +152,34 @@ Parameters:
 ## 2.2. Counting common k-mers 
 
 ### Samples in the database against each other:
+
+Dense computations - recomended when the distance matrix contains few zeros. Output can be stored in the dense or sparse form (`-sparse` switch).
+
+`kmer-db all2all [-buffer <size_mb>] [-sparse] [-t <threads>] [-above <v>] [-below <v>] [-above_eq <v>] [-below_eq <v>] <database> <common_table>`
  
- `kmer-db all2all [-buffer <size_mb>] [-sparse] [-t <threads>] <database> <common_table>`
+Sparse computations - recommended when the distance matrix contains many zeros. Output matrix is always in the sparse form:
+
+`kmer-db all2all-sp [-buffer <size_mb>] [-t <threads>] [-above <v>] [-below <v>] [-above_eq <v>] [-below_eq <v>] <database> <common_table>`
+
+Sparse computations, partial databases - use when the distance matrix contains many zeros and there are multiple partial databases. Output matrix is always in the sparse form:
+
+`kmer-db all2all-parts [-buffer <size_mb>] [-sparse] [-t <threads>] [-above <v>] [-below <v>] [-above_eq <v>] [-below_eq <v>] <db_list> <common_table>`
  
 Parameters:
 * `database` (input) - k-mer database file created by `build` mode,
+* `db_list` (input) - file containing list of databases files created by `build` mode,
 * `common_table` (output) - file containing table with common k-mer counts.
 * `-buffer <size_mb>` - size of cache buffer in megabytes; use L3 size for Intel CPUs and L2 for AMD for best performance; default: 8
 * `-sparse` - stores output matrix in a sparse form,
-* `-above <a_th>` - retains elements larger then <a_th>,
-* `-below <b_th>` - retains elements smaller then <b_th>.
+* `-above <v>` - retains elements greater then `<v>`
+* `-below <v>` - retains elements less then `<v>`
+* `-above_eq <v>` - retains elements greater or equal `<v>`
+* `-below_eq <v>` - retains elements less or equal `<v>`
 * `-t <threads>` - number of threads (default: number of available cores).
 
 ### New samples against the database:
 
-`kmer-db new2all [-multisample-fasta | -from-kmers | -from-minhash] [-sparse] [-t <threads>] <database> <sample_list> <common_table>`
+`kmer-db new2all [-multisample-fasta | -from-kmers | -from-minhash] [-sparse] [-t <threads>] [-above <v>] [-below <v>] [-above_eq <v>] [-below_eq <v>] <database> <sample_list> <common_table>`
 
 Parameters:
 * `database` (input) - k-mer database file created by `build` mode.
@@ -154,8 +187,10 @@ Parameters:
 * `common_table` (output) - file containing table with common k-mer counts.
 * `-multisample-fasta` / `-from-kmers` / `-from-minhash` - see `build` mode for details.
 * `-sparse` - stores output matrix in a sparse form,
-* `-above <a_th>` - retains elements larger then <a_th>,
-* `-below <b_th>` - retains elements smaller then <b_th>,
+* `-above <v>` - retains elements greater then `<v>`
+* `-below <v>` - retains elements less then `<v>`
+* `-above_eq <v>` - retains elements greater or equal `<v>`
+* `-below_eq <v>` - retains elements less or equal `<v>`
 * `-t <threads>` - number of threads (default: number of available cores).
  
 ### Single sample against the database:
@@ -201,7 +236,7 @@ When `-sparse` switch is specified, the table is stored in a sparse form. In par
  
  ## 2.3. Calculating similarities or distances
 
-`kmer-db distance [<measures>] [-sparse [-above <a_th>] [-below <b_th>]] <common_table>`
+`kmer-db distance [<measures>] [-sparse] [-above <v>] [-below <v>] [-above_eq <v>] [-below_eq <v>] <common_table>`
 
 Parameters:
 * `common_table` (input) - file containing table with numbers of common k-mers produced by `all2all`, `new2all`, or `one2all` mode (both, dense and sparse matrices are supported). 
@@ -213,9 +248,11 @@ Parameters:
   * `mash` (Mash distance): $\textrm{Mash}(q,s) = -\frac{1}{k}ln\frac{2 \cdot J(q,s)}{1 + J(q,s)}$ 
   * `ani` (average nucleotide identity): $\textrm{ANI}(q,s) = 1 - \textrm{Mash}(p,q)$
 * `-phylip-out` - store output distance matrix in a Phylip format,
-* `-sparse` - outputs a sparse matrix (independently of the input matrix format),
-* `-above <a_th>` - retains elements larger then <a_th>,
-* `-below <b_th>` - retains elements smaller then <b_th>.
+* `-sparse` - outputs a sparse matrix (only for dense input matrices - sparse inputs always produce sparse outputs),
+* `-above <v>` - retains elements greater then `<v>`
+* `-below <v>` - retains elements less then `<v>`
+* `-above_eq <v>` - retains elements greater or equal `<v>`
+* `-below_eq <v>` - retains elements less or equal `<v>`
 
 This mode generates a file with similarity/distance table for each selected measure. Name of the output file is produced by adding to the input file an extension with a measure name.
     

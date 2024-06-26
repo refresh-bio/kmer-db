@@ -15,7 +15,7 @@
 #include <iostream>
 
 //#define REFRESH_ATP_DEBUG
-#define REFRESH_ATP_STATS
+//#define REFRESH_ATP_STATS
 
 namespace refresh 
 {

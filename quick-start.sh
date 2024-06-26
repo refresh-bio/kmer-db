@@ -28,3 +28,13 @@ mkdir $OUTPUT
 # establish number of common 25-mers between single sequence and the database 
 # (minhash filtering that retains 10% of MT159713 k-mers is done prior to the comparison)  
 ./kmer-db one2all $OUTPUT/k25.db $INPUT/data/MT159713.fasta $OUTPUT/MT159713.csv
+
+# build two partial databases
+./kmer-db build $INPUT/seqs.part1.list  $OUTPUT/k18.parts1.db
+./kmer-db build $INPUT/seqs.part2.list  $OUTPUT/k18.parts2.db
+
+# establish numbers of common k-mers between all sequences in the databases,
+# computations are done in the sparse mode, the output matrix is also sparse
+echo $OUTPUT/k18.parts1.db > $OUTPUT/db.list
+echo $OUTPUT/k18.parts2.db >> $OUTPUT/db.list
+./kmer-db all2all-parts $OUTPUT/db.list $OUTPUT/k18.parts.csv
