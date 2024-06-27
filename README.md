@@ -16,7 +16,7 @@ Kmer-db is a fast and memory-efficient tool for large-scale k-mer analyses (inde
 ## Quick start
 
 ```bash
-git clone https://github.com/refresh-bio/kmer-db
+git clone --recurse-submodules https://github.com/refresh-bio/kmer-db
 cd kmer-db && make
 
 INPUT=./test/virus
