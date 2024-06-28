@@ -1,5 +1,5 @@
 # !/bin/bash
-git clone https://github.com/refresh-bio/kmer-db
+git clone --recurse-submodules https://github.com/refresh-bio/kmer-db
 cd kmer-db && make
 
 INPUT=./test/virus
