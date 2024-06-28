@@ -1,12 +1,14 @@
 #pragma once
 
-#define VERSION "2.0.2"
-#define DATE "19.06.2024"
+#define VERSION "2.0.3"
+#define DATE "28.06.2024"
 
 /* 
 
 Version history
 
+2.0.3 (28.06.2024)
+- Fixed bug with empty sample.
 
 2.0.2 (19.06.2024)
 - Some unneccessary stuff removed from the database.
