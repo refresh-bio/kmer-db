@@ -449,6 +449,12 @@ sample_id_t PrefixKmerDb::addKmers(
 	sample_id_t sampleId = AbstractKmerDb::addKmers(sampleName, kmers, kmersCount, kmerLength, fraction, atp);
 	uint32_t n_kmers = static_cast<uint32_t>(kmersCount);
 	
+	if (n_kmers == 0)
+	{
+		LOG_NORMAL << "Empty sample: " << sampleName << endl;
+		return sampleId;
+	}
+
 //	std::fill(stats.workerReallocs.begin(), stats.workerReallocs.end(), 0);
 //	std::fill(stats.workerAdditions.begin(), stats.workerAdditions.end(), 0);
 
