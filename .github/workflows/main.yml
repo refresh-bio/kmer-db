@@ -19,18 +19,18 @@ jobs:
     runs-on: ['${{ matrix.machine }}']   
    
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         submodules: recursive
     - name: make
       run: | 
         g++ --version
-        make -j CXX=g++-11
+        make -j CXX=g++-12
 
     - name: tar artifacts
       run: tar -cvf kmer-db.tar ./kmer-db ./test/virus
     
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@v4
       with:
         name: executable-artifact-${{ matrix.machine }}
         path: ./kmer-db.tar    
@@ -48,7 +48,7 @@ jobs:
       INPUT_DIR: ./test/virus
     
     steps:
-    - uses: actions/download-artifact@v2
+    - uses: actions/download-artifact@v4
       with:
         name: executable-artifact-${{ matrix.machine }}
         path: ./
