@@ -1,11 +1,14 @@
 #pragma once
 
-#define VERSION "2.0.3"
-#define DATE "28.06.2024"
+#define VERSION "2.0.4"
+#define DATE "20.08.2024"
 
 /* 
 
 Version history
+
+2.0.4 (20.08.2024)
+- Above and below options working correctly in all2all-sp mode.
 
 2.0.3 (28.06.2024)
 - Fixed bug with empty sample.

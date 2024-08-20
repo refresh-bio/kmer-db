@@ -85,21 +85,40 @@ jobs:
       run: |
         ${EXEC} build -multisample-fasta -k 21 ${INPUT_DIR}/synth.list synth.db
     
-    - name: all2all (dense and sparse)
+    - name: all2all (dense)
       run: |     
         ${EXEC} all2all synth.db a2a
-        ${EXEC} all2all -sparse synth.db a2a-sparse
-        ${EXEC} all2all -sparse -below 40 -above 30 synth.db a2a.sparse.above-below.csv
-        ${EXEC} all2all -sparse -below_eq 39 -above_eq 31 synth.db a2a.sparse.above_eq-below_eq.csv
         cmp ${INPUT_DIR}/a2a a2a
+        
+    - name: all2all (sparse)
+      run: |
+        ${EXEC} all2all -sparse synth.db a2a-sparse
         cmp ${INPUT_DIR}/a2a-sparse a2a-sparse
-        cmp ${INPUT_DIR}/a2a.sparse.above-below.csv a2a.sparse.above-below.csv    
-        cmp ${INPUT_DIR}/a2a.sparse.above-below.csv a2a.sparse.above_eq-below_eq.csv    
+  
+    - name: all2all (sparse + above + below)
+      run: |
+        ${EXEC} all2all -sparse -below 40 -above 30 synth.db a2a.sparse.above-below
+        cmp ${INPUT_DIR}/a2a.sparse.above-below a2a.sparse.above-below
+
+    - name: all2all (sparse + above_eq + below_eq)
+      run: |
+        ${EXEC} all2all -sparse -below_eq 39 -above_eq 31 synth.db a2a.sparse.above_eq-below_eq
+        cmp ${INPUT_DIR}/a2a.sparse.above-below a2a.sparse.above_eq-below_eq 
         
     - name: all2all-sp
       run: | 
         ${EXEC} all2all-sp synth.db a2a-sp
         cmp ${INPUT_DIR}/a2a-sparse a2a-sp
+
+    - name: all2all-sp (sparse + above + below)
+      run: | 
+        ${EXEC} all2all-sp -below 40 -above 30 synth.db a2a-sp.above-below
+        cmp ${INPUT_DIR}/a2a.sparse.above-below a2a-sp.above-below    
+
+    - name: all2all-sp (sparse + above_eq + below_eq)
+      run: | 
+        ${EXEC} all2all-sp -below_eq 39 -above_eq 31 synth.db a2a-sp.above_eq-below_eq
+        cmp ${INPUT_DIR}/a2a.sparse.above-below a2a-sp.above_eq-below_eq   
     
     - name: all2all distances (dense -> dense)
       run: |
@@ -126,14 +145,20 @@ jobs:
         cmp ${INPUT_DIR}/a2a.mash.above-below a2a-sparse.mash
         
        
-    - name: new2all (dense and sparse)
+    - name: new2all (dense)
       run: |
         ${EXEC} new2all -multisample-fasta synth.db ${INPUT_DIR}/synth.list n2a
-        ${EXEC} new2all -multisample-fasta -sparse synth.db ${INPUT_DIR}/synth.list n2a-sparse 
-        ${EXEC} new2all -multisample-fasta -sparse -below 70 -above 20 synth.db ${INPUT_DIR}/synth.list n2a.sparse.above-below.csv
         cmp ${INPUT_DIR}/n2a n2a
+
+    - name: new2all sparse)
+      run: |
+        ${EXEC} new2all -multisample-fasta -sparse synth.db ${INPUT_DIR}/synth.list n2a-sparse 
         cmp ${INPUT_DIR}/n2a-sparse n2a-sparse        
-        cmp ${INPUT_DIR}/n2a.sparse.above-below.csv n2a.sparse.above-below.csv
+
+    - name: new2all (sparse + above + below)
+      run: |
+        ${EXEC} new2all -multisample-fasta -sparse -below 70 -above 20 synth.db ${INPUT_DIR}/synth.list n2a.sparse.above-below
+        cmp ${INPUT_DIR}/n2a.sparse.above-below n2a.sparse.above-below
             
     - name: new2all distances (dense -> dense)
       run: |

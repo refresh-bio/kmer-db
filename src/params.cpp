@@ -235,8 +235,9 @@ void Params::showInstructions(Mode mode) const {
 			<< "Counting common k-mers for all the samples in the database:" << endl
 			<< "    kmer-db " << MODE_ALL_2_ALL
 			<< " [" << OPTION_BUFFER << " <size_mb>]"
-			<< " [" << SWITCH_SPARSE << "]"
-			<< " [" << OPTION_THREADS << " <threads>] <database> <common_table>" << endl << endl
+			<< " [" << OPTION_THREADS << " <threads>]" 
+			<< " [" << SWITCH_SPARSE << " [" << OPTION_ABOVE << " <v>] [" << OPTION_BELOW << " <v>] [" << OPTION_ABOVE_EQ << " <v>] [" << OPTION_BELOW_EQ << " <v>]]"
+			<< " <database> <common_table>" << endl
 
 			<< "Positional arguments:" << endl
 			<< "    database (input) - k-mer database file" << endl
@@ -245,16 +246,22 @@ void Params::showInstructions(Mode mode) const {
 			<< "Options:" << endl
 			<< "    " << OPTION_BUFFER << " <size_mb> - size of cache buffer in megabytes" << endl
 			<< "                      (use L3 size for Intel CPUs and L2 for AMD to maximize performance; default: 8)" << endl
+			<< "    " << OPTION_THREADS << " <threads> - number of threads (default: number of available cores)" << endl
 			<< "    " << SWITCH_SPARSE << " - produce sparse matrix as output" << endl
-			<< "    " << OPTION_THREADS << " <threads> - number of threads (default: number of available cores)" << endl << endl;
+			<< "    " << OPTION_ABOVE << " <v> - retains elements larger then <v>" << endl
+			<< "    " << OPTION_BELOW << " <v> - retains elements smaller then <v>" << endl
+			<< "    " << OPTION_ABOVE_EQ << " <v> - retains elements larger or equal <v>" << endl
+			<< "    " << OPTION_BELOW_EQ << " <v> - retains elements smaller or equal <v>" << endl
+			<< endl;
 	}
 	else if (mode == Mode::all2all_sparse) {
 		LOG_NORMAL
 			<< "Counting common k-mers for all the samples in the database (sparse computation):" << endl
 			<< "    kmer-db " << MODE_ALL_2_ALL_SPARSE
 			<< " [" << OPTION_BUFFER << " <size_mb>]"
-			<< " [" << SWITCH_SPARSE << "]"
-			<< " [" << OPTION_THREADS << " <threads>] <database> <common_table>" << endl << endl
+			<< " [" << OPTION_THREADS << " <threads>]" 
+			<< " [" << OPTION_ABOVE << " <v>] [" << OPTION_BELOW << " <v>] [" << OPTION_ABOVE_EQ << " <v>] [" << OPTION_BELOW_EQ << " <v>]"
+			<< " <database> <common_table>" << endl << endl
 
 			<< "Positional arguments:" << endl
 			<< "    database (input) - k-mer database file" << endl
@@ -263,16 +270,21 @@ void Params::showInstructions(Mode mode) const {
 			<< "Options:" << endl
 			<< "    " << OPTION_BUFFER << " <size_mb> - size of cache buffer in megabytes" << endl
 			<< "                      (use L3 size for Intel CPUs and L2 for AMD to maximize performance; default: 8)" << endl
-			<< "    " << SWITCH_SPARSE << " - produce sparse matrix as output" << endl
-			<< "    " << OPTION_THREADS << " <threads> - number of threads (default: number of available cores)" << endl << endl;
+			<< "    " << OPTION_THREADS << " <threads> - number of threads (default: number of available cores)" << endl
+			<< "    " << OPTION_ABOVE << " <v> - retains elements larger then <v>" << endl
+			<< "    " << OPTION_BELOW << " <v> - retains elements smaller then <v>" << endl
+			<< "    " << OPTION_ABOVE_EQ << " <v> - retains elements larger or equal <v>" << endl
+			<< "    " << OPTION_BELOW_EQ << " <v> - retains elements smaller or equal <v>" << endl
+			<< endl;
 	}
 	else if (mode == Mode::all2all_parts) {
 		LOG_NORMAL
 			<< "Counting common k-mers for all the samples in the database parts (sparse computation):" << endl
 			<< "    kmer-db " << MODE_ALL_2_ALL_PARTS
 			<< " [" << OPTION_BUFFER << " <size_mb>]"
-			<< " [" << SWITCH_SPARSE << "]"
-			<< " [" << OPTION_THREADS << " <threads>] <db_list> <common_table>" << endl << endl
+			<< " [" << OPTION_THREADS << " <threads>]" 
+			<< " [" << OPTION_ABOVE << " <v>] [" << OPTION_BELOW << " <v>] [" << OPTION_ABOVE_EQ << " <v>] [" << OPTION_BELOW_EQ << " <v>]"
+			<< " <db_list> <common_table>" << endl << endl
 
 			<< "Positional arguments:" << endl
 			<< "    db_list (input) - file containing list of database file names" << endl
@@ -281,8 +293,12 @@ void Params::showInstructions(Mode mode) const {
 			<< "Options:" << endl
 			<< "    " << OPTION_BUFFER << " <size_mb> - size of cache buffer in megabytes" << endl
 			<< "                      (use L3 size for Intel CPUs and L2 for AMD to maximize performance; default: 8)" << endl
-			<< "    " << SWITCH_SPARSE << " - produce sparse matrix as output" << endl
-			<< "    " << OPTION_THREADS << " <threads> - number of threads (default: number of available cores)" << endl << endl;
+			<< "    " << OPTION_THREADS << " <threads> - number of threads (default: number of available cores)" << endl
+			<< "    " << OPTION_ABOVE << " <v> - retains elements larger then <v>" << endl
+			<< "    " << OPTION_BELOW << " <v> - retains elements smaller then <v>" << endl
+			<< "    " << OPTION_ABOVE_EQ << " <v> - retains elements larger or equal <v>" << endl
+			<< "    " << OPTION_BELOW_EQ << " <v> - retains elements smaller or equal <v>" << endl
+			<< endl;
 	}
 	/*
 	else if (mode == Mode::db2db) {
@@ -310,7 +326,7 @@ void Params::showInstructions(Mode mode) const {
 			<< "Counting common kmers between set of new samples and all the samples in the database:" << endl
 			<< "    kmer-db " << MODE_NEW_2_ALL
 			<< " [" << SWITCH_MULTISAMPLE_FASTA << " | " << SWITCH_KMC_SAMPLES << " | " << SWITCH_MINHASH_SAMPLES << "]"
-			<< " [" << SWITCH_SPARSE << "]"
+			<< " [" << SWITCH_SPARSE << " [" << OPTION_ABOVE << " <v>] [" << OPTION_BELOW << " <v>] [" << OPTION_ABOVE_EQ << " <v>] [" << OPTION_BELOW_EQ << " <v>]] "
 			<< " [" << OPTION_THREADS << " <threads>] <database> <sample_list> <common_table>" << endl << endl
 
 			<< "Positional arguments:" << endl
@@ -321,8 +337,13 @@ void Params::showInstructions(Mode mode) const {
 
 			<< "Options:" << endl
 			<< "    " << SWITCH_MULTISAMPLE_FASTA << " - each sequence in a FASTA file is treated as a separate sample" << endl
+			<< "    " << OPTION_THREADS << " <threads> - number of threads (default: number of available cores)" << endl
 			<< "    " << SWITCH_SPARSE << " - outputs a sparse matrix" << endl
-			<< "    " << OPTION_THREADS << " <threads> - number of threads (default: number of available cores)" << endl << endl;
+			<< "    " << OPTION_ABOVE << " <v> - retains elements larger then <v>" << endl
+			<< "    " << OPTION_BELOW << " <v> - retains elements smaller then <v>" << endl
+			<< "    " << OPTION_ABOVE_EQ << " <v> - retains elements larger or equal <v>" << endl
+			<< "    " << OPTION_BELOW_EQ << " <v> - retains elements smaller or equal <v>" << endl
+			<< endl;
 	}
 	else if (mode == Mode::one2all) {
 		LOG_NORMAL
@@ -340,7 +361,8 @@ void Params::showInstructions(Mode mode) const {
 		LOG_NORMAL
 			<< "Calculating similarities/distances on the basis of common k-mers:" << endl
 			<< "    kmer-db " << MODE_DISTANCE << " [<measures>]"
-			<< " [" << SWITCH_SPARSE << " [" << OPTION_ABOVE << " <a_th>] [" << OPTION_BELOW << " <b_th>]] <common_table>" << endl << endl
+			<< " [" << SWITCH_SPARSE << " [" << OPTION_ABOVE << " <v>] [" << OPTION_BELOW << " <v>] [" << OPTION_ABOVE_EQ << " <v>] [" << OPTION_BELOW_EQ << " <v>]] "
+			<< "<common_table>" << endl << endl
 
 			<< "Positional arguments:" << endl
 			<< "    common_table (input) - comma-separated table with a number of common k-mers" << endl
@@ -350,8 +372,11 @@ void Params::showInstructions(Mode mode) const {
 			<< "               jaccard (default), min, max, cosine, mash, ani, ani-shorter." << endl
 			<< "    " << SWITCH_PHYLIP_OUT << " - store output distance matrix in a Phylip format" << endl
 			<< "    " << SWITCH_SPARSE << " - outputs a sparse matrix (independently of the input matrix format)" << endl
-			<< "    " << OPTION_ABOVE << " <a_th> - retains elements larger then <a_th>" << endl
-			<< "    " << OPTION_BELOW << " <b_th> - retains elements smaller then <b_th>" << endl << endl
+			<< "    " << OPTION_ABOVE << " <v> - retains elements larger then <v>" << endl
+			<< "    " << OPTION_BELOW << " <v> - retains elements smaller then <v>" << endl 
+			<< "    " << OPTION_ABOVE_EQ << " <v> - retains elements larger or equal <v>" << endl
+			<< "    " << OPTION_BELOW_EQ << " <v> - retains elements smaller or equal <v>" << endl
+			<< endl
 			<< "This mode generates a file with similarity/distance table for each selected measure." << endl
 			<< "Name of the output file is produced by adding to the input file an extension with a measure name." << endl << endl;
 	}
