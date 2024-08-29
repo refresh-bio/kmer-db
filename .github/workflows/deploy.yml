@@ -1,0 +1,77 @@
+name: Deploy
+
+on:
+ release:
+    types:
+      - created
+
+jobs:
+
+
+ ########################################################################################
+  checkout:
+    name: Checkout
+    strategy:
+      matrix:
+        machine: [x64_linux, x64_mac, arm64_linux, arm64_mac]
+    runs-on: [self-hosted, kmer-db, '${{ matrix.machine }}']
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+########################################################################################
+  make:
+    name: Make
+    needs: checkout
+    strategy:
+      fail-fast: false
+      matrix:
+        machine: [x64_linux, arm64_linux, x64_mac, arm64_mac]
+       
+    runs-on: [self-hosted, kmer-db, '${{ matrix.machine }}']  
+        
+    steps:
+    - name: make 
+      run: |
+        make clean
+        make -j32 CXX=g++-12 STATIC_LINK=true
+    - name: tar artifacts
+      run: tar -cvzf kmer-db.tar.gz kmer-db LICENSE
+
+      
+########################################################################################
+  help:
+    name: Print usage
+    needs: make
+    strategy:
+      fail-fast: false
+      matrix:
+        machine: [x64_linux, x64_mac, arm64_linux, arm64_mac]
+    runs-on: [self-hosted, kmer-db, '${{ matrix.machine }}']
+        
+    steps:
+    - name: help
+      run: ./kmer-db
+
+########################################################################################
+  upload:
+    name: Upload
+    needs: help
+    strategy:
+      fail-fast: false
+      matrix:
+        machine: [x64_linux, x64_mac, arm64_linux, arm64_mac]
+    runs-on: [self-hosted, kmer-db, '${{ matrix.machine }}']
+    
+    steps:
+    - name: deploy
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./kmer-db.tar.gz
+        asset_name: kmer-db-${{ github.event.release.tag_name }}-${{matrix.machine}}.tar.gz
+        asset_content_type: application/gzip
