@@ -14,11 +14,11 @@ jobs:
     name: Checkout
     strategy:
       matrix:
-        machine: [xeon, mac-i7, mac-m1]
+        machine: [x64_linux, x64_mac, arm64_linux, arm64_mac]
     runs-on: [self-hosted, kmer-db, '${{ matrix.machine }}']
     
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         submodules: recursive
     
@@ -30,15 +30,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        machine: [xeon, mac-i7, mac-m1]
-        compiler: [11]
+        machine: [x64_linux, x64_mac, arm64_linux, arm64_mac]
+        compiler: [g++-11, g++-12, g++-13]
+        include:
+        - {machine: x64_linux, platform: avx2}
+        - {machine: arm64_linux, platform: arm8}
+        - {machine: x64_mac, platform: avx2}
+        - {machine: arm64_mac, platform: m1}
+        exclude:
+        - {machine: arm64_linux, compiler: g++-13}
         force_zlib: [true, false]
+   
     runs-on: [self-hosted, kmer-db, '${{ matrix.machine }}']  
         
     steps:
-    - name: make (g++-${{matrix.compiler}}, FORCE_ZLIB=${{matrix.force_zlib}})
+    - name: make (${{matrix.compiler}}, FORCE_ZLIB=${{matrix.force_zlib}}, PLATFORM=${{ matrix.platform}})
       run: | 
-        make -j32 CXX=g++-${{matrix.compiler}} FORCE_ZLIB=${{matrix.force_zlib}}
+        make -j32 CXX=${{matrix.compiler}} FORCE_ZLIB=${{matrix.force_zlib}} PLATFORM=${{ matrix.platform }}
         cp ./kmer-db ./kmer-db-${{matrix.compiler}}-${{matrix.force_zlib}}
         make clean
         
@@ -49,16 +57,28 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        machine: [xeon, mac-i7, mac-m1]
-        compiler: [11]
-        mode: [unknown, build, all2all, all2all-parts, all2all-sp, new2all, one2all, distance, minhash]
+        machine: [x64_linux, x64_mac, arm64_linux, arm64_mac]
+        compiler: [g++-11, g++-12, g++-13]
+        force_zlib: [false, true]
+        mode: [unknown_mode]
+        exclude:
+        - {machine: arm64_linux, compiler: g++-13}
+        include:
+        - {machine: x64_linux, compiler: g++-13, force_zlib: false, mode: all2all}
+        - {machine: x64_linux, compiler: g++-13, force_zlib: false, mode: all2all-parts} 
+        - {machine: x64_linux, compiler: g++-13, force_zlib: false, mode: all2all-sp} 
+        - {machine: x64_linux, compiler: g++-13, force_zlib: false, mode: new2all} 
+        - {machine: x64_linux, compiler: g++-13, force_zlib: false, mode: one2all} 
+        - {machine: x64_linux, compiler: g++-13, force_zlib: false, mode: distance} 
+        - {machine: x64_linux, compiler: g++-13, force_zlib: false, mode: minhash} 
+
     runs-on: [self-hosted, kmer-db, '${{ matrix.machine }}']
     
     env: 
-      EXEC: ./kmer-db-${{matrix.compiler}}-true
+      EXEC: ./kmer-db-${{matrix.compiler}}-${{matrix.force_zlib}}
         
     steps:
-    - name: help (g++-${{matrix.compiler}}, ${{matrix.mode}})
+    - name: help (${{matrix.compiler}}, ${{matrix.mode}})
       run: | 
        ${EXEC} ${{matrix.mode}} -help
 
@@ -70,9 +90,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        machine: [xeon, mac-i7, mac-m1]
-        compiler: [11]
-        force_zlib: [true, false]
+        machine: [x64_linux, x64_mac, arm64_linux, arm64_mac]
+        compiler: [g++-11, g++-12, g++-13]
+        exclude:
+        - {machine: arm64_linux, compiler: g++-13}
+        force_zlib: [false]
     runs-on: [self-hosted, kmer-db, '${{ matrix.machine }}']
 
     env: 
@@ -188,14 +210,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        machine: [xeon, mac-i7, mac-m1]
-        compiler: [11]
-        threads: [1, 2, 16, 0]
+        machine: [x64_linux, x64_mac, arm64_linux, arm64_mac]
+        compiler: [g++-11, g++-12, g++-13]
+        exclude:
+        - {machine: arm64_linux, compiler: g++-13}
+        force_zlib: [false]
+        threads: [1, 2, 16]
+
     runs-on: [self-hosted, kmer-db, '${{ matrix.machine }}']
     
     env: 
       INPUT_DIR: ./test/virus
-      EXEC: ./kmer-db-${{matrix.compiler}}-false
+      EXEC: ./kmer-db-${{matrix.compiler}}-${{matrix.force_zlib}}
  
     steps:
     
