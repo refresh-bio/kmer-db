@@ -134,7 +134,7 @@ void All2AllPartsConsole::run(const Params& params) {
 
 	for (uint32_t i_row = 0; i_row < no_parts; ++i_row)
 	{
-		LOG_VERBOSE << "***** Row: " << i_row << " of " << no_parts << endl;
+		LOG_VERBOSE << "***** Row: " << i_row + 1 << " of " << no_parts << endl;
 
 		matrices_row.clear();
 		matrices_row.resize(i_row + 1, nullptr);
@@ -156,7 +156,7 @@ void All2AllPartsConsole::run(const Params& params) {
 		{
 			uint32_t i_col = i_row - 1;
 			t1 = std::chrono::high_resolution_clock::now();
-			LOG_NORMAL << "Processing cell (" << i_row << "," << i_col << ")" << endl << std::flush;
+			LOG_NORMAL << "Processing cell (" << i_row + 1 << "," << i_col + 1 << ")" << endl << std::flush;
 
 			db_col = db_tmp;
 			db_tmp = nullptr;

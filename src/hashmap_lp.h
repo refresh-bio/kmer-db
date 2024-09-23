@@ -219,6 +219,20 @@ public:
 
 	// *****************************************************************************************
 	//
+	uint32_t hash_val32(const Key k)
+	{
+		return (uint32_t) (my_hasher_lp<Key>(k) & allocated_mask);
+	}
+
+	// *****************************************************************************************
+	//
+	uint64_t hash_val64(const Key k)
+	{
+		return (uint64_t) (my_hasher_lp<Key>(k) & allocated_mask);
+	}
+
+	// *****************************************************************************************
+	//
 	Value* insert(Key k, Value v)
 	{
 		if (filled >= size_when_restruct) {

@@ -1,11 +1,14 @@
 #pragma once
 
-#define VERSION "2.0.5"
-#define DATE "12.09.2024"
+#define VERSION "2.0.6"
+#define DATE "23.09.2024"
 
 /* 
 
 Version history
+2.0.6 (23.09.2024)
+- Speed-ups in all2all-sp and all2all-parts modes.
+
 2.0.5 (12.09.2024)
 - Updates in tests and automatic building scripts.
 

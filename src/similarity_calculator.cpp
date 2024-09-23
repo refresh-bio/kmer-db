@@ -524,11 +524,17 @@ void SimilarityCalculator::all2all_sp(PrefixKmerDb& db, SparseMatrix<uint32_t>& 
 	for (int i = 0; i < num_threads; ++i)
 		thr_workers.emplace_back([&, i] {
 		uint32_t thread_id = i;
-		uint32_t my_mod = thread_id % num_threads;
+		uint32_t my_mod1 = thread_id % num_threads;
+		uint32_t my_mod2 = 2 * num_threads - 1 - my_mod1;
 		uint32_t pid = 0;
 
 		bar_patterns.arrive_and_wait();
 		bar_patterns.arrive_and_wait();
+
+		vector<uint32_t> my_js;
+		vector<pair<uint32_t, uint32_t>> hash_j;
+
+		const uint32_t pf_skip = 32;
 
 		while (true)
 		{
@@ -541,12 +547,17 @@ void SimilarityCalculator::all2all_sp(PrefixKmerDb& db, SparseMatrix<uint32_t>& 
 			{
 				uint32_t to_add = patterns[pid++].get_num_kmers();
 
+//				if(thread_id == 0)
+//					cout << pat.first << " ";
+
+#if 0	// OLD
 				for (uint32_t j = 0; j < pat.first; ++j)
 				{
-					uint32_t *pat_data = pat.second;
+					uint32_t* pat_data = pat.second;
 					uint32_t row_id = pat_data[j];
 
-					if (row_id % num_threads != my_mod)
+					uint32_t row_id_nt = row_id % (2 * num_threads);
+					if (row_id_nt != my_mod1 && row_id_nt != my_mod2)
 						continue;
 
 					auto& row_data = matrix[row_id];
@@ -554,6 +565,63 @@ void SimilarityCalculator::all2all_sp(PrefixKmerDb& db, SparseMatrix<uint32_t>& 
 					for (uint32_t k = 0; k < j; ++k)
 						row_data[pat_data[k]] += to_add;
 				}
+
+#else
+				my_js.clear();
+
+				uint32_t* pat_data = pat.second;
+
+				for (uint32_t j = 0; j < pat.first; ++j)
+				{
+					uint32_t row_id_nt = pat_data[j] % (2 * num_threads);
+					if (row_id_nt == my_mod1 || row_id_nt == my_mod2)
+						my_js.emplace_back(j);
+				}
+
+				for (size_t jj = 0; jj < my_js.size(); ++jj)
+				{
+					if (my_js[jj] < pf_skip)
+					{
+						if (jj + 1 < my_js.size())
+						{
+							uint32_t j_next = my_js[jj + 1];
+							uint32_t row_id_next = pat_data[j_next];
+							auto& row_data_next = matrix[row_id_next];
+
+							for (uint32_t k = 0; k < j_next; ++k)
+								row_data_next.prefetch(pat_data[k]);
+						}
+
+						uint32_t j = my_js[jj];
+						uint32_t row_id = pat_data[j];
+
+						auto& row_data = matrix[row_id];
+
+						for (uint32_t k = 0; k < j; ++k)
+							row_data[pat_data[k]] += to_add;
+					}
+					else
+					{
+						uint32_t j = my_js[jj];
+						uint32_t row_id = pat_data[j];
+						uint32_t row_id_next = (jj + 1 < my_js.size()) ? pat_data[my_js[jj + 1]] : 0;
+
+						auto& row_data = matrix[row_id];
+
+						for (uint32_t k = 0; k < j - pf_skip; ++k)
+						{
+							row_data.prefetch(pat_data[k+pf_skip]);
+							row_data[pat_data[k]] += to_add;
+						}
+
+						for (uint32_t k = j - pf_skip; k < j; ++k)
+						{
+							matrix[row_id_next].prefetch(pat_data[k - (j - pf_skip)]);			// for simplicity (to avoid if) can prefetch row_id_next=0
+							row_data[pat_data[k]] += to_add;
+						}
+					}
+				}
+#endif
 			}
 
 			bar_patterns.arrive_and_wait();
@@ -1164,6 +1232,8 @@ void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, Sparse
 
 	barrier bar_patterns(num_threads + 1);
 
+	size_t percent = 0;
+
 	thread thr_pattern_decompress([&] {
 		auto& patterns1 = db1.getPatterns();
 		auto& patterns2 = db2.getPatterns();
@@ -1173,6 +1243,11 @@ void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, Sparse
 
 		for (size_t i = 0; i < global_kmer_matchings_counts.size(); ++i)
 		{
+			if (i * 100 / global_kmer_matchings_counts.size() >= percent) {
+				LOG_NORMAL << "\r" << percent << "%" << std::flush;
+				++percent;
+			}
+
 			auto pid1 = global_kmer_matchings_counts[i].first.first;
 			auto pid2 = global_kmer_matchings_counts[i].first.second;
 
@@ -1227,7 +1302,13 @@ void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, Sparse
 		thr_workers.emplace_back([&, i] {
 			uint32_t thread_id = i;
 			uint32_t my_mod = thread_id % num_threads;
+			uint32_t my_mod1 = thread_id % num_threads;
+			uint32_t my_mod2 = 2 * num_threads - 1 - my_mod1; 
 			uint32_t pid = 0;
+
+			vector<uint32_t> my_js;
+			
+			const uint32_t pf_skip = 32;
 
 			bar_patterns.arrive_and_wait();
 			bar_patterns.arrive_and_wait();
@@ -1242,6 +1323,7 @@ void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, Sparse
 					uint32_t to_add = global_kmer_matchings_counts[pid++].second; 
 					uint32_t* pat_data1 = get<2>(pat);
 
+#if 0
 					for (uint32_t j = 0; j < get<0>(pat); ++j)
 					{
 						uint32_t row_id = pat_data1[j];
@@ -1255,6 +1337,65 @@ void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, Sparse
 						for (uint32_t k = 0; k < get<1>(pat); ++k)
 							row_data[pat_data2[k]] += to_add;
 					}
+#else
+					my_js.clear();
+
+					uint32_t n_data1 = get<0>(pat);
+					uint32_t n_data2 = get<1>(pat);
+					uint32_t* pat_data2 = get<3>(pat);
+
+					for (uint32_t j = 0; j < n_data1; ++j)
+					{
+						uint32_t row_id_nt = pat_data1[j] % (2 * num_threads);
+						if (row_id_nt == my_mod1 || row_id_nt == my_mod2)
+							my_js.emplace_back(j);
+					}
+
+					if (n_data2 < pf_skip)
+					{
+						for (uint32_t jj = 0; jj < my_js.size(); ++jj)
+						{
+							uint32_t j = my_js[jj];
+							uint32_t row_id = pat_data1[j];
+							auto& row_data = matrix[row_id];
+
+							if (jj + 1 < my_js.size())
+							{
+								uint32_t j_next = my_js[jj+1];
+								uint32_t row_id_next = pat_data1[j_next];
+								auto& row_data_next = matrix[row_id_next];
+								for (uint32_t k = 0; k < n_data2; ++k)
+									row_data_next.prefetch(pat_data2[k]);
+							}
+
+							for (uint32_t k = 0; k < n_data2; ++k)
+								row_data[pat_data2[k]] += to_add;
+						}
+					}
+					else
+					{
+						for (uint32_t jj = 0; jj < my_js.size(); ++jj)
+						{
+							uint32_t j = my_js[jj];
+							uint32_t row_id = pat_data1[j];
+							auto& row_data = matrix[row_id];
+
+							uint32_t row_id_next = (jj + 1 < my_js.size()) ? pat_data1[my_js[jj + 1]] : 0;
+
+							for (uint32_t k = 0; k < n_data2 - pf_skip; ++k)
+							{
+								row_data.prefetch(pat_data2[k + pf_skip]);
+								row_data[pat_data2[k]] += to_add;
+							}
+
+							for (uint32_t k = n_data2 - pf_skip; k < n_data2; ++k)
+							{
+								matrix[row_id_next].prefetch(pat_data2[k - (n_data2 - pf_skip)]);
+								row_data[pat_data2[k]] += to_add;
+							}
+						}
+					}
+#endif
 				}
 
 				bar_patterns.arrive_and_wait();
