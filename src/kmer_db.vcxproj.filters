@@ -56,5 +56,6 @@
     <ClInclude Include="params.h" />
     <ClInclude Include="..\libs\refresh\pdqsort_par.h" />
     <ClInclude Include="instr_set_detect.h" />
+    <ClInclude Include="sparse_filters.h" />
   </ItemGroup>
 </Project>

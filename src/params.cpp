@@ -1,7 +1,9 @@
 #include "params.h"
+#include "types.h"
 
 #include <iostream>
 #include <stdexcept>
+#include <cstdint>
 
 using namespace std;
 
@@ -9,29 +11,30 @@ using namespace std;
 // *****************************************************************************************
 //
 Params::Params() {
-	availableMetrics["jaccard"] = [](size_t common, size_t cnt1, size_t cnt2, int kmerLength) -> double { return (double)common / (cnt1 + cnt2 - common); };
-	availableMetrics["min"] = [](size_t common, size_t cnt1, size_t cnt2, int kmerLength) -> double { return (double)common / std::min(cnt1, cnt2); };
-	availableMetrics["max"] = [](size_t common, size_t cnt1, size_t cnt2, int kmerLength) -> double { return (double)common / std::max(cnt1, cnt2); };
-	availableMetrics["cosine"] = [](size_t common, size_t cnt1, size_t cnt2, int kmerLength) -> double { return (double)common / sqrt(cnt1 * cnt2); };
-	availableMetrics["mash"] = [](size_t common, size_t queryCnt, size_t dbCnt, int kmerLength) -> double {
+	availableMetrics["jaccard"] = [](num_kmers_t common, num_kmers_t cnt1, num_kmers_t cnt2, int kmerLength) -> double { return (double)common / (cnt1 + cnt2 - common); };
+	availableMetrics["min"] = [](num_kmers_t common, num_kmers_t cnt1, num_kmers_t cnt2, int kmerLength) -> double { return (double)common / std::min(cnt1, cnt2); };
+	availableMetrics["max"] = [](num_kmers_t common, num_kmers_t cnt1, num_kmers_t cnt2, int kmerLength) -> double { return (double)common / std::max(cnt1, cnt2); };
+	availableMetrics["cosine"] = [](num_kmers_t common, num_kmers_t cnt1, num_kmers_t cnt2, int kmerLength) -> double { return (double)common / sqrt(cnt1 * cnt2); };
+	availableMetrics["mash"] = [](num_kmers_t common, num_kmers_t queryCnt, num_kmers_t dbCnt, int kmerLength) -> double {
 		double d_jaccard = (double)common / (queryCnt + dbCnt - common);
 		return  (d_jaccard == 0) ? 1.0 : (-1.0 / kmerLength) * log((2 * d_jaccard) / (d_jaccard + 1));
 	};
-	availableMetrics["ani"] = [](size_t common, size_t queryCnt, size_t dbCnt, int kmerLength) -> double {
+	availableMetrics["ani"] = [](num_kmers_t common, num_kmers_t queryCnt, num_kmers_t dbCnt, int kmerLength) -> double {
 		double d_jaccard = (double)common / (queryCnt + dbCnt - common);
 		double d_mash = (d_jaccard == 0) ? 1.0 : (-1.0 / kmerLength) * log((2 * d_jaccard) / (d_jaccard + 1));
 		return 1.0 - d_mash;
 	};
-	availableMetrics["ani-shorter"] = [](size_t common, size_t queryCnt, size_t dbCnt, int kmerLength) -> double {
+	availableMetrics["ani-shorter"] = [](num_kmers_t common, num_kmers_t queryCnt, num_kmers_t dbCnt, int kmerLength) -> double {
 		double d_jaccard = (double)common / min(queryCnt, dbCnt);
 		double d_mash = (d_jaccard == 0) ? 1.0 : (-1.0 / kmerLength) * log((2 * d_jaccard) / (d_jaccard + 1));
 		return 1.0 - d_mash;
 	};
 
-	availableMetrics["mash-query"] = [](size_t common, size_t queryCnt, size_t dbCnt, int kmerLength) -> double {
+	availableMetrics["mash-query"] = [](num_kmers_t common, num_kmers_t queryCnt, num_kmers_t dbCnt, int kmerLength) -> double {
 		double d_jaccard = (double)common / queryCnt;
 		return  (d_jaccard == 0) ? 1.0 : (-1.0 / kmerLength) * log((2 * d_jaccard) / (d_jaccard + 1));
 	};
+
 }
 
 // *****************************************************************************************
@@ -61,13 +64,16 @@ bool Params::parse(int argc, char** argv) {
 		showInstructions(Mode::unknown);
 		return false;
 	}
-	else if (helpWanted && params.size() == 1) {
+
+	mode = str2mode(params.front());
+	params.erase(params.begin());
+	
+	if (helpWanted && params.size() == 0) {
 		// help for particular mode
-		showInstructions(str2mode(params[0]));
+		showInstructions(mode);
 		return false;
 	}
 	else {
-
 		// search for switches and options
 		if (findSwitch(params, OPTION_VERBOSE)) { // verbose mode
 			Log::getInstance(Log::LEVEL_VERBOSE).enable();
@@ -76,16 +82,6 @@ bool Params::parse(int argc, char** argv) {
 		if (findSwitch(params, OPTION_DEBUG)) { // verbose mode
 			Log::getInstance(Log::LEVEL_VERBOSE).enable();
 			Log::getInstance(Log::LEVEL_DEBUG).enable();
-		}
-
-		multisampleFasta = findSwitch(params, SWITCH_MULTISAMPLE_FASTA);
-		
-		bool fractionSpecified = findOption(params, OPTION_FRACTION, fraction);				// minhash fraction
-		findOption(params, OPTION_FRACTION_START, fractionStart);	// minhash fraction start value
-		findOption(params, OPTION_LENGTH, kmerLength);				// kmer length
-
-		if (kmerLength > 30) {
-			throw std::runtime_error("K-mer length cannot not exceed 30.");
 		}
 
 		findOption(params, OPTION_THREADS, numThreads);			// number of threads
@@ -100,96 +96,31 @@ bool Params::parse(int argc, char** argv) {
 			numReaderThreads = std::max(std::min(numThreads, (numThreads / 8) * invFraction), 1);
 		}
 
-		findOption(params, OPTION_BUFFER, cacheBufferMb);	// size of temporary buffer in megabytes
-		if (cacheBufferMb <= 0) {
-			cacheBufferMb = 8;
+		// parse mode-specific params
+		switch (mode) {
+		case Mode::build :
+			parse_build(params); break;
+		case Mode::all2all:
+		case Mode::all2all_sparse:
+		case Mode::all2all_parts:
+			parse_all2all(params); break;
+		case Mode::new2all:
+			parse_new2all(params); break;
+		case Mode::distance:
+			parse_distance(params); break;
+		case Mode::minhash:
+			parse_minhash(params); break;
+		default:
+			showInstructions(mode);
+
 		}
 
-		findOption(params, OPTION_BELOW, below);
-		findOption(params, OPTION_ABOVE, above);
-
-		bool below_eq = findOption(params, OPTION_BELOW_EQ, below);
-		bool above_eq = findOption(params, OPTION_ABOVE_EQ, above);
-
-		if (findSwitch(params, SWITCH_KMC_SAMPLES)) {
-			inputFormat = InputFile::KMC;
-			kmerLength = 0;
+		// set default fration in minhash mode if not specified
+		if (this->mode == Mode::minhash && !fractionSpecified) {
+			fraction = 0.01;
 		}
 
-		if (findSwitch(params, SWITCH_MINHASH_SAMPLES)) {
-			if (inputFormat == InputFile::KMC) {
-				throw std::runtime_error(
-					SWITCH_KMC_SAMPLES + " and " + SWITCH_MINHASH_SAMPLES + " switches exclude one another.");
-			}
-			inputFormat = InputFile::MINHASH;
-			fraction = 1.0;
-			kmerLength = 0;
-		}
-
-		sparseOut = findSwitch(params, SWITCH_SPARSE);
-		extendDb = findSwitch(params, SWITCH_EXTEND_DB);
-		nonCanonical = findSwitch(params, SWITCH_NON_CANONICAL);
-
-		phylipOut = findSwitch(params, SWITCH_PHYLIP_OUT);
-		if (phylipOut) {
-			sparseOut = false;
-		}
-
-		if (params.size()) {
-			string mode = params.front();
-			params.erase(params.begin());
-
-			// detect obsolete modes
-			if (mode == "build-kmers" || mode == "build-mh") {
-				throw std::runtime_error(
-					"build -kmers / build -mh modes are obsolete, use " + SWITCH_KMC_SAMPLES + " / " + SWITCH_MINHASH_SAMPLES + " switches instead.");
-			}
-
-			this->mode = str2mode(mode);
-
-			// fill metrics in distance mode
-			if (this->mode == Mode::distance) {
-				for (const auto& entry : availableMetrics) {
-					if (findSwitch(params, entry.first)) {
-						metrics.push_back(entry);
-					}
-				}
-
-				// if empty, add jacard
-				if (metrics.empty()) {
-					metrics.push_back(*availableMetrics.find("jaccard"));
-				}
-
-				// alter thresholds if above_eq or below_eq are selected 
-				if (below_eq) {
-					below = std::nextafter(below, below + 1.0);
-				}
-
-				if (above_eq) {
-					above = std::nextafter(above, above - 1.0);
-				}
-			}
-			else {
-				// alter thresholds if above_eq or below_eq are selected 
-				if (below_eq) {
-					below += 1.0;
-				}
-
-				if (above_eq) {
-					above -= 1.0;
-				}
-			}
-
-			// set default fration in minhash mode if not specified
-			if (this->mode == Mode::minhash && !fractionSpecified) {
-				fraction = 0.01;
-			}
-
-			files.insert(files.begin(), params.begin(), params.end());
-		}
-		else {
-			throw std::runtime_error("Mode not specified");
-		}
+		files.insert(files.begin(), params.begin(), params.end());
 	}
 
 	return true;
@@ -236,7 +167,7 @@ void Params::showInstructions(Mode mode) const {
 			<< "    kmer-db " << MODE_ALL_2_ALL
 			<< " [" << OPTION_BUFFER << " <size_mb>]"
 			<< " [" << OPTION_THREADS << " <threads>]" 
-			<< " [" << SWITCH_SPARSE << " [" << OPTION_ABOVE << " <v>] [" << OPTION_BELOW << " <v>] [" << OPTION_ABOVE_EQ << " <v>] [" << OPTION_BELOW_EQ << " <v>]]"
+			<< " [" << SWITCH_SPARSE << " [" << OPTION_MIN << "<th>]* [" << OPTION_MAX << "<th>]* ]"
 			<< " <database> <common_table>" << endl
 
 			<< "Positional arguments:" << endl
@@ -248,10 +179,10 @@ void Params::showInstructions(Mode mode) const {
 			<< "                      (use L3 size for Intel CPUs and L2 for AMD to maximize performance; default: 8)" << endl
 			<< "    " << OPTION_THREADS << " <threads> - number of threads (default: number of available cores)" << endl
 			<< "    " << SWITCH_SPARSE << " - produce sparse matrix as output" << endl
-			<< "    " << OPTION_ABOVE << " <v> - retains elements larger then <v>" << endl
-			<< "    " << OPTION_BELOW << " <v> - retains elements smaller then <v>" << endl
-			<< "    " << OPTION_ABOVE_EQ << " <v> - retains elements larger or equal <v>" << endl
-			<< "    " << OPTION_BELOW_EQ << " <v> - retains elements smaller or equal <v>" << endl
+			<< "    " << OPTION_MIN << " <th> - minimum output filtering" << endl
+			<< "    " << OPTION_MAX << " <th> - maximum output filtering" << endl
+			<< "Filtering threshold <th> has the form <[criterion:]value> with criterion being num-kmers (number of common k-mers) or one of the distance/similarity measures" << endl
+			<< " (jaccard, min, max, cosine, mash, ani, ani-shorder). If no criterion is specified, num-kmers is used by default. Multiple filters can be combined." << endl
 			<< endl;
 	}
 	else if (mode == Mode::all2all_sparse) {
@@ -260,7 +191,7 @@ void Params::showInstructions(Mode mode) const {
 			<< "    kmer-db " << MODE_ALL_2_ALL_SPARSE
 			<< " [" << OPTION_BUFFER << " <size_mb>]"
 			<< " [" << OPTION_THREADS << " <threads>]" 
-			<< " [" << OPTION_ABOVE << " <v>] [" << OPTION_BELOW << " <v>] [" << OPTION_ABOVE_EQ << " <v>] [" << OPTION_BELOW_EQ << " <v>]"
+			<< " [" << OPTION_MIN << " <th>]* [" << OPTION_MAX << " <th>]* " << endl
 			<< " <database> <common_table>" << endl << endl
 
 			<< "Positional arguments:" << endl
@@ -271,10 +202,10 @@ void Params::showInstructions(Mode mode) const {
 			<< "    " << OPTION_BUFFER << " <size_mb> - size of cache buffer in megabytes" << endl
 			<< "                      (use L3 size for Intel CPUs and L2 for AMD to maximize performance; default: 8)" << endl
 			<< "    " << OPTION_THREADS << " <threads> - number of threads (default: number of available cores)" << endl
-			<< "    " << OPTION_ABOVE << " <v> - retains elements larger then <v>" << endl
-			<< "    " << OPTION_BELOW << " <v> - retains elements smaller then <v>" << endl
-			<< "    " << OPTION_ABOVE_EQ << " <v> - retains elements larger or equal <v>" << endl
-			<< "    " << OPTION_BELOW_EQ << " <v> - retains elements smaller or equal <v>" << endl
+			<< "    " << OPTION_MIN << " <th> - minimum output filtering" << endl
+			<< "    " << OPTION_MAX << " <th> - maximum output filtering" << endl
+			<< "Filtering threshold <th> has the form <[criterion:]value> with criterion being num-kmers (number of common k-mers) or one of the distance/similarity measures" << endl
+			<< " (jaccard, min, max, cosine, mash, ani, ani-shorder). If no criterion is specified, num-kmers is used by default. Multiple filters can be combined." << endl
 			<< endl;
 	}
 	else if (mode == Mode::all2all_parts) {
@@ -283,21 +214,21 @@ void Params::showInstructions(Mode mode) const {
 			<< "    kmer-db " << MODE_ALL_2_ALL_PARTS
 			<< " [" << OPTION_BUFFER << " <size_mb>]"
 			<< " [" << OPTION_THREADS << " <threads>]" 
-			<< " [" << OPTION_ABOVE << " <v>] [" << OPTION_BELOW << " <v>] [" << OPTION_ABOVE_EQ << " <v>] [" << OPTION_BELOW_EQ << " <v>]"
+			<< " [" << OPTION_MIN << " <th>]* [" << OPTION_MAX << " <th>]* "
 			<< " <db_list> <common_table>" << endl << endl
 
 			<< "Positional arguments:" << endl
 			<< "    db_list (input) - file containing list of database file names" << endl
-			<< "    common_table (output) - comma-separated table with number of common k-mers" << endl
+			<< "    common_table (output) - CSV table with number of common k-mers" << endl
 
 			<< "Options:" << endl
 			<< "    " << OPTION_BUFFER << " <size_mb> - size of cache buffer in megabytes" << endl
 			<< "                      (use L3 size for Intel CPUs and L2 for AMD to maximize performance; default: 8)" << endl
 			<< "    " << OPTION_THREADS << " <threads> - number of threads (default: number of available cores)" << endl
-			<< "    " << OPTION_ABOVE << " <v> - retains elements larger then <v>" << endl
-			<< "    " << OPTION_BELOW << " <v> - retains elements smaller then <v>" << endl
-			<< "    " << OPTION_ABOVE_EQ << " <v> - retains elements larger or equal <v>" << endl
-			<< "    " << OPTION_BELOW_EQ << " <v> - retains elements smaller or equal <v>" << endl
+			<< "    " << OPTION_MIN << " <th> - minimum output filtering" << endl
+			<< "    " << OPTION_MAX << " <th> - maximum output filtering" << endl
+			<< "Filtering threshold <th> has the form <[criterion:]value> with criterion being num-kmers (number of common k-mers) or one of the distance/similarity measures" << endl
+			<< " (jaccard, min, max, cosine, mash, ani, ani-shorder). If no criterion is specified, num-kmers is used by default. Multiple filters can be combined." << endl
 			<< endl;
 	}
 	/*
@@ -326,23 +257,23 @@ void Params::showInstructions(Mode mode) const {
 			<< "Counting common kmers between set of new samples and all the samples in the database:" << endl
 			<< "    kmer-db " << MODE_NEW_2_ALL
 			<< " [" << SWITCH_MULTISAMPLE_FASTA << " | " << SWITCH_KMC_SAMPLES << " | " << SWITCH_MINHASH_SAMPLES << "]"
-			<< " [" << SWITCH_SPARSE << " [" << OPTION_ABOVE << " <v>] [" << OPTION_BELOW << " <v>] [" << OPTION_ABOVE_EQ << " <v>] [" << OPTION_BELOW_EQ << " <v>]] "
+			<< " [" << SWITCH_SPARSE << " [" << OPTION_MIN << "<th>]* [" << OPTION_MAX << "<th>]* ] " 
 			<< " [" << OPTION_THREADS << " <threads>] <database> <sample_list> <common_table>" << endl << endl
 
 			<< "Positional arguments:" << endl
 			<< "    database (input) - k-mer database file" << endl
 			<< "    sample_list (input) - file containing list of samples in one of the following formats:" << endl
 			<< "                          FASTA genomes/reads (default), KMC k-mers (" << SWITCH_KMC_SAMPLES << "), or minhashed k-mers (" << SWITCH_MINHASH_SAMPLES << ")" << endl
-			<< "    common_table (output) - comma-separated table with number of common k-mers" << endl
+			<< "    common_table (output) - CSV table with number of common k-mers" << endl
 
 			<< "Options:" << endl
 			<< "    " << SWITCH_MULTISAMPLE_FASTA << " - each sequence in a FASTA file is treated as a separate sample" << endl
 			<< "    " << OPTION_THREADS << " <threads> - number of threads (default: number of available cores)" << endl
 			<< "    " << SWITCH_SPARSE << " - outputs a sparse matrix" << endl
-			<< "    " << OPTION_ABOVE << " <v> - retains elements larger then <v>" << endl
-			<< "    " << OPTION_BELOW << " <v> - retains elements smaller then <v>" << endl
-			<< "    " << OPTION_ABOVE_EQ << " <v> - retains elements larger or equal <v>" << endl
-			<< "    " << OPTION_BELOW_EQ << " <v> - retains elements smaller or equal <v>" << endl
+			<< "    " << OPTION_MIN << " <th> - minimum output filtering" << endl
+			<< "    " << OPTION_MAX << " <th> - maximum output filtering" << endl
+			<< "Filtering threshold <th> has the form <[criterion:]value> with criterion being num-kmers (number of common k-mers) or one of the distance/similarity measures" << endl
+			<< " (jaccard, min, max, cosine, mash, ani, ani-shorder). If no criterion is specified, num-kmers is used by default. Multiple filters can be combined." << endl
 			<< endl;
 	}
 	else if (mode == Mode::one2all) {
@@ -355,30 +286,31 @@ void Params::showInstructions(Mode mode) const {
 			<< "    database (input) - k-mer database file." << endl
 			<< "    sample (input) - query sample in one of the supported formats:" << endl
 			<< "                     FASTA genomes/reads (default), KMC k-mers (" << SWITCH_KMC_SAMPLES << "), or minhashed k-mers (" << SWITCH_MINHASH_SAMPLES << "), " << endl
-			<< "    common_table (output) - comma-separated table with number of common k-mers." << endl << endl;
+			<< "    common_table (output) - CSV table with number of common k-mers." << endl << endl;
 	}
 	else if (mode == Mode::distance) {
 		LOG_NORMAL
 			<< "Calculating similarities/distances on the basis of common k-mers:" << endl
-			<< "    kmer-db " << MODE_DISTANCE << " [<measures>]"
-			<< " [" << SWITCH_SPARSE << " [" << OPTION_ABOVE << " <v>] [" << OPTION_BELOW << " <v>] [" << OPTION_ABOVE_EQ << " <v>] [" << OPTION_BELOW_EQ << " <v>]] "
-			<< "<common_table>" << endl << endl
+			<< "    kmer-db " << MODE_DISTANCE << " measure"
+			<< " [" << SWITCH_SPARSE << " [" << OPTION_MIN << " <th>]* [" << OPTION_MAX << " <th>]* ] "
+			<< "<common_table> <output_table>" << endl << endl
 
 			<< "Positional arguments:" << endl
-			<< "    common_table (input) - comma-separated table with a number of common k-mers" << endl
+			<< "    measure - name of the similarity/distance measure to be calculated, one of the following:" << endl
+			<< "               jaccard (default), min, max, cosine, mash, ani, ani-shorter." << endl
+			<< "    common_table (input) - CSV table with a number of common k-mers" << endl
+			<< "    output_table (output) - CSV table with calculated distances" << endl
 
 			<< "Options:" << endl
-			<< "    measures - names of the similarity/distance measures to be calculated, one or more of the following" << endl
-			<< "               jaccard (default), min, max, cosine, mash, ani, ani-shorter." << endl
+
 			<< "    " << SWITCH_PHYLIP_OUT << " - store output distance matrix in a Phylip format" << endl
-			<< "    " << SWITCH_SPARSE << " - outputs a sparse matrix (independently of the input matrix format)" << endl
-			<< "    " << OPTION_ABOVE << " <v> - retains elements larger then <v>" << endl
-			<< "    " << OPTION_BELOW << " <v> - retains elements smaller then <v>" << endl 
-			<< "    " << OPTION_ABOVE_EQ << " <v> - retains elements larger or equal <v>" << endl
-			<< "    " << OPTION_BELOW_EQ << " <v> - retains elements smaller or equal <v>" << endl
-			<< endl
-			<< "This mode generates a file with similarity/distance table for each selected measure." << endl
-			<< "Name of the output file is produced by adding to the input file an extension with a measure name." << endl << endl;
+			<< "    " << SWITCH_SPARSE << " - outputs a sparse matrix (only for dense input matrices - sparse input always produce sparse output)" << endl
+			<< "    " << OPTION_MIN << " <th> - minimum output filtering" << endl
+			<< "    " << OPTION_MAX << " <th> - maximum output filtering" << endl
+			<< "Filtering threshold <th> has the form <[criterion:]value> with criterion being num-kmers (number of common k-mers) or one of the distance/similarity measures" << endl
+			<< " (jaccard, min, max, cosine, mash, ani, ani-shorder). If no criterion is specified, measure argument is used by default. Multiple filters can be combined." << endl
+			<< endl;
+
 	}
 	else if (mode == Mode::minhash) {
 		LOG_NORMAL
@@ -404,7 +336,6 @@ void Params::showInstructions(Mode mode) const {
 			<< "    " << MODE_ALL_2_ALL << " - counting common k-mers - all samples in the database" << endl
 			<< "    " << MODE_ALL_2_ALL_SPARSE << " - counting common k-mers - all samples in the database (sparse computation)" << endl
 			<< "    " << MODE_ALL_2_ALL_PARTS << " - counting common k-mers - all samples in the database parts (sparse computation)" << endl
-			//	<< "    " << MODE_DB_2_DB_SP << " - counting common k-mers - all samples between the databases (sparse computation)" << endl
 			<< "    " << MODE_NEW_2_ALL << " - counting common k-mers - set of new samples versus database" << endl
 			<< "    " << MODE_ONE_2_ALL << " - counting common k-mers - single sample versus database" << endl
 			<< "    " << MODE_DISTANCE << " - calculating similarities/distances" << endl
@@ -414,4 +345,238 @@ void Params::showInstructions(Mode mode) const {
 			<< "The meaning of other options and positional arguments depends on the selected mode. For more information, run:" << endl
 			<< "kmer-db <mode> -help" << endl << endl;
 	}
+}
+
+
+// *****************************************************************************************
+//
+void Params::parseFilters(std::vector<std::string>& params) {
+	std::vector<string> options{ OPTION_MIN, OPTION_MAX };
+
+	for (int i = 0; i < options.size(); ++i) {
+
+		string value_str;
+		while (findOption(params, options[i], value_str)) {
+			string metric;
+			double value;
+
+			auto beg = value_str.begin();
+			auto sep = value_str.rfind(':');
+			if (sep != string::npos) {
+				metric = string(value_str.begin(), value_str.begin() + sep);
+				beg = value_str.begin() + sep + 1;
+			}
+			else {
+				metric = "num-kmers";
+			}
+
+			istringstream iss(string(beg, value_str.end()));
+			if (!(iss >> value)) {
+				throw runtime_error("Filtering error - unable to parse numerical value: " + value_str);
+			}
+
+			if (metric == "num-kmers") {
+				kmerFilter.bounds[i] = lrint(value);
+			}
+			else if (availableMetrics.contains(metric)) {
+				metricFilters[metric].metric = availableMetrics[metric];
+				metricFilters[metric].bounds[i] = value;
+			}
+			else {
+				throw runtime_error("Filtering error - unknown metric: " + metric);
+			}
+		}
+	}
+}
+
+// *****************************************************************************************
+//
+bool Params::parse_build(std::vector<string>& params) {
+
+	bool switchKmc = findSwitch(params, SWITCH_KMC_SAMPLES);
+	bool switchMinhash = findSwitch(params, SWITCH_MINHASH_SAMPLES);
+
+	if (!switchMinhash) {
+		fractionSpecified = findOption(params, OPTION_FRACTION, fraction);	// minhash fraction
+		findOption(params, OPTION_FRACTION_START, fractionStart);			// minhash fraction start value
+
+		if (!switchKmc) {
+			multisampleFasta = findSwitch(params, SWITCH_MULTISAMPLE_FASTA);
+			findOption(params, OPTION_LENGTH, kmerLength);				// kmer length
+			nonCanonical = findSwitch(params, SWITCH_NON_CANONICAL);
+
+			inputFormat = InputFile::GENOME;
+
+			if (kmerLength > 30) {
+				throw std::runtime_error("K-mer length cannot not exceed 30.");
+			}
+		}
+		else {
+			inputFormat = InputFile::KMC;
+			kmerLength = 0;
+		}
+	}
+	else {
+		if (switchKmc) {
+			throw std::runtime_error(
+				SWITCH_KMC_SAMPLES + " and " + SWITCH_MINHASH_SAMPLES + " switches exclude one another.");
+		}
+
+		inputFormat = InputFile::MINHASH;
+		fraction = 1.0;
+		kmerLength = 0;
+	}
+
+	extendDb = findSwitch(params, SWITCH_EXTEND_DB);
+
+	return true;
+}
+
+// *****************************************************************************************
+//
+bool Params::parse_all2all(std::vector<string>& params) {
+
+	findOption(params, OPTION_BUFFER, cacheBufferMb);	// size of temporary buffer in megabytes
+	if (cacheBufferMb <= 0) {
+		cacheBufferMb = 8;
+	}
+
+	sparseOut = findSwitch(params, SWITCH_SPARSE);
+
+	// parse filters
+	if (sparseOut || mode == Mode::all2all_parts || mode == all2all_sparse) {
+		parseFilters(params);
+	}
+
+	return true;
+}
+
+// *****************************************************************************************
+//
+bool Params::parse_new2all(std::vector<string>& params) {
+
+	bool switchKmc = findSwitch(params, SWITCH_KMC_SAMPLES);
+	bool switchMinhash = findSwitch(params, SWITCH_MINHASH_SAMPLES);
+
+	if (!switchMinhash) {
+		if (!switchKmc) {
+			multisampleFasta = findSwitch(params, SWITCH_MULTISAMPLE_FASTA);
+			inputFormat = InputFile::GENOME;
+		}
+		else {
+			inputFormat = InputFile::KMC;
+		}
+	}
+	else {
+		if (switchKmc) {
+			throw std::runtime_error(
+				SWITCH_KMC_SAMPLES + " and " + SWITCH_MINHASH_SAMPLES + " switches exclude one another.");
+		}
+
+		inputFormat = InputFile::MINHASH;
+	}
+
+	sparseOut = findSwitch(params, SWITCH_SPARSE);
+
+	// parse filters
+	if (sparseOut) {
+		parseFilters(params);
+	}
+
+	return true;
+}
+
+// *****************************************************************************************
+//
+bool Params::parse_distance(std::vector<std::string>& params) {
+
+	sparseOut = findSwitch(params, SWITCH_SPARSE);
+
+	phylipOut = findSwitch(params, SWITCH_PHYLIP_OUT);
+	if (phylipOut) {
+		sparseOut = false;
+	}
+
+	std::vector<string> options{ OPTION_MIN, OPTION_MAX };
+
+	for (int i = 0; i < options.size(); ++i) {
+
+		string value_str;
+		while (findOption(params, options[i], value_str)) {
+			string metric;
+			double value;
+
+			auto beg = value_str.begin();
+			auto sep = value_str.rfind(':');
+			if (sep != string::npos) {
+				metric = string(value_str.begin(), value_str.begin() + sep);
+				beg = value_str.begin() + sep + 1;
+			}
+			else {
+				metric = "?";
+			}
+
+			istringstream iss(string(beg, value_str.end()));
+			if (!(iss >> value)) {
+				throw runtime_error("Filtering error - unable to parse numerical value: " + value_str);
+			}
+
+			if (metric == "num-kmers") {
+				kmerFilter.bounds[i] = lrint(value);
+			}
+			else if (availableMetrics.contains(metric)) {
+				metricFilters[metric].metric = availableMetrics[metric];
+				metricFilters[metric].bounds[i] = value;
+			}
+			else if (metric == "?") {
+				// metric to be filled later
+				metricFilters[metric].bounds[i] = value;
+			}
+			else {
+				throw runtime_error("Filtering error - unknown metric: " + metric);
+			}
+		}
+	}
+
+	if (params.empty()) {
+		throw runtime_error("No distance/similarity metric specified");
+	}
+
+	metricName = params.front();
+	params.erase(params.begin());
+
+	// replace ? with real metric
+	auto it = metricFilters.find("?");
+	if (it != metricFilters.end()) {
+		MetricFilter mf(it->second);
+		mf.metric = availableMetrics[metricName];
+		metricFilters[metricName] = mf;
+		metricFilters.erase(it);
+	}
+
+	return true;
+}
+
+// *****************************************************************************************
+//
+bool Params::parse_minhash(std::vector<string>& params) {
+
+	fractionSpecified = findOption(params, OPTION_FRACTION, fraction);		// minhash fraction
+	findOption(params, OPTION_FRACTION_START, fractionStart);				// minhash fraction start value
+
+	if (findSwitch(params, SWITCH_KMC_SAMPLES)) {
+		inputFormat = InputFile::KMC;
+		kmerLength = 0;
+	}
+	else {
+		multisampleFasta = findSwitch(params, SWITCH_MULTISAMPLE_FASTA);
+		findOption(params, OPTION_LENGTH, kmerLength);				// kmer length
+
+		if (kmerLength > 30) {
+			throw std::runtime_error("K-mer length cannot not exceed 30.");
+		}
+		inputFormat = InputFile::GENOME;
+	}
+
+	return true;
 }

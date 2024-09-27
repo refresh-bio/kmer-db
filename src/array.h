@@ -163,6 +163,56 @@ public:
 
 	// *****************************************************************************************
 	//
+	template <class Filter>
+	void compact(const Filter& filter) {
+
+		for (int i = 0; i < size; ++i) {
+			T* row = (*this)[i];
+			for (int j = 0; j < i; ++j) {
+				if (!filter(row[j], i, j)) {
+					row[j] = 0;
+				}
+			}
+		}
+
+	}
+
+	// *****************************************************************************************
+	//
+	template <class Filter>
+	void compact(const Filter& filter, uint32_t num_threads) {
+
+		atomic<uint32_t> row_id = 0;
+
+		vector<future<void>> fut;
+		fut.reserve(num_threads);
+
+		for (uint32_t thread_id = 0; thread_id < num_threads; ++thread_id) {
+			fut.push_back(async([&, thread_id] {
+
+				while (true) {
+					uint32_t i = row_id.fetch_add(1);
+
+					if (i >= data.size())
+						break;
+
+					T* row = (*this)[i];
+					for (int j = 0; j < i; ++j) {
+						if (!filter(row[j], i, j)) {
+							row[j] = 0;
+						}
+					}
+				}
+			}));
+		}
+
+		for (auto& f : fut) {
+			f.get();
+		}
+	}
+
+	// *****************************************************************************************
+	//
 	void save(std::ofstream & file) {
 		T * ptr = data.data();
 		for (int i = 0; i < size; ++i) {
@@ -273,7 +323,7 @@ public:
 
 	// *****************************************************************************************
 	//
-	void compact(uint32_t below, uint32_t above, uint32_t num_threads)
+	void compact(uint32_t mini, uint32_t maxi, uint32_t num_threads)
 	{
 		data_compacted.resize(data.size());
 
@@ -294,10 +344,10 @@ public:
 
 					if (i >= data.size())
 						break;
-
+					
 					auto empty_value = data[i].empty_value;
 					for (auto p = data[i].begin(); p != data[i].end(); ++p)
-						if (p->val != empty_value && p->val < below && p->val > above)
+						if (p->val != empty_value && p->val >= mini && p->val <= maxi)
 							my_row.push_back(make_pair(p->key, p->val));
 
 					refresh::sort::pdqsort_branchless(my_row.begin(), my_row.end());
@@ -331,6 +381,55 @@ public:
 		data.clear();
 		data.shrink_to_fit();
 	}
+
+
+	// *****************************************************************************************
+	//
+	template <class Filter>
+	void compact(const Filter& filter, uint32_t num_threads)
+	{
+		data_compacted.resize(data.size());
+
+		if (tmp_rows.size() < num_threads)
+			tmp_rows.resize(num_threads);
+
+		atomic<uint32_t> row_id = 0;
+
+		vector<future<void>> fut;
+		fut.reserve(num_threads);
+
+		for (uint32_t thread_id = 0; thread_id < num_threads; ++thread_id)
+			fut.push_back(async([&, thread_id] {
+			auto& my_row = tmp_rows[thread_id];
+			while (true)
+			{
+				uint32_t i = row_id.fetch_add(1);
+
+				if (i >= data.size())
+					break;
+
+				auto empty_value = data[i].empty_value;
+				for (auto p = data[i].begin(); p != data[i].end(); ++p)
+					if (p->val != empty_value && filter(p->val, i, p->key))
+						my_row.push_back(make_pair(p->key, p->val));
+
+				refresh::sort::pdqsort_branchless(my_row.begin(), my_row.end());
+				data_compacted[i].assign(my_row.begin(), my_row.end());
+				my_row.clear();
+			}
+
+			my_row.shrink_to_fit();
+				}
+			));
+
+		for (auto& f : fut)
+			f.get();
+
+
+		data.clear();
+		data.shrink_to_fit();
+	}
+
 
 	// *****************************************************************************************
 	//

@@ -6,14 +6,14 @@
 
 void DistanceConsole::run(const Params& params) {
 
-	if (params.files.size() < 1) {
+	if (params.files.size() < 2) {
 		throw usage_error(params.mode);
 	}
 	LOG_NORMAL << "Calculating distance measures" << endl;
 
 	const std::string& similarityFilename = params.files[0];
 
-	std::vector<size_t> kmersCount;
+	std::vector<num_kmers_t> dbKmerCounts;
 	uint32_t kmerLength;
 
 	LOG_NORMAL << "Loading file with common k-mer counts: " << similarityFilename << "...";
@@ -29,12 +29,8 @@ void DistanceConsole::run(const Params& params) {
 	similarityFile.rdbuf()->pubsetbuf(io_buffer1, io_buf_size);
 
 
-	std::vector<std::ofstream> files(params.metrics.size());
+	std::ofstream file(params.files[1]);
 	std::vector<std::string> dbSampleNames;
-
-	for (size_t i = 0; i < files.size(); ++i) {
-		files[i].open(similarityFilename + "." + params.metrics[i].first);
-	}
 
 	string tmp, in;
 	double fraction;
@@ -42,9 +38,7 @@ void DistanceConsole::run(const Params& params) {
 
 	getline(similarityFile, in); // copy sample names to output files
 	if (!params.phylipOut) {
-		for (auto& f : files) {
-			f << "kmer-length: " << kmerLength << " fraction: " << fraction << in << endl;
-		}
+		file << "kmer-length: " << kmerLength << " fraction: " << fraction << in << endl;
 	}
 
 	std::replace(in.begin(), in.end(), ',', ' ');
@@ -55,17 +49,15 @@ void DistanceConsole::run(const Params& params) {
 	std::replace(in.begin(), in.end(), ',', ' ');
 	istringstream iss2(in);
 	iss2 >> tmp >> tmp;
-	std::copy(std::istream_iterator<size_t>(iss2), std::istream_iterator<size_t>(), std::back_inserter(kmersCount));
+	std::copy(std::istream_iterator<size_t>(iss2), std::istream_iterator<size_t>(), std::back_inserter(dbKmerCounts));
 
 	if (params.phylipOut) {
-		for (auto& f : files) {
-			f << kmersCount.size() << endl;
-		}
+		file << dbKmerCounts.size() << endl;
 	}
 
-	std::vector<size_t> intersections_dense(kmersCount.size());
-	std::vector<pair<size_t, size_t>> intersections_sparse;
-	std::vector<double> values_dense(kmersCount.size());
+	std::vector<num_kmers_t> intersections_dense(dbKmerCounts.size());
+	std::vector<pair<size_t, num_kmers_t>> intersections_sparse;
+	std::vector<double> values_dense(dbKmerCounts.size());
 	std::vector<pair<size_t, double>> values_sparse;
 
 	const size_t bufsize = 1ULL << 30; // 1 GB  buffer
@@ -75,12 +67,14 @@ void DistanceConsole::run(const Params& params) {
 
 	LOG_NORMAL << "Processing rows..." << endl;
 	bool triangle = false;
-	bool sparseIn = false, sparseOut = params.sparseOut;
+	bool sparseOut = params.sparseOut && !params.phylipOut; // output in Phylip format is always dense
+
+	auto& metric = params.availableMetrics.at(params.metricName);
 
 	// fixme: check if bufsize can be removed here - maybe some auto-adjustment of outBuffer can be applied
 	for (int row_id = 0; similarityFile.getline(line, bufsize); ++row_id) {
 		if ((row_id + 1) % 10 == 0) {
-			LOG_NORMAL << "\r" << row_id + 1 << "/" << kmersCount.size() << "...                      " << std::flush;
+			LOG_NORMAL << "\r" << row_id + 1 << "/" << dbKmerCounts.size() << "...                      " << std::flush;
 		}
 
 		// extract name
@@ -91,119 +85,125 @@ void DistanceConsole::run(const Params& params) {
 		begin = p + 1;
 
 		// extract kmer count
-		uint64_t queryKmersCount = NumericConversions::strtol(begin, &p); // assume no white characters after the number -> p points comma
+		num_kmers_t queryKmersCount = NumericConversions::strtol(begin, &p); // assume no white characters after the number -> p points comma
 		begin = p + 1;
+
+		std::vector<num_kmers_t> queryKmerCounts(1, queryKmersCount);
+
+		CombinedFilter<num_kmers_t> filter(
+			params.metricFilters,
+			params.kmerFilter,
+			queryKmerCounts,
+			dbKmerCounts,
+			kmerLength);
 
 		int numRead = 0;
 		for (numRead = 0; end - begin > 1; ++numRead) {
 			long v = NumericConversions::strtol(begin, &p);
 
 			if (*p == ':') {
-				// sparse input always produces sparse outputs
-				sparseIn = sparseOut = true;
-
 				begin = p + 1;
-				long common = NumericConversions::strtol(begin, &p);
+				num_kmers_t common = NumericConversions::strtol(begin, &p);
 
-				if (params.phylipOut || !sparseOut)
+				if (params.phylipOut) {
 					intersections_dense[v - 1] = common; // 1-based indexing in file
-				else
-					intersections_sparse.emplace_back(v - 1, common);
+				}
+				else {
+					// sparse input always produces sparse outputs
+					sparseOut = true;
+					if (common > 0 && filter(common, 0, v - 1)) {
+						intersections_sparse.emplace_back(v - 1, common);
+					}
+				}
 
 			}
 			else {
-				// dense form
-				intersections_dense[numRead] = v;
+				num_kmers_t common = v;
+				if (sparseOut) {
+					if (common > 0 && filter(common, 0, numRead)) {
+						intersections_sparse.emplace_back(numRead, common);
+					}
+				} else {
+					// dense form
+					intersections_dense[numRead] = common;
+				}
 			}
 
 			begin = p + 1;
 		}
 
 		// determine if matrix is triangle
-		if (row_id == 0 && queryName == dbSampleNames[0] && intersections_dense[0] == 0) {
+		bool emptyDiagonal = sparseOut ? (intersections_sparse.size() == 0) : (intersections_dense[0] == 0);
+		if (row_id == 0 && queryName == dbSampleNames[0] && emptyDiagonal) {
 			triangle = true;
 		}
 
-		for (size_t m = 0; m < params.metrics.size(); ++m) {
-			auto& metric = params.metrics[m].second;
+		// number of processed elements:
+		// - dense triangle matrices - same as row id
+		// - dense non-triangle - entire row
+		// - others - same as input
+		int numToProcess = !sparseOut
+			? (triangle ? row_id : intersections_dense.size())
+			: intersections_sparse.size();
 
-			// number of processed elements:
-			// - triangle matrices - same as row id
-			// - non-triangle sparse matrices - entire row 
-			// - others - same as input
-			int numToProcess = triangle ? row_id : (sparseIn ? intersections_dense.size() : numRead);
+		if (sparseOut) {
+			values_sparse.resize(intersections_sparse.size());
 
-			if (sparseIn && !params.phylipOut && sparseOut)
-			{
-				values_sparse.clear();
-				for (size_t i = 0; i < intersections_sparse.size(); ++i)
-				{
-					size_t id = intersections_sparse[i].first;
-					values_sparse.emplace_back(id + 1, metric(intersections_sparse[i].second, queryKmersCount, kmersCount[id], kmerLength));
-				}
+			// non-empty row
+			if (intersections_sparse.size() > 0) {
+				
+				std::transform(intersections_sparse.begin(), intersections_sparse.begin() + numToProcess, values_sparse.begin(),
+					[&metric, &dbKmerCounts, queryKmersCount, kmerLength](const std::pair<size_t, num_kmers_t>& entry) {
+						return std::make_pair<size_t, double>(
+							entry.first + 1,
+							metric(entry.second, queryKmersCount, dbKmerCounts[entry.first], kmerLength));
+					});
 			}
-			else
-				std::transform(intersections_dense.begin(), intersections_dense.begin() + numToProcess, kmersCount.begin(), values_dense.begin(),
-					[&metric, queryKmersCount, kmerLength](size_t intersection, size_t dbKmerCount)->double { return  metric(intersection, queryKmersCount, dbKmerCount, kmerLength); });
+		}
+		else {
+			std::transform(intersections_dense.begin(), intersections_dense.begin() + numToProcess, dbKmerCounts.begin(), values_dense.begin(),
+				[&metric, queryKmersCount, kmerLength](size_t intersection, num_kmers_t dbKmerCount) { 
+					return metric(intersection, queryKmersCount, dbKmerCount, kmerLength); 
+				});
+		}
+		
+		char* ptr = outBuffer;
+		memcpy(ptr, queryName.c_str(), queryName.size());
+		ptr += queryName.size();
 
-			char* ptr = outBuffer;
-			memcpy(ptr, queryName.c_str(), queryName.size());
-			ptr += queryName.size();
-
-			if (params.phylipOut) {
-				// phylip matrices are always stored in the dense form
-				*ptr++ = ' ';
-				ptr += num2str(values_dense.data(), numRead, ' ', ptr);
+		if (params.phylipOut) {
+			// phylip matrices are always stored in the dense form
+			*ptr++ = ' ';
+			ptr += num2str(values_dense.data(), numRead, ' ', ptr);
+		}
+		else {
+			*ptr++ = ',';
+			if (sparseOut) {
+				for (auto& x : values_sparse) {
+					ptr += num2str(x, ptr);
+					*ptr++ = ',';
+				}
 			}
 			else {
-				*ptr++ = ',';
-				if (sparseOut) {
-					if (sparseIn)
-					{
-						for (auto& x : values_sparse)
-							if (x.second < params.below && x.second > params.above)
-							{
-								ptr += num2str(x, ptr);
-								*ptr++ = ',';
-							}
-					}
-					else
-					{
-						// sparse value
-						double sparse_val = 0.0;
-
-						// if boundaries are specified - remove elements outside boundaries
-						if (params.below != params.MAX_BELOW || params.above != params.MIN_ABOVE) {
-							sparse_val = (params.below != params.MAX_BELOW) ? params.MAX_BELOW : params.MIN_ABOVE;
-
-							std::replace_if(values_dense.begin(), values_dense.end(),
-								[&params](double x) { return x >= params.below || x <= params.above; }, sparse_val);
-						}
-
-						ptr += num2str_sparse(values_dense.data(), numToProcess, ',', ptr, sparse_val);
-					}
-				}
-				else {
-					// dense matrix - write the same number of elements as was read
-					ptr += num2str(values_dense.data(), numToProcess, ',', ptr);
-				}
+				// dense matrix - write the same number of elements as was read
+				ptr += num2str(values_dense.data(), numToProcess, ',', ptr);
 			}
-
-			*ptr = 0;
-			size_t len = ptr - outBuffer;
-			files[m].write(outBuffer, len);
-			files[m] << endl;
 		}
 
-		if (sparseIn) {
-			if (params.phylipOut || !sparseOut)
-				intersections_dense.assign(intersections_dense.size(), 0);
-			else
-				intersections_sparse.clear();
+		*ptr = 0;
+		size_t len = ptr - outBuffer;
+		file.write(outBuffer, len);
+		file << endl;
+		
+		if (params.phylipOut || !sparseOut) {
+			intersections_dense.assign(intersections_dense.size(), 0);
+		}
+		else {
+			intersections_sparse.clear();
 		}
 	}
 
-	LOG_NORMAL << "\r" << kmersCount.size() << "/" << kmersCount.size() << "...";
+	LOG_NORMAL << "\r" << dbKmerCounts.size() << "/" << dbKmerCounts.size() << "...";
 	LOG_NORMAL << "OK" << endl;
 
 	delete[] outBuffer;

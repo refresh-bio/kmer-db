@@ -21,9 +21,6 @@ void New2AllConsole::run(const Params& params)
 	const std::string& multipleSamples = params.files[1];
 	const std::string & similarityFile = params.files[2];
 	
-	uint32_t below = (uint32_t)lrint(params.below);
-	uint32_t above = (uint32_t)std::max(0l, lrint(params.above));
-
 	std::ifstream dbFile(dbFilename, std::ios::binary);
 	PrefixKmerDb db(params.numThreads);
 	SimilarityCalculator calculator(params.numThreads, params.cacheBufferMb);
@@ -120,8 +117,22 @@ void New2AllConsole::run(const Params& params)
 			ptr += sprintf(ptr, "%s,%lu,", task->sampleName.c_str(), task->kmersCount);
 
 			if (params.sparseOut) {
-				std::replace_if(buf.begin(), buf.end(),
-					[below, above](uint32_t x) { return x >= below || x <= above; }, 0);
+				
+				std::vector<num_kmers_t> queryKmersCounts(1, task->kmersCount);
+				CombinedFilter<num_kmers_t> filter(
+					params.metricFilters,
+					params.kmerFilter,
+					queryKmersCounts,
+					db.getSampleKmersCount(),
+					params.kmerLength);
+				
+				// filter row
+				for (int j = 0; j < buf.size(); ++j) {
+					if (!filter(buf[j], 0, j)) {
+						buf[j] = 0;
+					}
+				}
+				
 				ptr += num2str_sparse(buf.data(), buf.size(), ',', ptr);
 			}
 			else {

@@ -71,7 +71,7 @@ void PrefixKmerDb::initialize(uint32_t kmerLength, double fraction) {
 		prefixBits = 8;
 	}
 
-	size_t binsCount = 1 << prefixBits;
+	size_t binsCount = 1ULL << prefixBits;
 
 	//prefixHistogram.resize(binsCount + 1);
 	hashtables.resize(binsCount);
@@ -441,7 +441,7 @@ void PrefixKmerDb::patternJobATP() {
 sample_id_t PrefixKmerDb::addKmers(
 	const std::string& sampleName,
 	const kmer_t* kmers,
-	size_t kmersCount,
+	uint32_t kmersCount,
 	uint32_t kmerLength,
 	double fraction,
 	refresh::active_thread_pool& atp)

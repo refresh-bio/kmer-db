@@ -16,6 +16,8 @@ typedef uint32_t suffix_t;
 typedef int32_t pattern_id_t;
 typedef uint32_t sample_id_t;
 
+typedef uint32_t num_kmers_t;
+
 union kmer_or_pattern_t {
 	kmer_t kmer;
 	pattern_id_t pattern_id;

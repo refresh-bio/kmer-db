@@ -17,9 +17,6 @@ void All2AllPartsConsole::run(const Params& params) {
 	const string& multipleDb = params.files[0];
 	const std::string& similarityFile = params.files[1];
 
-	uint32_t below = (uint32_t)lrint(params.below);
-	uint32_t above = (uint32_t)std::max(0l, lrint(params.above));
-
 	SimilarityCalculator calculator(params.numThreads, params.cacheBufferMb);
 
 	PrefixKmerDb* db_row, * db_col;
@@ -166,7 +163,15 @@ void All2AllPartsConsole::run(const Params& params) {
 
 			matrix = new SparseMatrix<uint32_t>;
 			calculator.db2db_sp(*db_row, *db_col, *matrix);
-			matrix->compact(below, above, params.numThreads);
+
+			CombinedFilter<uint32_t> filter(
+				params.metricFilters,
+				params.kmerFilter,
+				db_row->getSampleKmersCount(),
+				db_col->getSampleKmersCount(),
+				params.kmerLength);
+			
+			matrix->compact(filter, params.numThreads);
 
 			t3 = std::chrono::high_resolution_clock::now();
 			dt_all2all += t3 - t2;
@@ -196,7 +201,15 @@ void All2AllPartsConsole::run(const Params& params) {
 
 			matrix = new SparseMatrix<uint32_t>;
 			calculator.db2db_sp(*db_row, *db_col, *matrix);
-			matrix->compact(below, above, params.numThreads);
+
+			CombinedFilter<uint32_t> filter(
+				params.metricFilters,
+				params.kmerFilter,
+				db_row->getSampleKmersCount(),
+				db_col->getSampleKmersCount(),
+				params.kmerLength);
+
+			matrix->compact(filter, params.numThreads);
 
 			t3 = std::chrono::high_resolution_clock::now();
 			dt_all2all += t3 - t2;
@@ -215,7 +228,15 @@ void All2AllPartsConsole::run(const Params& params) {
 
 		matrix = new SparseMatrix<uint32_t>;
 		calculator.all2all_sp(*db_row, *matrix);
-		matrix->compact(below, above, params.numThreads);
+
+		CombinedFilter<uint32_t> filter(
+			params.metricFilters,
+			params.kmerFilter,
+			db_row->getSampleKmersCount(),
+			db_row->getSampleKmersCount(),
+			params.kmerLength);
+
+		matrix->compact(filter, params.numThreads);
 		matrices_row[i_row] = matrix;
 
 		t2 = std::chrono::high_resolution_clock::now();

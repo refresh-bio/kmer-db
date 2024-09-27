@@ -22,6 +22,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include <vector>
 #include <map>
 #include <sstream>
+#include <cstdint>
 
 
 class AbstractKmerDb {
@@ -37,7 +38,7 @@ protected:
 
 	std::vector<string> sampleNames;
 
-	std::vector<size_t> sampleKmersCount;
+	std::vector<uint32_t> sampleKmersCount;
 
 	virtual void initialize(uint32_t kmerLength, double fraction) {
 		this->kmerLength = kmerLength;
@@ -68,7 +69,7 @@ public:
 
 	const std::vector<string>& getSampleNames() const { return sampleNames; }
 
-	const std::vector<size_t>& getSampleKmersCount() const { return sampleKmersCount; }
+	const std::vector<uint32_t>& getSampleKmersCount() const { return sampleKmersCount; }
 
 	virtual size_t getKmersCount() const = 0;
 
@@ -94,7 +95,7 @@ public:
 	virtual sample_id_t addKmers(
 		const std::string& sampleName,
 		const kmer_t* kmers,
-		size_t kmersCount,
+		uint32_t kmersCount,
 		uint32_t kmerLength, 
 		double fraction,
 		refresh::active_thread_pool& atp) {

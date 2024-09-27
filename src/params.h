@@ -1,6 +1,7 @@
 #pragma once
 
 #include "input_file.h"
+#include "sparse_filters.h"
 
 #include <string>
 #include <algorithm>
@@ -11,8 +12,9 @@
 
 class Params {
 public:
-	using metric_fun_t = std::function<double(size_t, size_t, size_t, int)>;
 
+
+	
 	enum Mode {
 		build,
 		minhash,
@@ -51,17 +53,15 @@ public:
 	const std::string OPTION_THREADS = "-t";
 	const std::string OPTION_READER_THREADS = "-rt";
 	const std::string OPTION_BUFFER = "-buffer";
-	const std::string OPTION_BELOW = "-below";
-	const std::string OPTION_ABOVE = "-above";
-	const std::string OPTION_BELOW_EQ = "-below_eq";
-	const std::string OPTION_ABOVE_EQ = "-above_eq";
+
+	const std::string OPTION_MAX = "-max";
+	const std::string OPTION_MIN = "-min";
 
 	std::map<std::string, metric_fun_t> availableMetrics;
 
-
+	
 public:
-	const double MAX_BELOW	{ (double)std::numeric_limits<int>::max() };
-	const double MIN_ABOVE{ (double)std::numeric_limits<int>::min() };
+
 
 	int numThreads{ 0 };
 	int numReaderThreads{ 0 };
@@ -69,27 +69,33 @@ public:
 	bool multisampleFasta{ false };
 	double fraction{ 1.0 };
 	double fractionStart{ 0.0 };
+	bool fractionSpecified{ false };
 	uint32_t kmerLength{ 18 };
 	bool sparseOut{ false };
 	bool extendDb{ false };
 	bool phylipOut{ false };
 	bool nonCanonical{ false };
 
-	double below{ MAX_BELOW };
-	double above{ MIN_ABOVE };
 
 	InputFile::Format inputFormat { InputFile::GENOME };
 	Mode mode;
 
 	std::vector<std::string> files;
-	std::vector<std::pair<std::string,metric_fun_t>> metrics;
 
+	std::map<std::string, MetricFilter> metricFilters;
+	KmerFilter kmerFilter;
+
+	std::string metricName;
+
+	
 	Params();
 
 	bool parse(int argc, char** argv);
 
+	
 	void showInstructions(Mode mode) const;
 
+	
 	bool findSwitch(std::vector<std::string>& params, const std::string& name) const {
 		auto it = std::find(params.begin(), params.end(), name); // verbose mode
 		if (it != params.end()) {
@@ -115,5 +121,32 @@ public:
 		return false;
 	}
 
+	template <typename T, typename U>
+	bool findOption(std::vector<std::string>& params, const std::string& name, T& value1, U& value2) {
+		if (params.size() < 3) {
+			return false;
+		}
+
+		auto stop = std::prev(params.end(), 2);
+		auto it = find(params.begin(), stop, name); // verbose mode
+		if (it != stop) {
+			if (std::istringstream(*std::next(it)) >> value1
+				&& std::istringstream(*std::next(it, 2)) >> value2) {
+				params.erase(it, it + 3);
+				return true;
+			}
+		}
+		return false;
+	}
+
 	Mode str2mode(const std::string& str);
+
+private:
+	void parseFilters(std::vector<std::string>& params);
+
+	bool parse_build(std::vector<std::string>& params);
+	bool parse_all2all(std::vector<std::string>& params);
+	bool parse_new2all(std::vector<std::string>& params);
+	bool parse_distance(std::vector<std::string>& params);
+	bool parse_minhash(std::vector<std::string>& params);
 };

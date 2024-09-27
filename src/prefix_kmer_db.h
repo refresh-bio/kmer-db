@@ -66,7 +66,7 @@ public:
 
 	sample_id_t addKmers(const std::string& sampleName,
 		const kmer_t* kmers,
-		size_t kmersCount,
+		uint32_t kmersCount,
 		uint32_t kmerLength,
 		double fraction,
 		refresh::active_thread_pool &atp) override;

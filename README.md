@@ -30,7 +30,7 @@ mkdir $OUTPUT
 ./kmer-db new2all $OUTPUT/k18.db $INPUT/seqs.part2.list $OUTPUT/n2a.csv
 
 # calculate jaccard index from common k-mers
-./kmer-db distance $OUTPUT/n2a.csv
+./kmer-db distance jaccard $OUTPUT/n2a.csv n2a.jaccard
 
 # extend the database with new sequences
 ./kmer-db build -extend $INPUT/seqs.part2.list $OUTPUT/k18.db
@@ -155,15 +155,15 @@ Parameters:
 
 Dense computations - recomended when the distance matrix contains few zeros. Output can be stored in the dense or sparse form (`-sparse` switch).
 
-`kmer-db all2all [-buffer <size_mb>] [-t <threads>] [-sparse [-above <v>] [-below <v>] [-above_eq <v>] [-below_eq <v>]] <database> <common_table>`
+`kmer-db all2all [-buffer <size_mb>] [-t <threads>] [-sparse [-min <th>]* [-max <th>]* ] <database> <common_table>`
  
 Sparse computations - recommended when the distance matrix contains many zeros. Output matrix is always in the sparse form:
 
-`kmer-db all2all-sp [-buffer <size_mb>] [-t <threads>] [-above <v>] [-below <v>] [-above_eq <v>] [-below_eq <v>] <database> <common_table>`
+`kmer-db all2all-sp [-buffer <size_mb>] [-t <threads>] [-min <th>]* [-max <th>]* <database> <common_table>`
 
 Sparse computations, partial databases - use when the distance matrix contains many zeros and there are multiple partial databases. Output matrix is always in the sparse form:
 
-`kmer-db all2all-parts [-buffer <size_mb>] [-sparse] [-t <threads>] [-above <v>] [-below <v>] [-above_eq <v>] [-below_eq <v>] <db_list> <common_table>`
+`kmer-db all2all-parts [-buffer <size_mb>] [-t <threads>] [-min <th>]* [-max <th>]* <db_list> <common_table>`
  
 Parameters:
 * `database` (input) - k-mer database file created by `build` mode,
@@ -172,15 +172,14 @@ Parameters:
 * `-buffer <size_mb>` - size of cache buffer in megabytes; use L3 size for Intel CPUs and L2 for AMD for best performance; default: 8,
 * `-t <threads>` - number of threads (default: number of available cores),
 * `-sparse` - stores output matrix in a sparse form (always on in `all2all-sp` and `all2all-parts` modes),
-* `-above <v>` - retains elements greater then `<v>`,
-* `-below <v>` - retains elements less then `<v>`,
-* `-above_eq <v>` - retains elements greater or equal `<v>`,
-* `-below_eq <v>` - retains elements less or equal `<v>`.
+* `-min <th>` - minimum output filtering, 
+* `-max <th>` - maximum output filtering.
 
+Filtering threshold `<th>` has the form `<[criterion:]value>` with `criterion` being `num-kmers` (number of common k-mers) or one of the distance/similarity measures (`jaccard`, `min`, `max`, `cosine`, `mash`, `ani`, `ani-shorder`, see 2.3 for definitions). If no `criterion` is specified, `num-kmers` is used by default. Multiple filters can be combined. 
 
 ### New samples against the database:
 
-`kmer-db new2all [-multisample-fasta | -from-kmers | -from-minhash] [-t <threads>] [-sparse [-above <v>] [-below <v>] [-above_eq <v>] [-below_eq <v>]] <database> <sample_list> <common_table>`
+`kmer-db new2all [-multisample-fasta | -from-kmers | -from-minhash] [-t <threads>]  [-sparse [-min <th>]* [-max <th>]* ] <database> <sample_list> <common_table>`
 
 Parameters:
 * `database` (input) - k-mer database file created by `build` mode,
@@ -189,10 +188,11 @@ Parameters:
 * `-multisample-fasta` / `-from-kmers` / `-from-minhash` - see `build` mode for details,
 * `-t <threads>` - number of threads (default: number of available cores),
 * `-sparse` - stores output matrix in a sparse form,
-* `-above <v>` - retains elements greater then `<v>`,
-* `-below <v>` - retains elements less then `<v>`,
-* `-above_eq <v>` - retains elements greater or equal `<v>`,
-* `-below_eq <v>` - retains elements less or equal `<v>`.
+* `-min <th>` - minimum output filtering, 
+* `-max <th>` - maximum output filtering.
+
+Filtering threshold `<th>` has the form `<[criterion:]value>` with `criterion` being `num-kmers` (number of common k-mers) or one of the distance/similarity measures (`jaccard`, `min`, `max`, `cosine`, `mash`, `ani`, `ani-shorder`, see 2.3 for definitions). If no `criterion` is specified, `num-kmers` is used by default. Multiple filters can be combined.
+
  
 ### Single sample against the database:
 
@@ -237,11 +237,10 @@ When `-sparse` switch is specified, the table is stored in a sparse form. In par
  
  ## 2.3. Calculating similarities or distances
 
-`kmer-db distance [<measures>] [-sparse] [-above <v>] [-below <v>] [-above_eq <v>] [-below_eq <v>] <common_table>`
+`kmer-db distance <measure> [-sparse [-min <th>]* [-max <th>]* ] <common_table> <output_table>`
 
 Parameters:
-* `common_table` (input) - file containing table with numbers of common k-mers produced by `all2all`, `new2all`, or `one2all` mode (both, dense and sparse matrices are supported), 
-* `measures` - names of the similarity/distance measures to be calculated, can be one or several of the following (is not specified, `jaccard` is used): 
+* `measure` - names of the similarity/distance measure to be calculated, can be one of the following: 
   * `jaccard`: $J(q,s) = |p \cap q| / |p \cup q|$, 
   * `min`: $\min(q,s) =  |p \cap q| / \min(|p|,|q|)$, 
   * `max`: $\max(q,s) =  |p \cap q| / \max(|p|,|q|)$, 
@@ -249,16 +248,17 @@ Parameters:
   * `mash` (Mash distance): $\textrm{Mash}(q,s) = -\frac{1}{k}ln\frac{2 \cdot J(q,s)}{1 + J(q,s)}$, 
   * `ani` (average nucleotide identity): $\textrm{ANI}(q,s) = 1 - \textrm{Mash}(p,q)$,
   * `ani-shorter` - same as `ani` but with `min` used instead of `jaccard`.
+* `common_table` (input) - file containing table with numbers of common k-mers produced by `all2all`, `new2all`, or `one2all` mode (both, dense and sparse matrices are supported), 
+* `output_table` (output) - file containing table with calculated distance measure,  
 * `-phylip-out` - store output distance matrix in a Phylip format,
 * `-sparse` - outputs a sparse matrix (only for dense input matrices - sparse inputs always produce sparse outputs),
-* `-above <v>` - retains elements greater then `<v>`,
-* `-below <v>` - retains elements less then `<v>`,
-* `-above_eq <v>` - retains elements greater or equal `<v>`,
-* `-below_eq <v>` - retains elements less or equal `<v>`.
+* `-min <th>` - minimum output filtering, 
+* `-max <th>` - maximum output filtering.
 
-This mode generates a file with similarity/distance table for each selected measure. Name of the output file is produced by adding to the input file an extension with a measure name.
-    
-    
+Filtering threshold `<th>` has the form `<[criterion:]value>` with `criterion` being `num-kmers` (number of common k-mers) or one of the distance/similarity measures (`jaccard`, `min`, `max`, `cosine`, `mash`, `ani`, `ani-shorder`, see 2.3 for definitions). If no `criterion` is specified, `measure` argument is used by default. Multiple filters can be combined.
+
+
+        
 ## 2.4. Storing minhashed k-mers
 
 This is an optional analysis step which stores minhashed k-mers on the hard disk to be later consumed by `build`, `new2all`, or `one2all` modes with `-from-minhash` switch. It can be skipped if one wants to use all k-mers from samples for distance estimation or employs minhashing during database construction. Syntax:

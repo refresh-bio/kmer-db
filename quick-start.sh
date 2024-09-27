@@ -14,7 +14,7 @@ mkdir $OUTPUT
 ./kmer-db new2all $OUTPUT/k18.db $INPUT/seqs.part2.list $OUTPUT/n2a.csv
 
 # calculate jaccard index from common k-mers
-./kmer-db distance $OUTPUT/n2a.csv
+./kmer-db distance jaccard $OUTPUT/n2a.csv n2a.jaccard
 
 # extend the database with new sequences
 ./kmer-db build -extend $INPUT/seqs.part2.list $OUTPUT/k18.db

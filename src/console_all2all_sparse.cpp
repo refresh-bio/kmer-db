@@ -20,9 +20,6 @@ void All2AllSparseConsole::run(const Params& params) {
 	const std::string& dbFilename = params.files[0];
 	const std::string& similarityFile = params.files[1];
 	
-	uint32_t below = (uint32_t)lrint(params.below);
-	uint32_t above = (uint32_t)std::max(0l, lrint(params.above));
-
 	std::ifstream dbFile(dbFilename, std::ios::binary);
 	std::ofstream ofs(similarityFile, std::ios::binary);
 	PrefixKmerDb* db = new PrefixKmerDb(params.numThreads);
@@ -58,11 +55,18 @@ void All2AllSparseConsole::run(const Params& params) {
 	*ptr++ = '\n';
 	ofs.write(row, ptr - row);
 
-	matrix.compact(below, above, params.numThreads);
+	CombinedFilter<uint32_t> filter(
+		params.metricFilters,
+		params.kmerFilter,
+		db->getSampleKmersCount(),
+		db->getSampleKmersCount(),
+		params.kmerLength);
+
+	matrix.compact(filter, params.numThreads);
 
 	for (size_t sid = 0; sid < db->getSamplesCount(); ++sid) {
 		ptr = row;
-		ptr += sprintf(ptr, "%s,%lu,", db->getSampleNames()[sid].c_str(), db->getSampleKmersCount()[sid]);
+		ptr += sprintf(ptr, "%s,%lu,", db->getSampleNames()[sid].c_str(), (unsigned long)db->getSampleKmersCount()[sid]);
 
 		ptr += matrix.saveRowSparse(sid, ptr, 0);
 
