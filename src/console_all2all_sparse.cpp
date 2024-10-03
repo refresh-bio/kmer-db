@@ -6,11 +6,15 @@
 #include <cstdint>
 #include <algorithm>
 
+using sampler_t = Sampler<uint32_t, uint32_t, double>;
+
 // *****************************************************************************************
 //
 void All2AllSparseConsole::run(const Params& params) {
+	uint32_t sampling_max_no_items = params.samplingSize;
+	bool do_sampling = sampling_max_no_items != 0;
+	sampler_t::strategy_t sampling_strategy = params.samplingCriterion ? sampler_t::strategy_t::best : sampler_t::strategy_t::random;
 
-	
 	if (params.files.size() != 2) {
 		throw usage_error(params.mode);
 	}
@@ -54,7 +58,7 @@ void All2AllSparseConsole::run(const Params& params) {
 	ptr += num2str(db->getSampleKmersCount().data(), db->getSampleKmersCount().size(), ',', ptr);
 	*ptr++ = '\n';
 	ofs.write(row, ptr - row);
-
+	
 	CombinedFilter<uint32_t> filter(
 		params.metricFilters,
 		params.kmerFilter,
@@ -62,14 +66,23 @@ void All2AllSparseConsole::run(const Params& params) {
 		db->getSampleKmersCount(),
 		params.kmerLength);
 
-	matrix.compact(filter, params.numThreads);
+	sampler_t sampler(do_sampling ? db->getSamplesCount() : 0, sampling_max_no_items, sampling_strategy);
+
+	if (do_sampling)
+	{
+		matrix.add_to_sampler(filter, sampler, params.samplingCriterion, db->getSampleKmersCount(), db->getSampleKmersCount(), 0, 0, params.kmerLength, params.numThreads);
+		matrix.clear();
+	}
+	else
+		matrix.compact(filter, params.numThreads);
 
 	for (size_t sid = 0; sid < db->getSamplesCount(); ++sid) {
 		ptr = row;
 		ptr += sprintf(ptr, "%s,%lu,", db->getSampleNames()[sid].c_str(), (unsigned long)db->getSampleKmersCount()[sid]);
-
-		ptr += matrix.saveRowSparse(sid, ptr, 0);
-
+		if (do_sampling)
+			ptr += sampler.saveRowSparse(sid, ptr, 0);
+		else
+			ptr += matrix.saveRowSparse(sid, ptr, 0);
 		*ptr++ = '\n';
 		ofs.write(row, ptr - row);
 	}

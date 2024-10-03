@@ -7,7 +7,8 @@ class InputFile;
 //
 struct InputTask {
 	size_t fileId;
-	const std::string& filePath;
+//	const std::string& filePath;
+	const std::string filePath;
 	std::shared_ptr<InputFile> file;
 
 	
@@ -20,7 +21,8 @@ struct InputTask {
 //
 struct SampleTask {
 	size_t id;
-	const std::string& filePath;
+//	const std::string& filePath;
+	const std::string filePath;
 	std::string sampleName;
 	kmer_t *kmers;
 	size_t kmersCount;

@@ -145,17 +145,30 @@ namespace refresh
 	{
 		std::string file_name;
 		size_t io_buffer_size;
-		FILE* file = nullptr;
-		bool test_extension = true;
+		FILE* file;
+		bool test_extension;
+
+		void _open()
+		{
+			file = fopen(file_name.c_str(), "rb");
+
+			if (!file)
+				return;
+
+			setvbuf(file, nullptr, _IOFBF, io_buffer_size);
+			buffer_released = true;
+		}
 
 	public:
 		stream_in_file(const std::string& file_name, size_t io_buffer_size = 16 << 20, size_t buffer_size = 8 << 20, bool test_extension = true) :
 			stream_in_buffered(buffer_size),
-			file_name(file_name),
-			io_buffer_size(io_buffer_size),
-			test_extension(test_extension)
+			file_name{ file_name },
+			io_buffer_size{ io_buffer_size },
+			file{ nullptr },
+			test_extension{test_extension}
 		{
-			open(file_name);
+//			open(file_name);
+			_open();
 		}
 
 		virtual ~stream_in_file()
@@ -170,16 +183,9 @@ namespace refresh
 			if (file)
 				close();
 
-			file = fopen(file_name.c_str(), "rb");
+			_open();
 
-			if (!file)
-				return false;
-
-			setvbuf(file, nullptr, _IOFBF, io_buffer_size);
-
-			buffer_released = true;
-
-			return true;
+			return file != nullptr;
 		}
 
 		virtual bool close()

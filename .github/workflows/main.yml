@@ -87,7 +87,11 @@ jobs:
 
     - name: distance
       run: | 
-        ./kmer-db distance jaccard min max cosine mash k18.csv
+        ./kmer-db distance jaccard k18.csv k18.csv.jaccard
+        ./kmer-db distance min k18.csv k18.csv.min
+        ./kmer-db distance max k18.csv k18.csv.max
+        ./kmer-db distance cosine k18.csv k18.csv.cosine
+        ./kmer-db distance mash k18.csv k18.csv.mash
         cmp k18.csv.jaccard ${INPUT_DIR}/k18.csv.jaccard
         cmp k18.csv.min ${INPUT_DIR}/k18.csv.min
         cmp k18.csv.max ${INPUT_DIR}/k18.csv.max
@@ -128,7 +132,7 @@ jobs:
     - name: minhash (default k, fraction 0.1) + build + all2all 
       run: |
         ./kmer-db minhash -f 0.1 ${INPUT_DIR}/seqs.list
-        ./kmer-db build -from-minhash -k 25 ${INPUT_DIR}/seqs.list k18.minhash.db
+        ./kmer-db build -from-minhash ${INPUT_DIR}/seqs.list k18.minhash.db
         ./kmer-db all2all k18.minhash.db k18.minhash.csv
         cmp k18.minhash.csv ${INPUT_DIR}/k18.frac.csv
         

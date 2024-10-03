@@ -57,6 +57,8 @@ public:
 	const std::string OPTION_MAX = "-max";
 	const std::string OPTION_MIN = "-min";
 
+	const std::string OPTION_SAMPLE_ROWS = "-sample-rows";
+
 	std::map<std::string, metric_fun_t> availableMetrics;
 
 	
@@ -75,6 +77,9 @@ public:
 	bool extendDb{ false };
 	bool phylipOut{ false };
 	bool nonCanonical{ false };
+
+	int samplingSize{ 0 };
+	metric_fun_t samplingCriterion;
 
 
 	InputFile::Format inputFormat { InputFile::GENOME };

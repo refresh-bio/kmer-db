@@ -193,7 +193,8 @@ bool GenomeInputFile::loadNext(
 	uint32_t& kmerLength,
 	double& filterValue,
 	bool nonCanonical,
-	std::string& sampleName
+	std::string& sampleName,
+	atomic<size_t>& total_kmers_in_kmers_collections
 ) {
 	
 	std::shared_ptr<MinHashFilter> minhashFilter = dynamic_pointer_cast<MinHashFilter>(filter);
@@ -208,7 +209,9 @@ bool GenomeInputFile::loadNext(
 	sampleName = headers[multifastaIndex];
 
 	kmersBuffer.clear();
+	total_kmers_in_kmers_collections -= kmersBuffer.size();
 	kmersBuffer.resize(lengths[multifastaIndex]);
+	total_kmers_in_kmers_collections += kmersBuffer.size();
 
 	if(filterValue < 1.0)
 		kmersCount = KmerHelper::extract(

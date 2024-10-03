@@ -36,7 +36,8 @@ void BuildConsole::run(const Params& params){
 	}
 
 	LOG_NORMAL << "Building database (from " << InputFile::format2string(params.inputFormat) << ")" << endl;
-	const std::string& multipleSamples(params.files[0]);
+//	const std::string& multipleSamples(params.files[0]);
+	const std::string multipleSamples(params.files[0]);
 	const std::string dbFilename(params.files[1]);
 
 	LOG_DEBUG << "Creating PrefixKmerDb object" << endl ;

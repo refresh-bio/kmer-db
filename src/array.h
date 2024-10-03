@@ -8,6 +8,8 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 */
 
 #include "conversion.h"
+#include "sampler.h"
+#include "sparse_filters.h"
 #include "../libs/refresh/sort/lib/pdqsort_par.h"
 
 #include <vector>
@@ -432,6 +434,90 @@ public:
 
 
 	// *****************************************************************************************
+	void add_to_sampler(
+		CombinedFilter<uint32_t> &filter, 
+		Sampler<uint32_t, uint32_t, double> &sampler, 
+		const metric_fun_t &sampling_criterion, 
+		const std::vector<uint32_t>& num_row_kmers, 
+		const std::vector<uint32_t>& num_col_kmers, 
+		const uint32_t idx_row_shift,
+		const uint32_t idx_col_shift,
+		const uint32_t k_len,
+		const uint32_t num_threads)
+	{
+		atomic<uint32_t> row_id = 0;
+
+		vector<uint32_t> max_col_ids(num_threads, 0);
+
+		vector<future<void>> fut;
+		fut.reserve(num_threads);
+
+		vector<vector<pair<uint32_t, T>>> accepted_items(data.size());
+
+		for (uint32_t thread_id = 0; thread_id < num_threads; ++thread_id)
+			fut.push_back(async([&, thread_id] {
+			auto local_sampling_criterion = sampling_criterion ? sampling_criterion : [](num_kmers_t common, num_kmers_t seq1, num_kmers_t seq2, int k_len) ->double {return 1; };
+			uint32_t my_max_col_id = 0;
+
+			while (true)
+			{
+				uint32_t i = row_id.fetch_add(1);
+
+				if (i >= data.size())
+					break;
+
+				auto empty_value = data[i].empty_value;
+				for (auto p = data[i].begin(); p != data[i].end(); ++p)
+					if (p->val != empty_value && filter(p->val, i, p->key))
+					{
+						sampler.add(i + idx_row_shift, p->key + idx_col_shift, p->val, (double)local_sampling_criterion(p->val, num_row_kmers[i], num_col_kmers[p->key], k_len));
+						accepted_items[i].emplace_back(p->key, p->val);
+
+						if (p->key > my_max_col_id)
+							my_max_col_id = p->key;
+					}
+			}
+
+			max_col_ids[thread_id] = my_max_col_id;
+				}
+			));
+
+		for (auto& f : fut)
+			f.get();
+		fut.clear();
+
+		// Transpose
+		uint32_t max_col_id = *max_element(max_col_ids.begin(), max_col_ids.end());
+		vector<vector<pair<uint32_t, T>>> data_transposed(max_col_id + 1);
+
+		for (uint32_t i = 0; i < accepted_items.size(); ++i)
+			for (auto& x : accepted_items[i])
+				data_transposed[x.first].emplace_back(i, x.second);
+
+		atomic<uint32_t> tr_row_id = 0;
+
+		for (uint32_t thread_id = 0; thread_id < num_threads; ++thread_id)
+			fut.push_back(async([&, thread_id] {
+			auto local_sampling_criterion = sampling_criterion ? sampling_criterion : [](num_kmers_t common, num_kmers_t seq1, num_kmers_t seq2, int k_len) ->double {return 1; };
+
+			while (true)
+			{
+				uint32_t i = tr_row_id.fetch_add(1);
+
+				if (i >= data_transposed.size())
+					break;
+
+				for (auto &x : data_transposed[i])
+					sampler.add(i + idx_col_shift, x.first + idx_row_shift, x.second, (double)local_sampling_criterion(x.second, num_row_kmers[x.first], num_col_kmers[i], k_len));
+			}
+				}
+			));
+
+		for (auto& f : fut)
+			f.get();
+	}
+
+	// *****************************************************************************************
 	//
 	void save(std::ofstream& file) {
 		T* ptr = data.data();
@@ -508,7 +594,7 @@ public:
 				*out++ = ',';
 			}
 
-		return out - out0;
+		return (int) (out - out0);
 	}
 
 	int saveRowSparse(size_t row_id, char* out, uint32_t idx_shift) {
@@ -522,7 +608,7 @@ public:
 			*out++ = ',';
 		}
 
-		return out - out0;
+		return (int) (out - out0);
 	}
 
 

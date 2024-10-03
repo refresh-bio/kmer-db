@@ -528,12 +528,13 @@ sample_id_t PrefixKmerDb::addKmers(
 
 	queues.hashtableAdditionATP.Push(hashtableTasks);
 
-	int n_ht_jobs = std::min<int>(num_threads - 1, hashtableTasks.size() - 1);
+	int n_ht_jobs = std::min<int>(num_threads - 1, (int) hashtableTasks.size() - 1);
 
 	for (int i = 0; i < n_ht_jobs; ++i)
 		atp.launch([&, this] {hashtableJobATP(); }, &hashtableAddition_state);
 	hashtableJobATP();
-	hashtableAddition_state.busy_wait();
+	if(n_ht_jobs)
+		hashtableAddition_state.busy_wait();
 
 	/*
 	if(use_busy_wait)
@@ -651,14 +652,15 @@ sample_id_t PrefixKmerDb::addKmers(
 
 	refresh::active_thread_pool_state patternExtension_state;
 	
-	int n_pat_jobs = std::min<int>(num_threads - 1, patternTasks.size() - 1);
+	int n_pat_jobs = std::min<int>(num_threads - 1, (int) patternTasks.size() - 1);
 
 //	for (int i = 0; i < num_threads - 1; ++i)
 	for (int i = 0; i < n_pat_jobs; ++i)
 		atp.launch([&, this] {patternJobATP(); }, &patternExtension_state);
 	patternJobATP(); 
-	patternExtension_state.busy_wait();
-
+	
+	if (n_pat_jobs)
+		patternExtension_state.busy_wait();
 
 /*	queues.patternExtension.AddTasks(patternTasks);
 	if(use_busy_wait)
@@ -728,7 +730,7 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 	}
 
 	// store number of hashmaps
-	LOG_NORMAL << "Storing k-mer hashtables (" << (rawHashtables ? "raw" : "compressed") << ")..." << endl;
+	LOG_NORMAL << "Storing k-mer hashtables (" << (rawHashtables ? "raw" : "compressed"s) << ")..." << endl;
 	auto time = std::chrono::high_resolution_clock::now();
 
 	temp = hashtables.size();
@@ -882,7 +884,7 @@ bool PrefixKmerDb::deserialize(std::ifstream& file, DeserializationMode mode) {
 	}
 
 	if (mode != DeserializationMode::SkipHashtables) {
-		LOG_NORMAL << "Loading k-mer hashtables (" << (rawHashtables ? "raw" : "compressed") << ")..." << endl;
+		LOG_NORMAL << "Loading k-mer hashtables (" << (rawHashtables ? "raw" : "compressed"s) << ")..." << endl;
 	}
 	
 	auto time = std::chrono::high_resolution_clock::now();

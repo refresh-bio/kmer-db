@@ -4,6 +4,56 @@
 #include <atomic>
 #include <numeric>
 
+
+template <typename T>
+class semi_atomic
+{
+	T value{};
+	refresh::utils::spin_mutex mutex{};
+
+public:
+	semi_atomic() = default;
+	semi_atomic(const T x) : value{x}
+	{}
+
+	void clear()
+	{
+		mutex.lock();
+		value = T{};
+		mutex.unlock();
+	}
+
+	void operator=(const T& x)
+	{
+		mutex.lock();
+		value = x;
+		mutex.unlock();
+	}
+
+	void operator+=(const T& x)
+	{
+		mutex.lock();
+		value += x;
+		mutex.unlock();
+	}
+
+	void operator-=(const T& x)
+	{
+		mutex.lock();
+		value -= x;
+		mutex.unlock();
+	}
+
+	T load() const
+	{
+		const_cast<refresh::utils::spin_mutex&>(mutex).lock();
+		T ret{ value };
+		const_cast<refresh::utils::spin_mutex&>(mutex).unlock();
+
+		return ret;
+	}
+};
+
 // auxiliary templates for saving/loading single values in a binary file
 template <class T>
 void save(std::ostream &stream, const T& val) {
@@ -83,11 +133,15 @@ public:
 			hashtables.capacity() * sizeof(hash_map_lp<suffix_t, pattern_id_t>) +
 			samplePatterns.get_bytes();
 	
+//		auto s = Log::formatLargeNumber(getKmersCount());
+
 		oss << "HT entries: " << Log::formatLargeNumber(getKmersCount())
+//		oss << "HT entries: " << std::move(s)
 			<< " (" << ((getKmersCount() * getHashtableEntrySize()) >> 20) << " MB, " << (getHashtableBytes() >> 20) << " MB res),"
 			<< "\t patterns: " << Log::formatLargeNumber(getPatternsCount())
 			<< " (" << Log::formatLargeNumber(getPatternBytes()) << " B), worker_patterns: " << (getWorkersPatternBytes() >> 20) << " MB res, "
 			<< " other: " << (otherBytes >> 20) << " MB";
+//		return std::string(oss.str());
 		return oss.str();
 	}
 
@@ -104,12 +158,12 @@ public:
 
 	std::string printDetailedTimes() const override {
 		std::ostringstream oss;
-		oss << "\tHashtable processing (parallel): " << times.hashtableProcess.count() <<  endl 
+		oss << "\tHashtable processing (parallel): " << times.hashtableProcess.load().count() <<  endl 
 		//	<< "\timbalance: " << stats.hashtableJobsImbalance / getSamplesCount() <<  endl
-			<< "\t\tResize: " << (times.hashtableResize_worker.count() / num_threads) << endl
-			<< "\t\tFind'n'add: " << (times.hashtableFind_worker.count() / num_threads) << endl
-			<< "\tSort time (parallel): " << times.sort.count() << endl
-			<< "\tPattern extension time (parallel): " << times.extension.count() << endl;
+			<< "\t\tResize: " << (times.hashtableResize_worker.load().count() / num_threads) << endl
+			<< "\t\tFind'n'add: " << (times.hashtableFind_worker.load().count() / num_threads) << endl
+			<< "\tSort time (parallel): " << times.sort.load().count() << endl
+			<< "\tPattern extension time (parallel): " << times.extension.load().count() << endl;
 		return oss.str();
 	}
 
@@ -165,14 +219,14 @@ protected:
 
 	// structure for storing all the times
 	struct {
-		std::chrono::duration<double> hashtableProcess { 0 };
+		semi_atomic<std::chrono::duration<double>> hashtableProcess { };
 		
-		std::chrono::duration<double> hashtableResize_worker{ 0 };
-		std::chrono::duration<double> hashtableFind_worker{ 0 };
-		std::chrono::duration<double> hashtableAdd_worker{ 0 };
+		semi_atomic<std::chrono::duration<double>> hashtableResize_worker{ };
+		semi_atomic<std::chrono::duration<double>> hashtableFind_worker{ };
+		semi_atomic<std::chrono::duration<double>> hashtableAdd_worker{ };
 
-		std::chrono::duration<double> sort { 0 };
-		std::chrono::duration<double> extension{ 0 };
+		semi_atomic<std::chrono::duration<double>> sort { };
+		semi_atomic<std::chrono::duration<double>> extension{ };
 	} times;
 
 	// structure for storing bytes 
@@ -180,7 +234,7 @@ protected:
 		std::atomic<size_t> hashtableBytes { 0 };
 		std::atomic<size_t> patternBytes { 0 };
 
-		double hashtableJobsImbalance{ 0 };
+		semi_atomic<double> hashtableJobsImbalance{ 0 };
 
 	} stats;
 

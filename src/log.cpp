@@ -28,28 +28,33 @@ uint64_t NumericConversions::powers10[];
 // *****************************************************************************************
 //
 std::string Log::formatLargeNumber(uint64_t num, int minWidth) {
-	std::string out = "";
+	std::string ret = "";
 
 	do {
-		uint64_t part = num % 1000LL;
-		num = num / 1000LL;
+		uint64_t part = num % 1000uLL;
+		num = num / 1000uLL;
 
 		if (num > 0) {
 			std::ostringstream oss;
 			oss << "," << std::setw(3) << std::setfill('0') << part;
-			out = oss.str() + out;
+			ret = oss.str() + ret;
+/*			auto s = std::to_string(part);
+			if (s.length() < 3)
+				ret = "," + std::string(3 - s.length(), '0') + s + ret;
+			else
+				ret = "," + s + ret;*/
 		}
 		else {
-			out = std::to_string(part) + out;
+			ret = std::to_string(part) + ret;
 		}
 
 	} while (num > 0);
 
-	int initialSpaces = minWidth - out.length();
+	int initialSpaces = minWidth - (int)ret.length();
 
 	if (initialSpaces > 0) {
-		out = string(initialSpaces, ' ') + out;
+		ret = string(initialSpaces, ' ') + ret;
 	}
 
-	return out;
+	return ret;
 }

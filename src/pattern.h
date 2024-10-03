@@ -130,7 +130,7 @@ public:
 
 	// *****************************************************************************************
 	//
-	pattern_t(pattern_t &&v)
+	pattern_t(pattern_t &&v) noexcept
 	{
 		*this = std::move(v);
 	}
@@ -155,7 +155,7 @@ public:
 	
 	// *****************************************************************************************
 	//
-	pattern_t& operator=(pattern_t &&v) {
+	pattern_t& operator=(pattern_t &&v) noexcept {
 		is_parent = v.is_parent;
 		num_samples = v.num_samples;
 		num_local_samples = v.num_local_samples;

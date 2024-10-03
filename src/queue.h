@@ -374,7 +374,7 @@ public:
 		
 		for(auto &x : data)
 			q.push(x);
-		n_elements += data.size();
+		n_elements += (int) data.size();
 
 //		if (was_empty)
 			cv_queue_empty.notify_all();

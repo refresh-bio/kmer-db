@@ -1380,19 +1380,24 @@ void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, Sparse
 							uint32_t row_id = pat_data1[j];
 							auto& row_data = matrix[row_id];
 
-							uint32_t row_id_next = (jj + 1 < my_js.size()) ? pat_data1[my_js[jj + 1]] : 0;
-
 							for (uint32_t k = 0; k < n_data2 - pf_skip; ++k)
 							{
 								row_data.prefetch(pat_data2[k + pf_skip]);
 								row_data[pat_data2[k]] += to_add;
 							}
 
-							for (uint32_t k = n_data2 - pf_skip; k < n_data2; ++k)
+							if (jj + 1 < my_js.size())
 							{
-								matrix[row_id_next].prefetch(pat_data2[k - (n_data2 - pf_skip)]);
-								row_data[pat_data2[k]] += to_add;
+								uint32_t row_id_next = pat_data1[my_js[jj + 1]];
+								for (uint32_t k = n_data2 - pf_skip; k < n_data2; ++k)
+								{
+									matrix[row_id_next].prefetch(pat_data2[k - (n_data2 - pf_skip)]);
+									row_data[pat_data2[k]] += to_add;
+								}
 							}
+							else
+								for (uint32_t k = n_data2 - pf_skip; k < n_data2; ++k)
+									row_data[pat_data2[k]] += to_add;
 						}
 					}
 #endif

@@ -271,7 +271,7 @@ public:
 			masks[i] = (masks[i - 1] << 1) + 1ull;
 
 		// lut_ilog2[i] = min. no. of bits for number i
-		lut_ilog2 = new uint8_t[1u << LEN_ILOG2];
+		lut_ilog2 = new uint8_t[1ull << LEN_ILOG2];
 		lut_ilog2[0] = 0;
 		lut_ilog2[1] = 1;
 
@@ -279,7 +279,7 @@ public:
 			lut_ilog2[i] = lut_ilog2[i / 2] + 1;
 
 		// lut_prefix_len[i] - no. of leading 1 in LEN_PREFIX_LEN lower bits of i
-		lut_prefix_len = new uint8_t[1u << LEN_PREFIX_LEN];
+		lut_prefix_len = new uint8_t[1ull << LEN_PREFIX_LEN];
 
 		uint32_t prefix_len = 0;
 		uint32_t pos = 0;

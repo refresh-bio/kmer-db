@@ -1,11 +1,15 @@
 #pragma once
 
-#define VERSION "2.1.0"
-#define DATE "27.09.2024"
+#define VERSION "2.2.0"
+#define DATE "02.10.2024"
 
 /* 
 
 Version history
+
+2.2.0 (02.10.2024)
+- Added rows sampling (`-sample-rows` option) in `all2all-sp` and `all2all-parts` modes. 
+
 2.1.0 (27.09.2024)
 - Added unified filtering based on any specified measure (parameters `-above`, `-above_eq`, `-below`, and `-below_eq` replaced with `-min` and `-max` options).
 - Changed interface in `distance` mode: only one measure allowed, output file has to be specified.

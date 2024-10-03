@@ -24,7 +24,7 @@ public:
 	virtual ~AbstractFilter() {}
 
 protected:
-	uint64_t kmerLength;
+	uint64_t kmerLength{};
 };
 
 // *****************************************************************************************
@@ -53,7 +53,7 @@ protected:
 class MinHashFilter : public AbstractFilter {
 public:
 
-	uint64_t getLength() const { return kmer_length; }
+	uint32_t getLength() const { return kmer_length; }
 	double getFraction() const { return fraction; }
 	double getStartValue() const { return startValue;  }
 

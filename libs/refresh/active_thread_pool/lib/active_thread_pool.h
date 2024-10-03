@@ -77,15 +77,16 @@ namespace refresh
 		void inc()
 		{
 			no_working.fetch_add(1);
-			is_operating.test_and_set();
+//			is_operating.test_and_set();
 		}
 
 		void dec()
 		{
-			if (no_working.fetch_sub(1) == 1)
+			no_working.fetch_sub(1);
+/*			if (no_working.fetch_sub(1) == 1)
 				is_operating.clear();
 
-			is_operating.notify_all();
+			is_operating.notify_all();*/
 		}
 
 		void set_exception(std::exception_ptr ptr)
@@ -114,20 +115,23 @@ namespace refresh
 			return exception_ptr != nullptr;
 		}
 
-		void wait()
+/*		void wait()
 		{
+			// !!! FIXME: can work improperly
 			is_operating.wait(true);
-		}
+		}*/
 
 		void heavy_wait()
 		{
-			while (is_operating.test())
+//			while (is_operating.test())
+			while (no_working.load() != 0)
 				;
 		}
 
 		void busy_wait()
 		{
-			while (is_operating.test())
+//			while (is_operating.test())
+			while (no_working.load() != 0)
 				refresh::utils::noop();
 		}
 
@@ -231,27 +235,23 @@ namespace refresh
 
 							if (pool_ptr)
 								pool_ptr->dec();
+							thread_state.store(thread_state_waiting);
 						}
 						catch (const std::exception &e)
 						{
 							if (pool_ptr)
 							{
-								pool_ptr->dec();
-
 								std::cerr << "Exception: " + std::string(e.what()) + "\n";
 								fflush(stderr);
 
 								pool_ptr->set_exception(std::current_exception());
-								
+								pool_ptr->dec();
+								thread_state.store(thread_state_waiting);
+
 								return;
 							}
 						}
 
-						{
-//							auto tmp = thread_state_working;
-//							thread_state.compare_exchange_strong(tmp, thread_state_waiting);
-							thread_state.store(thread_state_waiting);
-						}
 						break;
 					}
 				}

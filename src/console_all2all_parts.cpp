@@ -6,7 +6,12 @@
 #include <cstdint>
 #include <algorithm>
 
+using sampler_t = Sampler<uint32_t, uint32_t, double>;
+
 void All2AllPartsConsole::run(const Params& params) {
+	uint32_t sampling_max_no_items = params.samplingSize;
+	bool do_sampling = sampling_max_no_items != 0;
+	sampler_t::strategy_t sampling_strategy = params.samplingCriterion ? sampler_t::strategy_t::best : sampler_t::strategy_t::random;
 
 	if (params.files.size() != 2) {
 		throw usage_error(params.mode);
@@ -128,6 +133,9 @@ void All2AllPartsConsole::run(const Params& params) {
 
 	PrefixKmerDb* db_tmp = nullptr;
 
+	sampler_t sampler(do_sampling ? sample_name_count.size() : 0, sampling_max_no_items, sampling_strategy);
+
+	vector<uint32_t> idx_shifts = { 0 };
 
 	for (uint32_t i_row = 0; i_row < no_parts; ++i_row)
 	{
@@ -146,6 +154,9 @@ void All2AllPartsConsole::run(const Params& params) {
 		db_row->deserialize(dbFile1, AbstractKmerDb::DeserializationMode::CompactedHashtables);
 		uint32_t no_row_samples = db_row->getSamplesCount();
 
+		auto cum_no_samples = idx_shifts.back();
+		idx_shifts.emplace_back(cum_no_samples + no_row_samples);
+
 		t2 = std::chrono::high_resolution_clock::now();
 		dt_load += t2 - t1;
 
@@ -163,15 +174,22 @@ void All2AllPartsConsole::run(const Params& params) {
 
 			matrix = new SparseMatrix<uint32_t>;
 			calculator.db2db_sp(*db_row, *db_col, *matrix);
-
-			CombinedFilter<uint32_t> filter(
-				params.metricFilters,
-				params.kmerFilter,
-				db_row->getSampleKmersCount(),
-				db_col->getSampleKmersCount(),
-				params.kmerLength);
 			
-			matrix->compact(filter, params.numThreads);
+			CombinedFilter<uint32_t> filter(
+			params.metricFilters,
+			params.kmerFilter,
+			db_row->getSampleKmersCount(),
+			db_col->getSampleKmersCount(),
+			params.kmerLength);
+
+			if (do_sampling)
+			{
+				matrix->add_to_sampler(filter, sampler, params.samplingCriterion, db_row->getSampleKmersCount(), db_col->getSampleKmersCount(), idx_shifts[i_row], idx_shifts[i_col], params.kmerLength, params.numThreads);
+				matrix->clear();
+			}
+			else {
+				matrix->compact(filter, params.numThreads);
+			}
 
 			t3 = std::chrono::high_resolution_clock::now();
 			dt_all2all += t3 - t2;
@@ -209,7 +227,14 @@ void All2AllPartsConsole::run(const Params& params) {
 				db_col->getSampleKmersCount(),
 				params.kmerLength);
 
-			matrix->compact(filter, params.numThreads);
+			if (do_sampling)
+			{
+				matrix->add_to_sampler(filter, sampler, params.samplingCriterion, db_row->getSampleKmersCount(), db_col->getSampleKmersCount(), idx_shifts[i_row], idx_shifts[i_col], params.kmerLength, params.numThreads);
+				matrix->clear();
+			}
+			else {
+				matrix->compact(filter, params.numThreads);
+			}
 
 			t3 = std::chrono::high_resolution_clock::now();
 			dt_all2all += t3 - t2;
@@ -236,7 +261,14 @@ void All2AllPartsConsole::run(const Params& params) {
 			db_row->getSampleKmersCount(),
 			params.kmerLength);
 
-		matrix->compact(filter, params.numThreads);
+		if (do_sampling)
+		{
+			matrix->add_to_sampler(filter, sampler, params.samplingCriterion, db_row->getSampleKmersCount(), db_row->getSampleKmersCount(), idx_shifts[i_row], idx_shifts[i_row], params.kmerLength, params.numThreads);
+			matrix->clear();
+		}
+		else {
+			matrix->compact(filter, params.numThreads);
+		}
 		matrices_row[i_row] = matrix;
 
 		t2 = std::chrono::high_resolution_clock::now();
@@ -250,26 +282,27 @@ void All2AllPartsConsole::run(const Params& params) {
 		t3 = std::chrono::high_resolution_clock::now();
 		dt_release += t3 - t2;
 
-
-		LOG_NORMAL << "Saving output matrix..." << endl << flush;
-		for (uint32_t k = 0; k < no_row_samples; ++k)
+		if (!do_sampling)
 		{
-			ofs << sample_name_count[k_global + k].first << "," << sample_name_count[k_global + k].second << ",";
-			ptr = line;
-			size_t idx_shift = 0;
-
-			for (uint32_t i_col = 0; i_col <= i_row; ++i_col)
+			LOG_NORMAL << "Saving output matrix..." << endl << flush;
+			for (uint32_t k = 0; k < no_row_samples; ++k)
 			{
-				matrix = matrices_row[i_col];
-				ptr += matrix->saveRowSparse(k, ptr, idx_shift);
+				ofs << sample_name_count[k_global + k].first << "," << sample_name_count[k_global + k].second << ",";
+				ptr = line;
+				size_t idx_shift = 0;
 
-				idx_shift += part_no_samples[i_col];
+				for (uint32_t i_col = 0; i_col <= i_row; ++i_col)
+				{
+					matrix = matrices_row[i_col];
+					ptr += matrix->saveRowSparse(k, ptr, idx_shift);
+					idx_shift += part_no_samples[i_col];
+				}
+
+				ofs.write(line, ptr - line);
+				ofs << endl;
 			}
-
-			ofs.write(line, ptr - line);
-			ofs << endl;
+			LOG_NORMAL << " OK" << endl;
 		}
-		LOG_NORMAL << " OK" << endl;
 
 		t4 = std::chrono::high_resolution_clock::now();
 		dt_store += t4 - t3;
@@ -285,6 +318,20 @@ void All2AllPartsConsole::run(const Params& params) {
 
 		t2 = std::chrono::high_resolution_clock::now();
 		dt_release += t2 - t1;
+	}
+
+	if (do_sampling)
+	{
+		for (uint32_t i = 0; i < sample_name_count.size(); ++i)
+		{
+			ofs << sample_name_count[i].first << "," << sample_name_count[i].second << ",";
+
+			ptr = line;
+			ptr += sampler.saveRowSparse(i, ptr, 0);
+
+			ofs.write(line, ptr - line);
+			ofs << endl;
+		}
 	}
 
 	t1 = std::chrono::high_resolution_clock::now();

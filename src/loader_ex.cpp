@@ -173,7 +173,6 @@ void LoaderEx::readerJob(int tid) {
 	LOG_DEBUG << "loader thread completed: " << tid << endl ;
 }
 
-
 // *****************************************************************************************
 //
 void LoaderEx::multifastaReaderJob() {
@@ -210,7 +209,8 @@ void LoaderEx::multifastaReaderJob() {
 
 				bool ok = genomicFile->loadNext(
 					kmersCollections[bufferId], positionsCollections[bufferId],
-					sampleTask->kmers, sampleTask->kmersCount, sampleTask->kmerLength, sampleTask->fraction, false, sampleTask->sampleName);
+					sampleTask->kmers, sampleTask->kmersCount, sampleTask->kmerLength, sampleTask->fraction, false, sampleTask->sampleName,
+					total_kmers_in_kmers_collections);
 
 				++sample_id;
 				++bufferRefCounters[bufferId];
@@ -227,7 +227,7 @@ void LoaderEx::multifastaReaderJob() {
 		}
 
 		if (count > 0) {
-			LOG_VERBOSE << "File loaded successfully: " << inputTask->fileId + 1 << endl ;
+			LOG_VERBOSE << "File loaded successfully: " << inputTask->fileId + 1 << endl;
 		}
 		else {
 			LOG_NORMAL << "File load failed: " << inputTask->fileId + 1 << endl << std::flush;

@@ -54,8 +54,11 @@
     <ClInclude Include="loader_tasks.h" />
     <ClInclude Include="conversion.h" />
     <ClInclude Include="params.h" />
-    <ClInclude Include="..\libs\refresh\pdqsort_par.h" />
     <ClInclude Include="instr_set_detect.h" />
     <ClInclude Include="sparse_filters.h" />
+    <ClInclude Include="sampler.h" />
+    <ClInclude Include="..\libs\refresh\sort\lib\pdqsort_par.h" />
+    <ClInclude Include="..\libs\refresh\active_thread_pool\lib\active_thread_pool.h" />
+    <ClInclude Include="..\libs\refresh\compression\lib\file_wrapper.h" />
   </ItemGroup>
 </Project>

@@ -53,12 +53,14 @@ public:
 	}
 	
 	size_t getBytes() {
-		size_t mem = 0;
+		return total_kmers_in_kmers_collections;
+
+/*		size_t mem = 0;
 		for (const auto& col : kmersCollections) {
 			mem += col.capacity() * sizeof(kmer_t);
 		}
 
-		return mem;
+		return mem;*/
 	}
 
 	bool isCompleted() {
@@ -92,6 +94,7 @@ private:
 	std::vector<std::thread> readers;
 
 	std::vector<std::vector<kmer_t>> kmersCollections;
+	atomic<size_t> total_kmers_in_kmers_collections{ 0 };
 
 	std::vector<std::vector<uint32_t>> positionsCollections;
 

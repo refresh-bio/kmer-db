@@ -34,6 +34,7 @@ public:
 	}
 
 	InputFile(std::shared_ptr<AbstractFilter> filter) : filter(filter) {}
+	virtual ~InputFile() {};
 
 	virtual bool open(const std::string& filename) = 0;
 	virtual bool load(
@@ -69,6 +70,8 @@ public:
 	GenomeInputFile(std::shared_ptr<AbstractFilter> filter, bool storePositions)
 		: InputFile(filter), status(false), storePositions(storePositions) {}
 
+	virtual ~GenomeInputFile() {}
+
 	bool open(const std::string& filename) override;
 	
 	bool load(
@@ -90,7 +93,8 @@ public:
 		uint32_t& kmerLength,
 		double& filterValue,
 		bool nonCanonical,
-		std::string& sampleName
+		std::string& sampleName,
+		atomic<size_t>& total_kmers_in_kmers_collections
 	);
 
 	
@@ -121,6 +125,7 @@ protected:
 class MihashedInputFile : public InputFile {
 public:
 	MihashedInputFile(std::shared_ptr<AbstractFilter> filter) : InputFile(filter), status(false) {}
+	virtual ~MihashedInputFile() {}
 
 	bool open(const std::string& filename) override;
 	
@@ -153,6 +158,7 @@ class KmcInputFile : public InputFile {
 public:
 	
 	KmcInputFile(std::shared_ptr<AbstractFilter> filter) : InputFile(filter) {}
+	virtual ~KmcInputFile() {}
 
 	bool open(const std::string& filename) override {
 		kmcfile = std::make_shared<CKMCFile>();

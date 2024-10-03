@@ -7,7 +7,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 */
 
 #ifdef _MSC_VER 
-#include <mimalloc.h>
+//#include <mimalloc.h>
 #include <mimalloc-new-delete.h>
 #endif
 

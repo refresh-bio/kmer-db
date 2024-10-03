@@ -25,7 +25,8 @@ class LockedStream {
 	std::recursive_mutex* mtx{ nullptr };
 
 public:
-	LockedStream() : mtx() {}
+//	LockedStream() : mtx() {}
+	LockedStream() = default;
 	LockedStream(std::ostream& out, std::recursive_mutex& mtx) : out(&out), mtx(&mtx) {}
 	~LockedStream() {
 		if (out) {
@@ -35,14 +36,35 @@ public:
 	}
 
 	template <class T>
-	LockedStream& operator<< (const T& v)							{ if (out) { *out << v; }; return *this; }
+//	LockedStream& operator<< (const T& v)							{ if (out) { *out << v; }; return *this; }
+	LockedStream& operator<< (bool v)							{ if (out) { *out << v; }; return *this; }
+	LockedStream& operator<< (long v)							{ if (out) { *out << v; }; return *this; }
+	LockedStream& operator<< (unsigned long v)							{ if (out) { *out << v; }; return *this; }
+	LockedStream& operator<< (long long v)							{ if (out) { *out << v; }; return *this; }
+	LockedStream& operator<< (unsigned long long v)							{ if (out) { *out << v; }; return *this; }
+	LockedStream& operator<< (float v)							{ if (out) { *out << v; }; return *this; }
+	LockedStream& operator<< (double v)							{ if (out) { *out << v; }; return *this; }
+	LockedStream& operator<< (long double v)							{ if (out) { *out << v; }; return *this; }
+//	LockedStream& operator<< (const void *v)							{ if (out) { *out << v; }; return *this; }
+	LockedStream& operator<< (short v)							{ if (out) { *out << v; }; return *this; }
+	LockedStream& operator<< (unsigned short v)							{ if (out) { *out << v; }; return *this; }
+	LockedStream& operator<< (int v)							{ if (out) { *out << v; }; return *this; }
+	LockedStream& operator<< (unsigned int v)							{ if (out) { *out << v; }; return *this; }
+	
+	LockedStream& operator<< (std::string v)							{ if (out) { *out << v; }; return *this; }
 	
 	LockedStream& operator<< (std::ostream& (*pf)(std::ostream&))	{ if (out) { *out << pf; }; return *this; }
 	LockedStream& operator<< (std::ios& (*pf)(std::ios&))			{ if (out) { *out << pf; }; return *this; }
 	LockedStream& operator<< (std::ios& (*pf)(std::ios_base&))		{ if (out) { *out << pf; }; return *this; }
-	
+
+	friend LockedStream& operator<<(LockedStream& os, const char* s);
+	friend LockedStream& operator<<(LockedStream& os, const signed char* s);
+	friend LockedStream& operator<<(LockedStream& os, const unsigned char* s);
 };
 
+inline LockedStream& operator<<(LockedStream& os, const char*s) { if (os.out) { *(os.out) << s; }; return os; }
+inline LockedStream& operator<<(LockedStream& os, const signed char*s) { if (os.out) { *(os.out) << s; }; return os; }
+inline LockedStream& operator<<(LockedStream& os, const unsigned char*s) { if (os.out) { *(os.out) << s; }; return os; }
 
 // *****************************************************************************************
 //
