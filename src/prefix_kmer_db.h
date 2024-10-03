@@ -4,6 +4,7 @@
 #include <atomic>
 #include <numeric>
 
+//#define COLLECT_DETAILED_TIMES
 
 template <typename T>
 class semi_atomic
@@ -158,12 +159,14 @@ public:
 
 	std::string printDetailedTimes() const override {
 		std::ostringstream oss;
-		oss << "\tHashtable processing (parallel): " << times.hashtableProcess.load().count() <<  endl 
+#ifdef COLLECT_DETAILED_TIMES
+		oss << "\tHashtable processing (parallel): " << times.hashtableProcess.load().count() <<  endl
 		//	<< "\timbalance: " << stats.hashtableJobsImbalance / getSamplesCount() <<  endl
 			<< "\t\tResize: " << (times.hashtableResize_worker.load().count() / num_threads) << endl
 			<< "\t\tFind'n'add: " << (times.hashtableFind_worker.load().count() / num_threads) << endl
 			<< "\tSort time (parallel): " << times.sort.load().count() << endl
 			<< "\tPattern extension time (parallel): " << times.extension.load().count() << endl;
+#endif
 		return oss.str();
 	}
 
@@ -217,6 +220,7 @@ protected:
 //	Semaphore semaphore;
 //	Semaphore semaphore2;
 
+#ifdef COLLECT_DETAILED_TIMES
 	// structure for storing all the times
 	struct {
 		semi_atomic<std::chrono::duration<double>> hashtableProcess { };
@@ -228,6 +232,7 @@ protected:
 		semi_atomic<std::chrono::duration<double>> sort { };
 		semi_atomic<std::chrono::duration<double>> extension{ };
 	} times;
+#endif
 
 	// structure for storing bytes 
 	struct {
@@ -238,15 +243,7 @@ protected:
 
 	} stats;
 
-
 	void initialize(uint32_t kmerLength, double fraction) override;
-
-	//void histogramJob();
-	//void hashtableSearchJob();
-	//void hashtableAdditionJob();
-
-	void hashtableJob();
-	void patternJob();
 
 	void hashtableJobATP();
 	void patternJobATP();

@@ -121,7 +121,9 @@ void BuildConsole::run(const Params& params){
 		<< "Total: " << totalTime.count() << endl
 		<< "Kmer sorting/unique time: " << sortingTime.count() << endl
 		<< "Database update time:" << processingTime.count() << endl
+#ifdef COLLECT_DETAILED_TIMES
 		<< db->printDetailedTimes() << endl
+#endif
 		<< "STATISTICS" << endl << db->printStats() << endl;
 
 	std::chrono::duration<double> dt{ 0 };

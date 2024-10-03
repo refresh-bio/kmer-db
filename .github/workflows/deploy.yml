@@ -17,6 +17,8 @@ jobs:
     runs-on: [self-hosted, kmer-db, '${{ matrix.machine }}']
     
     steps:
+    - name: clean
+      run: rm -rf ${{ github.workspace }}/*
     - uses: actions/checkout@v4
       with:
         submodules: recursive
@@ -30,23 +32,21 @@ jobs:
       matrix:
         machine: [x64_linux]
         platform: [avx2]
-        compiler: [g++-13]
+        compiler: [14]
         include:
-        - {machine: arm64_linux, platform: arm8, compiler: g++-12}
-        - {machine: x64_mac, platform: avx2, compiler: g++-13}
-        - {machine: arm64_mac, platform: m1, compiler: g++-13}
+        - {machine: arm64_linux, platform: arm8, compiler: 12}
+        - {machine: x64_mac, platform: avx2, compiler: 13}
+        - {machine: arm64_mac, platform: m1, compiler: 13}
        
     runs-on: [self-hosted, kmer-db, '${{ matrix.machine }}']  
         
     steps:
     - name: make 
       run: |
-        make clean
-        make -j32 CXX=${{matrix.compiler}} STATIC_LINK=true PLATFORM=${{ matrix.platform }}
+        make -j32 CXX=g++-${{matrix.compiler}} CC=gcc-${{matrix.compiler}} STATIC_LINK=true PLATFORM=${{ matrix.platform }}
     - name: tar artifacts
       run: tar -cvzf kmer-db.tar.gz kmer-db LICENSE
-
-      
+    
 ########################################################################################
   help:
     name: Print usage

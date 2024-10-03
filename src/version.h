@@ -1,11 +1,14 @@
 #pragma once
 
-#define VERSION "2.2.0"
-#define DATE "02.10.2024"
+#define VERSION "2.2.1"
+#define DATE "03.10.2024"
 
 /* 
 
 Version history
+
+2.2.1 (03.10.2024)
+- Fixed slight slow down in `build` mode introduced in the previous version. 
 
 2.2.0 (02.10.2024)
 - Added rows sampling (`-sample-rows` option) in `all2all-sp` and `all2all-parts` modes. 

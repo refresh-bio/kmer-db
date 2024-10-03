@@ -18,6 +18,9 @@ jobs:
     runs-on: [self-hosted, kmer-db, '${{ matrix.machine }}']
     
     steps:
+    - name: clean
+      run: rm -rf ${{ github.workspace }}/*
+      
     - uses: actions/checkout@v4
       with:
         submodules: recursive
@@ -31,22 +34,23 @@ jobs:
       fail-fast: false
       matrix:
         machine: [x64_linux, x64_mac, arm64_linux, arm64_mac]
-        compiler: [g++-11, g++-12, g++-13]
+        compiler: [11, 12, 13]
+        force_zlib: [true, false]
         include:
+        - {machine: x64_linux, platform: avx2, compiler: 14, force_zlib: false}
         - {machine: x64_linux, platform: avx2}
         - {machine: arm64_linux, platform: arm8}
         - {machine: x64_mac, platform: avx2}
         - {machine: arm64_mac, platform: m1}
         exclude:
-        - {machine: arm64_linux, compiler: g++-13}
-        force_zlib: [true, false]
-   
+        - {machine: arm64_linux, compiler: 13}
+        
     runs-on: [self-hosted, kmer-db, '${{ matrix.machine }}']  
         
     steps:
     - name: make (${{matrix.compiler}}, FORCE_ZLIB=${{matrix.force_zlib}}, PLATFORM=${{ matrix.platform}})
       run: | 
-        make -j32 CXX=${{matrix.compiler}} FORCE_ZLIB=${{matrix.force_zlib}} PLATFORM=${{ matrix.platform }}
+        make -j32 CXX=g++-${{matrix.compiler}} CC=gcc-${{matrix.compiler}} FORCE_ZLIB=${{matrix.force_zlib}} PLATFORM=${{ matrix.platform }}
         cp ./kmer-db ./kmer-db-${{matrix.compiler}}-${{matrix.force_zlib}}
         make clean
         
@@ -58,19 +62,19 @@ jobs:
       fail-fast: false
       matrix:
         machine: [x64_linux, x64_mac, arm64_linux, arm64_mac]
-        compiler: [g++-11, g++-12, g++-13]
+        compiler: [11, 12, 13]
         force_zlib: [false, true]
         mode: [unknown_mode]
         exclude:
-        - {machine: arm64_linux, compiler: g++-13}
+        - {machine: arm64_linux, compiler: 13}
         include:
-        - {machine: x64_linux, compiler: g++-13, force_zlib: false, mode: all2all}
-        - {machine: x64_linux, compiler: g++-13, force_zlib: false, mode: all2all-parts} 
-        - {machine: x64_linux, compiler: g++-13, force_zlib: false, mode: all2all-sp} 
-        - {machine: x64_linux, compiler: g++-13, force_zlib: false, mode: new2all} 
-        - {machine: x64_linux, compiler: g++-13, force_zlib: false, mode: one2all} 
-        - {machine: x64_linux, compiler: g++-13, force_zlib: false, mode: distance} 
-        - {machine: x64_linux, compiler: g++-13, force_zlib: false, mode: minhash} 
+        - {machine: x64_linux, compiler: 14, force_zlib: false, mode: all2all}
+        - {machine: x64_linux, compiler: 14, force_zlib: false, mode: all2all-parts} 
+        - {machine: x64_linux, compiler: 14, force_zlib: false, mode: all2all-sp} 
+        - {machine: x64_linux, compiler: 14, force_zlib: false, mode: new2all} 
+        - {machine: x64_linux, compiler: 14, force_zlib: false, mode: one2all} 
+        - {machine: x64_linux, compiler: 14, force_zlib: false, mode: distance} 
+        - {machine: x64_linux, compiler: 14, force_zlib: false, mode: minhash} 
 
     runs-on: [self-hosted, kmer-db, '${{ matrix.machine }}']
     
@@ -91,10 +95,13 @@ jobs:
       fail-fast: false
       matrix:
         machine: [x64_linux, x64_mac, arm64_linux, arm64_mac]
-        compiler: [g++-11, g++-12, g++-13]
-        exclude:
-        - {machine: arm64_linux, compiler: g++-13}
+        compiler: [11, 12, 13]
         force_zlib: [false]
+        include:
+        - {machine: x64_linux, compiler: 14, force_zlib: false}
+        exclude:
+        - {machine: arm64_linux, compiler: 13}
+   
     runs-on: [self-hosted, kmer-db, '${{ matrix.machine }}']
 
     env: 
@@ -213,11 +220,16 @@ jobs:
       fail-fast: false
       matrix:
         machine: [x64_linux, x64_mac, arm64_linux, arm64_mac]
-        compiler: [g++-11, g++-12, g++-13]
-        exclude:
-        - {machine: arm64_linux, compiler: g++-13}
+        compiler: [11, 12, 13]
         force_zlib: [false]
         threads: [1, 2, 16]
+        include:
+        - {machine: x64_linux, compiler: 14, force_zlib: false, threads: 1}
+        - {machine: x64_linux, compiler: 14, force_zlib: false, threads: 2}
+        - {machine: x64_linux, compiler: 14, force_zlib: false, threads: 16}
+        exclude:
+        - {machine: arm64_linux, compiler: 13}
+     
 
     runs-on: [self-hosted, kmer-db, '${{ matrix.machine }}']
     
