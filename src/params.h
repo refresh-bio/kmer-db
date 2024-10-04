@@ -61,18 +61,22 @@ public:
 
 	std::map<std::string, metric_fun_t> availableMetrics;
 
+private:
+
+
 	
 public:
-
+	double fraction{ 1.0 };
+	uint32_t kmerLength{ 18 };
 
 	int numThreads{ 0 };
 	int numReaderThreads{ 0 };
 	int cacheBufferMb{ 8 };
 	bool multisampleFasta{ false };
-	double fraction{ 1.0 };
+	
 	double fractionStart{ 0.0 };
 	bool fractionSpecified{ false };
-	uint32_t kmerLength{ 18 };
+	
 	bool sparseOut{ false };
 	bool extendDb{ false };
 	bool phylipOut{ false };

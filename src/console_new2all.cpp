@@ -124,7 +124,7 @@ void New2AllConsole::run(const Params& params)
 					params.kmerFilter,
 					queryKmersCounts,
 					db.getSampleKmersCount(),
-					params.kmerLength);
+					db.getKmerLength());
 				
 				// filter row
 				for (int j = 0; j < buf.size(); ++j) {

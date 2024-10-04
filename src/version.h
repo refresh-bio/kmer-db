@@ -1,11 +1,14 @@
 #pragma once
 
-#define VERSION "2.2.1"
-#define DATE "03.10.2024"
+#define VERSION "2.2.2"
+#define DATE "04.10.2024"
 
 /* 
 
 Version history
+
+2.2.2 (04.10.2024)
+- Fixed bug with filtering/sampling in all2all variants and new2all always using 18 as a kmer length.
 
 2.2.1 (03.10.2024)
 - Fixed slight slow down in `build` mode introduced in the previous version. 

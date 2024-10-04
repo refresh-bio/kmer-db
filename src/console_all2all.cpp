@@ -57,7 +57,7 @@ void All2AllConsole::run(const Params& params) {
 			params.kmerFilter,
 			db->getSampleKmersCount(),
 			db->getSampleKmersCount(),
-			params.kmerLength);
+			db->getKmerLength());
 
 		matrix.compact(filter);
 	}

@@ -180,11 +180,11 @@ void All2AllPartsConsole::run(const Params& params) {
 			params.kmerFilter,
 			db_row->getSampleKmersCount(),
 			db_col->getSampleKmersCount(),
-			params.kmerLength);
+			db_row->getKmerLength());
 
 			if (do_sampling)
 			{
-				matrix->add_to_sampler(filter, sampler, params.samplingCriterion, db_row->getSampleKmersCount(), db_col->getSampleKmersCount(), idx_shifts[i_row], idx_shifts[i_col], params.kmerLength, params.numThreads);
+				matrix->add_to_sampler(filter, sampler, params.samplingCriterion, db_row->getSampleKmersCount(), db_col->getSampleKmersCount(), idx_shifts[i_row], idx_shifts[i_col], db_row->getKmerLength(), params.numThreads);
 				matrix->clear();
 			}
 			else {
@@ -225,11 +225,11 @@ void All2AllPartsConsole::run(const Params& params) {
 				params.kmerFilter,
 				db_row->getSampleKmersCount(),
 				db_col->getSampleKmersCount(),
-				params.kmerLength);
+				db_row->getKmerLength());
 
 			if (do_sampling)
 			{
-				matrix->add_to_sampler(filter, sampler, params.samplingCriterion, db_row->getSampleKmersCount(), db_col->getSampleKmersCount(), idx_shifts[i_row], idx_shifts[i_col], params.kmerLength, params.numThreads);
+				matrix->add_to_sampler(filter, sampler, params.samplingCriterion, db_row->getSampleKmersCount(), db_col->getSampleKmersCount(), idx_shifts[i_row], idx_shifts[i_col], db_row->getKmerLength(), params.numThreads);
 				matrix->clear();
 			}
 			else {
@@ -259,11 +259,11 @@ void All2AllPartsConsole::run(const Params& params) {
 			params.kmerFilter,
 			db_row->getSampleKmersCount(),
 			db_row->getSampleKmersCount(),
-			params.kmerLength);
+			db_row->getKmerLength());
 
 		if (do_sampling)
 		{
-			matrix->add_to_sampler(filter, sampler, params.samplingCriterion, db_row->getSampleKmersCount(), db_row->getSampleKmersCount(), idx_shifts[i_row], idx_shifts[i_row], params.kmerLength, params.numThreads);
+			matrix->add_to_sampler(filter, sampler, params.samplingCriterion, db_row->getSampleKmersCount(), db_row->getSampleKmersCount(), idx_shifts[i_row], idx_shifts[i_row], db_row->getKmerLength(), params.numThreads);
 			matrix->clear();
 		}
 		else {

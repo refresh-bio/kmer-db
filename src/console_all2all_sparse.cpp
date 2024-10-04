@@ -64,13 +64,13 @@ void All2AllSparseConsole::run(const Params& params) {
 		params.kmerFilter,
 		db->getSampleKmersCount(),
 		db->getSampleKmersCount(),
-		params.kmerLength);
+		db->getKmerLength());
 
 	sampler_t sampler(do_sampling ? db->getSamplesCount() : 0, sampling_max_no_items, sampling_strategy);
 
 	if (do_sampling)
 	{
-		matrix.add_to_sampler(filter, sampler, params.samplingCriterion, db->getSampleKmersCount(), db->getSampleKmersCount(), 0, 0, params.kmerLength, params.numThreads);
+		matrix.add_to_sampler(filter, sampler, params.samplingCriterion, db->getSampleKmersCount(), db->getSampleKmersCount(), 0, 0, db->getKmerLength(), params.numThreads);
 		matrix.clear();
 	}
 	else
