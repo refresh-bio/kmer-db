@@ -37,6 +37,7 @@ public:
 	const std::string MODE_DISTANCE = "distance";
 
 	const std::string SWITCH_HELP = "-help";
+	const std::string SWITCH_VERSION = "-version";
 	const std::string SWITCH_KMC_SAMPLES = "-from-kmers";
 	const std::string SWITCH_MINHASH_SAMPLES = "-from-minhash";
 	const std::string SWITCH_MULTISAMPLE_FASTA = "-multisample-fasta";
@@ -103,6 +104,8 @@ public:
 
 	
 	void showInstructions(Mode mode) const;
+
+	void showHeader() const;
 
 	
 	bool findSwitch(std::vector<std::string>& params, const std::string& name) const {

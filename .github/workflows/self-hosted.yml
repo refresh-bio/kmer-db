@@ -83,8 +83,10 @@ jobs:
         
     steps:
     - name: help (${{matrix.compiler}}, ${{matrix.mode}})
-      run: | 
-       ${EXEC} ${{matrix.mode}} -help
+      run: ${EXEC} ${{matrix.mode}} -help
+      
+    - name: run (${{matrix.compiler}})
+      run: ${EXEC} -version  
 
 
  ########################################################################################

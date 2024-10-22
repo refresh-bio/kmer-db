@@ -1,4 +1,4 @@
-name: GitHub Actions CI
+name: Build and tests
 
 on:
   push:
@@ -54,8 +54,13 @@ jobs:
         path: ./
         
     - name: untar artifacts
-      run: |
-        tar -xf kmer-db.tar
+      run: tar -xf kmer-db.tar
+        
+    - name: help
+      run: ./kmer-db
+    
+    - name: version
+      run: ./kmer-db -version
     
     - name: build 
       run: |

@@ -23,9 +23,6 @@ int main(int argc, char **argv)
 {
 	Log::getInstance(Log::LEVEL_NORMAL).enable();
 	
-	LOG_NORMAL << "Kmer-db version " << VERSION << " (" << DATE << ")" << endl
-		<< "S. Deorowicz, A. Gudys, M. Dlugosz, M. Kokot, and A. Danek (c) 2018" << endl << endl;
-
 	Params params;
 
 	try {

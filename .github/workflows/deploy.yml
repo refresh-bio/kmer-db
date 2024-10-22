@@ -60,6 +60,9 @@ jobs:
     steps:
     - name: help
       run: ./kmer-db
+    
+    - name: version
+      run: ./kmer-db -version
 
 ########################################################################################
   upload:

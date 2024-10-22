@@ -1,5 +1,6 @@
 #include "params.h"
 #include "types.h"
+#include "version.h"
 
 #include <iostream>
 #include <stdexcept>
@@ -61,6 +62,13 @@ bool Params::parse(int argc, char** argv) {
 	std::vector<string> params(argc - 1);
 	std::transform(argv + 1, argv + argc, params.begin(), [](char* c)->string { return c; });
 
+	if (findSwitch(params, SWITCH_VERSION)) {
+		LOG_NORMAL << VERSION;
+		return false;
+	}
+	
+	showHeader();
+
 	bool helpWanted = findSwitch(params, SWITCH_HELP);
 	if (params.size() == 0) {
 		// no arguments or -help switch already consumed
@@ -71,7 +79,7 @@ bool Params::parse(int argc, char** argv) {
 	mode = str2mode(params.front());
 	params.erase(params.begin());
 	
-	if (helpWanted && params.size() == 0) {
+	if (helpWanted || params.size() == 0 || mode == Mode::unknown) {
 		// help for particular mode
 		showInstructions(mode);
 		return false;
@@ -116,7 +124,7 @@ bool Params::parse(int argc, char** argv) {
 			parse_minhash(params); break;
 		default:
 			showInstructions(mode);
-
+			return false;
 		}
 
 		// set default fration in minhash mode if not specified
@@ -128,6 +136,14 @@ bool Params::parse(int argc, char** argv) {
 	}
 
 	return true;
+}
+
+// *****************************************************************************************
+//
+void Params::showHeader() const {
+
+	LOG_NORMAL << "Kmer-db version " << VERSION << " (" << DATE << ")" << endl
+		<< "S. Deorowicz, A. Gudys, M. Dlugosz, M. Kokot, and A. Danek (c) 2018" << endl << endl;
 }
 
 // *****************************************************************************************
