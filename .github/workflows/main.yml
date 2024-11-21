@@ -31,7 +31,7 @@ jobs:
     
     - name: make
       run: | 
-        gmake -j CXX=g++-12 CC=gcc-12
+        gmake -j CXX=g++-12 CC=gcc-12 STATIC_LINK=true
 
     - name: tar artifacts
       run: tar -cvf kmer-db.tar ./test/virus -C ./bin kmer-db

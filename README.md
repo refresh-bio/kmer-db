@@ -17,7 +17,7 @@ Kmer-db is a fast and memory-efficient tool for large-scale k-mer analyses (inde
 
 ```bash
 git clone --recurse-submodules https://github.com/refresh-bio/kmer-db
-cd kmer-db && make
+cd kmer-db && gmake
 
 INPUT=./test/virus
 OUTPUT=./output
@@ -79,7 +79,7 @@ conda install -c bioconda kmer-db
 For detailed instructions how to set up Bioconda, please refer to the [Bioconda manual](https://bioconda.github.io/user/install.html#install-conda).
 Kmer-db can be also built from the sources distributed as:
 
-* MAKE project (C++-20-compatible compiler required, e.g., g++-11) for Linux and macOS,
+* GNU Make project for Linux and macOS (gmake 4.3 and gcc/g++ 11 or newer required),
 * Visual Studio 2022 solution for Windows.
 
 

@@ -35,9 +35,8 @@ jobs:
       matrix:
         machine: [x64_linux, x64_mac, arm64_linux, arm64_mac]
         compiler: [11, 12, 13]
-        force_zlib: [true, false]
         include:
-        - {machine: x64_linux, platform: avx2, compiler: 14, force_zlib: false}
+        - {machine: x64_linux, platform: avx2, compiler: 14}
         - {machine: x64_linux, platform: avx2}
         - {machine: arm64_linux, platform: arm8}
         - {machine: x64_mac, platform: avx2}
@@ -48,10 +47,10 @@ jobs:
     runs-on: [self-hosted, kmer-db, '${{ matrix.machine }}']  
         
     steps:
-    - name: make (${{matrix.compiler}}, FORCE_ZLIB=${{matrix.force_zlib}}, PLATFORM=${{ matrix.platform}})
+    - name: make (${{matrix.compiler}}, PLATFORM=${{ matrix.platform}})
       run: | 
-        gmake -j32 CXX=g++-${{matrix.compiler}} CC=gcc-${{matrix.compiler}} FORCE_ZLIB=${{matrix.force_zlib}} PLATFORM=${{ matrix.platform }}
-        cp ./bin/kmer-db ./kmer-db-${{matrix.compiler}}-${{matrix.force_zlib}}
+        gmake -j32 CXX=g++-${{matrix.compiler}} CC=gcc-${{matrix.compiler}} PLATFORM=${{ matrix.platform }} STATIC_LINK=true
+        cp ./bin/kmer-db ./kmer-db-${{matrix.compiler}}
         gmake clean
         
 ########################################################################################
@@ -63,29 +62,28 @@ jobs:
       matrix:
         machine: [x64_linux, x64_mac, arm64_linux, arm64_mac]
         compiler: [11, 12, 13]
-        force_zlib: [false, true]
         mode: [unknown_mode]
         exclude:
         - {machine: arm64_linux, compiler: 13}
         include:
-        - {machine: x64_linux, compiler: 14, force_zlib: false, mode: all2all}
-        - {machine: x64_linux, compiler: 14, force_zlib: false, mode: all2all-parts} 
-        - {machine: x64_linux, compiler: 14, force_zlib: false, mode: all2all-sp} 
-        - {machine: x64_linux, compiler: 14, force_zlib: false, mode: new2all} 
-        - {machine: x64_linux, compiler: 14, force_zlib: false, mode: one2all} 
-        - {machine: x64_linux, compiler: 14, force_zlib: false, mode: distance} 
-        - {machine: x64_linux, compiler: 14, force_zlib: false, mode: minhash} 
+        - {machine: x64_linux, compiler: 14, mode: all2all}
+        - {machine: x64_linux, compiler: 14, mode: all2all-parts} 
+        - {machine: x64_linux, compiler: 14, mode: all2all-sp} 
+        - {machine: x64_linux, compiler: 14, mode: new2all} 
+        - {machine: x64_linux, compiler: 14, mode: one2all} 
+        - {machine: x64_linux, compiler: 14, mode: distance} 
+        - {machine: x64_linux, compiler: 14, mode: minhash} 
 
     runs-on: [self-hosted, kmer-db, '${{ matrix.machine }}']
     
     env: 
-      EXEC: ./kmer-db-${{matrix.compiler}}-${{matrix.force_zlib}}
+      EXEC: ./kmer-db-${{matrix.compiler}}
         
     steps:
     - name: help (${{matrix.compiler}}, ${{matrix.mode}})
       run: ${EXEC} ${{matrix.mode}} -help
       
-    - name: run (${{matrix.compiler}})
+    - name: version (${{matrix.compiler}})
       run: ${EXEC} -version  
 
 
@@ -98,9 +96,8 @@ jobs:
       matrix:
         machine: [x64_linux, x64_mac, arm64_linux, arm64_mac]
         compiler: [11, 12, 13]
-        force_zlib: [false]
         include:
-        - {machine: x64_linux, compiler: 14, force_zlib: false}
+        - {machine: x64_linux, compiler: 14}
         exclude:
         - {machine: arm64_linux, compiler: 13}
    
@@ -108,8 +105,7 @@ jobs:
 
     env: 
       INPUT_DIR: ./test/synth
-      EXEC: ./kmer-db-${{matrix.compiler}}-${{matrix.force_zlib}}
-        
+      EXEC: ./kmer-db-${{matrix.compiler}}
     steps:
           
     - name: build 
@@ -223,12 +219,11 @@ jobs:
       matrix:
         machine: [x64_linux, x64_mac, arm64_linux, arm64_mac]
         compiler: [11, 12, 13]
-        force_zlib: [false]
         threads: [1, 2, 16]
         include:
-        - {machine: x64_linux, compiler: 14, force_zlib: false, threads: 1}
-        - {machine: x64_linux, compiler: 14, force_zlib: false, threads: 2}
-        - {machine: x64_linux, compiler: 14, force_zlib: false, threads: 16}
+        - {machine: x64_linux, compiler: 14, threads: 1}
+        - {machine: x64_linux, compiler: 14, threads: 2}
+        - {machine: x64_linux, compiler: 14, threads: 16}
         exclude:
         - {machine: arm64_linux, compiler: 13}
      
@@ -237,7 +232,7 @@ jobs:
     
     env: 
       INPUT_DIR: ./test/virus
-      EXEC: ./kmer-db-${{matrix.compiler}}-${{matrix.force_zlib}}
+      EXEC: ./kmer-db-${{matrix.compiler}}
  
     steps:
     

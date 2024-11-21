@@ -1,4 +1,4 @@
-### REFRESH group macros - v.1.0.8 (2024-11-19)
+### REFRESH group macros - v.1.0.9 (2024-11-25)
 
 ### Macros for initialization
 define INIT_GLOBALS
@@ -291,7 +291,7 @@ define SET_STATIC
 			$(eval STATIC_LFLAGS:=-static-libgcc -static-libstdc++ -pthread), \
 			$(if $(filter x86_64,$(ARCH_TYPE)), \
 				$(eval STATIC_LFLAGS:=-static -Wl,--whole-archive -lpthread -Wl,--no-whole-archive), \
-				$(eval STATIC_LFLAGS:=-static-libgcc -static-libstdc++ -lpthread) \
+				$(eval STATIC_LFLAGS:=-static -Wl,--whole-archive -lpthread -Wl,--no-whole-archive) \
 			)
 		)
 	)
