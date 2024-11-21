@@ -50,9 +50,9 @@ jobs:
     steps:
     - name: make (${{matrix.compiler}}, FORCE_ZLIB=${{matrix.force_zlib}}, PLATFORM=${{ matrix.platform}})
       run: | 
-        make -j32 CXX=g++-${{matrix.compiler}} CC=gcc-${{matrix.compiler}} FORCE_ZLIB=${{matrix.force_zlib}} PLATFORM=${{ matrix.platform }}
-        cp ./kmer-db ./kmer-db-${{matrix.compiler}}-${{matrix.force_zlib}}
-        make clean
+        gmake -j32 CXX=g++-${{matrix.compiler}} CC=gcc-${{matrix.compiler}} FORCE_ZLIB=${{matrix.force_zlib}} PLATFORM=${{ matrix.platform }}
+        cp ./bin/kmer-db ./kmer-db-${{matrix.compiler}}-${{matrix.force_zlib}}
+        gmake clean
         
 ########################################################################################
   help:

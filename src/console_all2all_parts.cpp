@@ -17,7 +17,7 @@ void All2AllPartsConsole::run(const Params& params) {
 		throw usage_error(params.mode);
 	}
 
-	LOG_NORMAL << "All versus all comparison (sparse computation)" << endl;
+	LOG_NORMAL("All versus all comparison (sparse computation)" << endl);
 	
 	const string& multipleDb = params.files[0];
 	const std::string& similarityFile = params.files[1];
@@ -52,7 +52,7 @@ void All2AllPartsConsole::run(const Params& params) {
 
 	ifs.close();
 
-	LOG_NORMAL << "Processing database grid of size " << no_parts << " by " << no_parts << endl;
+	LOG_NORMAL("Processing database grid of size " << no_parts << " by " << no_parts << endl);
 
 	const size_t io_buffer_size = 32 << 20;
 	char* io_buffer1 = new char[io_buffer_size];
@@ -132,14 +132,17 @@ void All2AllPartsConsole::run(const Params& params) {
 	uint32_t k_global = 0;
 
 	PrefixKmerDb* db_tmp = nullptr;
+	CBubbleHelper bubbles(params.bubbleSize);
 
 	sampler_t sampler(do_sampling ? sample_name_count.size() : 0, sampling_max_no_items, sampling_strategy);
 
 	vector<uint32_t> idx_shifts = { 0 };
 
+	size_t no_pairs_saved = 0;
+
 	for (uint32_t i_row = 0; i_row < no_parts; ++i_row)
 	{
-		LOG_VERBOSE << "***** Row: " << i_row + 1 << " of " << no_parts << endl;
+		LOG_VERBOSE("***** Row: " << i_row + 1 << " of " << no_parts << endl);
 
 		matrices_row.clear();
 		matrices_row.resize(i_row + 1, nullptr);
@@ -150,7 +153,7 @@ void All2AllPartsConsole::run(const Params& params) {
 		string fn_row = input_fn[i_row];
 		std::ifstream dbFile1(fn_row, std::ios::binary);
 		dbFile1.rdbuf()->pubsetbuf(io_buffer1, io_buffer_size);
-		LOG_NORMAL << "Deserializing database " << i_row + 1 << " (" << fn_row << ")" << std::flush << endl;
+		LOG_NORMAL("Deserializing database " << i_row + 1 << " (" << fn_row << ")" << std::flush << endl);
 		db_row->deserialize(dbFile1, AbstractKmerDb::DeserializationMode::CompactedHashtables);
 		uint32_t no_row_samples = db_row->getSamplesCount();
 
@@ -164,7 +167,7 @@ void All2AllPartsConsole::run(const Params& params) {
 		{
 			uint32_t i_col = i_row - 1;
 			t1 = std::chrono::high_resolution_clock::now();
-			LOG_NORMAL << "Processing cell (" << i_row + 1 << "," << i_col + 1 << ")" << endl << std::flush;
+			LOG_NORMAL("Processing cell (" << i_row + 1 << "," << i_col + 1 << ")" << endl);
 
 			db_col = db_tmp;
 			db_tmp = nullptr;
@@ -173,7 +176,7 @@ void All2AllPartsConsole::run(const Params& params) {
 			dt_load += t2 - t1;
 
 			matrix = new SparseMatrix<uint32_t>;
-			calculator.db2db_sp(*db_row, *db_col, *matrix);
+			calculator.db2db_sp(*db_row, *db_col, *matrix, bubbles);
 			
 			CombinedFilter<uint32_t> filter(
 			params.metricFilters,
@@ -184,11 +187,12 @@ void All2AllPartsConsole::run(const Params& params) {
 
 			if (do_sampling)
 			{
-				matrix->add_to_sampler(filter, sampler, params.samplingCriterion, db_row->getSampleKmersCount(), db_col->getSampleKmersCount(), idx_shifts[i_row], idx_shifts[i_col], db_row->getKmerLength(), params.numThreads);
+				// !!! TODO: add support for bubbles
+				matrix->add_to_sampler(filter, sampler, params.samplingCriterion, db_row->getSampleKmersCount(), db_col->getSampleKmersCount(), idx_shifts[i_row], idx_shifts[i_col], db_row->getKmerLength(), params.numThreads, bubbles);
 				matrix->clear();
 			}
 			else {
-				matrix->compact(filter, params.numThreads);
+				matrix->compact2(filter, params.numThreads, bubbles);
 			}
 
 			t3 = std::chrono::high_resolution_clock::now();
@@ -205,20 +209,20 @@ void All2AllPartsConsole::run(const Params& params) {
 		for (uint32 i_col = 0; i_col + 1 < i_row; ++i_col)
 		{
 			t1 = std::chrono::high_resolution_clock::now();
-			LOG_NORMAL << "Processing cell (" << i_row + 1 << "," << i_col + 1 << ")" << endl << std::flush;
+			LOG_NORMAL("Processing cell (" << i_row + 1 << "," << i_col + 1 << ")" << endl);
 
 			db_col = new PrefixKmerDb(params.numThreads);
 			string fn_col = input_fn[i_col];
 			std::ifstream dbFile2(fn_col, std::ios::binary);
 			dbFile2.rdbuf()->pubsetbuf(io_buffer2, io_buffer_size);
-			LOG_NORMAL << "Deserializing database" << i_col << " (" << fn_col << ")" << endl << std::flush;
+			LOG_NORMAL("Deserializing database" << i_col << " (" << fn_col << ")" << endl);
 			db_col->deserialize(dbFile2, AbstractKmerDb::DeserializationMode::CompactedHashtables);
 
 			t2 = std::chrono::high_resolution_clock::now();
 			dt_load += t2 - t1;
 
 			matrix = new SparseMatrix<uint32_t>;
-			calculator.db2db_sp(*db_row, *db_col, *matrix);
+			calculator.db2db_sp(*db_row, *db_col, *matrix, bubbles);
 
 			CombinedFilter<uint32_t> filter(
 				params.metricFilters,
@@ -229,11 +233,12 @@ void All2AllPartsConsole::run(const Params& params) {
 
 			if (do_sampling)
 			{
-				matrix->add_to_sampler(filter, sampler, params.samplingCriterion, db_row->getSampleKmersCount(), db_col->getSampleKmersCount(), idx_shifts[i_row], idx_shifts[i_col], db_row->getKmerLength(), params.numThreads);
+				// !!! TODO: add support for bubbles
+				matrix->add_to_sampler(filter, sampler, params.samplingCriterion, db_row->getSampleKmersCount(), db_col->getSampleKmersCount(), idx_shifts[i_row], idx_shifts[i_col], db_row->getKmerLength(), params.numThreads, bubbles);
 				matrix->clear();
 			}
 			else {
-				matrix->compact(filter, params.numThreads);
+				matrix->compact2(filter, params.numThreads, bubbles);
 			}
 
 			t3 = std::chrono::high_resolution_clock::now();
@@ -247,12 +252,15 @@ void All2AllPartsConsole::run(const Params& params) {
 			matrices_row[i_col] = matrix;
 		}
 
-		LOG_NORMAL << "Processing cell (" << i_row + 1 << "," << i_row + 1 << ")" << std::flush;
+		LOG_NORMAL("Processing cell (" << i_row + 1 << "," << i_row + 1 << ")" << endl);
 
 		t1 = std::chrono::high_resolution_clock::now();
 
 		matrix = new SparseMatrix<uint32_t>;
-		calculator.all2all_sp(*db_row, *matrix);
+
+		CBubbleHelper bubbles(params.bubbleSize);
+
+		calculator.all2all_sp(*db_row, *matrix, bubbles);
 
 		CombinedFilter<uint32_t> filter(
 			params.metricFilters,
@@ -263,11 +271,12 @@ void All2AllPartsConsole::run(const Params& params) {
 
 		if (do_sampling)
 		{
-			matrix->add_to_sampler(filter, sampler, params.samplingCriterion, db_row->getSampleKmersCount(), db_row->getSampleKmersCount(), idx_shifts[i_row], idx_shifts[i_row], db_row->getKmerLength(), params.numThreads);
+			// !!! TODO: support for bubbles
+			matrix->add_to_sampler(filter, sampler, params.samplingCriterion, db_row->getSampleKmersCount(), db_row->getSampleKmersCount(), idx_shifts[i_row], idx_shifts[i_row], db_row->getKmerLength(), params.numThreads, bubbles);
 			matrix->clear();
 		}
 		else {
-			matrix->compact(filter, params.numThreads);
+			matrix->compact2(filter, params.numThreads, bubbles);
 		}
 		matrices_row[i_row] = matrix;
 
@@ -284,7 +293,7 @@ void All2AllPartsConsole::run(const Params& params) {
 
 		if (!do_sampling)
 		{
-			LOG_NORMAL << "Saving output matrix..." << endl << flush;
+			LOG_NORMAL("Saving output matrix..." << endl);
 			for (uint32_t k = 0; k < no_row_samples; ++k)
 			{
 				ofs << sample_name_count[k_global + k].first << "," << sample_name_count[k_global + k].second << ",";
@@ -296,12 +305,13 @@ void All2AllPartsConsole::run(const Params& params) {
 					matrix = matrices_row[i_col];
 					ptr += matrix->saveRowSparse(k, ptr, idx_shift);
 					idx_shift += part_no_samples[i_col];
+					no_pairs_saved += matrix->getNoInRow(k);
 				}
 
 				ofs.write(line, ptr - line);
 				ofs << endl;
 			}
-			LOG_NORMAL << " OK" << endl;
+			LOG_NORMAL(" OK (no. currently saved pairs: " << no_pairs_saved << ")" << endl);
 		}
 
 		t4 = std::chrono::high_resolution_clock::now();
@@ -328,7 +338,7 @@ void All2AllPartsConsole::run(const Params& params) {
 
 			ptr = line;
 			ptr += sampler.saveRowSparse(i, ptr, 0);
-
+			no_pairs_saved += sampler.getNoInRow(i);
 			ofs.write(line, ptr - line);
 			ofs << endl;
 		}
@@ -339,12 +349,13 @@ void All2AllPartsConsole::run(const Params& params) {
 	t2 = std::chrono::high_resolution_clock::now();
 	dt_store += t2 - t1;
 
-	LOG_NORMAL << "Database grid procesed successfully" << endl;
-	LOG_NORMAL << "  Load time   : " << dt_load.count() << " seconds" << endl;
-	LOG_NORMAL << "  All2All time: " << dt_all2all.count() << " seconds" << endl;
-	LOG_NORMAL << "  Store time  : " << dt_store.count() << " seconds" << endl;
+	LOG_NORMAL("Database grid procesed successfully" << endl
+		<< "  Load time    : " << dt_load.count() << " seconds" << endl
+		<< "  All2All time : " << dt_all2all.count() << " seconds" << endl
+		<< "  Store time   : " << dt_store.count() << " seconds" << endl
+		<< "No. saved pairs: " << no_pairs_saved << endl);
 
-	LOG_NORMAL << "Releasing memory...";
+	LOG_NORMAL("Releasing memory...");
 	t2 = std::chrono::high_resolution_clock::now();
 	delete[] line;
 	delete[] io_buffer1;
@@ -353,8 +364,8 @@ void All2AllPartsConsole::run(const Params& params) {
 	delete db_tmp;
 	t3 = std::chrono::high_resolution_clock::now();
 	dt_release = t3 - t2;
-	LOG_NORMAL << "OK (" << dt_release.count() << " seconds)" << endl;
+	LOG_NORMAL("OK (" << dt_release.count() << " seconds)" << endl);
 
 	dt_total = t3 - t0;
-	LOG_NORMAL << "Total time  : " << dt_total.count() << " seconds" << endl;
+	LOG_NORMAL("Total time  : " << dt_total.count() << " seconds" << endl);
 }

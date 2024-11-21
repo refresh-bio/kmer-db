@@ -10,7 +10,7 @@ void All2AllConsole::run(const Params& params) {
 		throw usage_error(params.mode);
 	}
 	
-	LOG_NORMAL << "All versus all comparison" << endl;
+	LOG_NORMAL("All versus all comparison" << endl);
 
 	const std::string& dbFilename = params.files[0];
 	const std::string& similarityFile = params.files[1];
@@ -21,21 +21,21 @@ void All2AllConsole::run(const Params& params) {
 	SimilarityCalculator calculator(params.numThreads, params.cacheBufferMb);
 
 	std::chrono::duration<double> dt{ 0 };
-	LOG_NORMAL << "Loading k-mer database " << dbFilename << "..." << endl;
+	LOG_NORMAL("Loading k-mer database " << dbFilename << "..." << endl);
 	auto start = std::chrono::high_resolution_clock::now();
 	if (!dbFile || !db->deserialize(dbFile, AbstractKmerDb::DeserializationMode::SkipHashtables)) {
 		throw runtime_error("Cannot open k-mer database " + dbFilename);
 	}
 	dt = std::chrono::high_resolution_clock::now() - start;
 
-	LOG_NORMAL << "Calculating matrix of common k-mers..." << endl;
+	LOG_NORMAL("Calculating matrix of common k-mers..." << endl);
 	start = std::chrono::high_resolution_clock::now();
 	LowerTriangularMatrix<uint32_t> matrix;
 	calculator.all2all(*db, matrix);
 	dt = std::chrono::high_resolution_clock::now() - start;
-	LOG_NORMAL << "OK (" << dt.count() << " seconds)" << endl;
+	LOG_NORMAL("OK (" << dt.count() << " seconds)" << endl);
 
-	LOG_NORMAL << "Storing matrix of common k-mers in " << similarityFile << "...";
+	LOG_NORMAL("Storing matrix of common k-mers in " << similarityFile << "...");
 	start = std::chrono::high_resolution_clock::now();
 	ofs << "kmer-length: " << db->getKmerLength() << " fraction: " << db->getFraction() << " ,db-samples ,";
 	std::copy(db->getSampleNames().cbegin(), db->getSampleNames().cend(), ostream_iterator<string>(ofs, ","));
@@ -80,11 +80,11 @@ void All2AllConsole::run(const Params& params) {
 	delete[] row;
 
 	dt = std::chrono::high_resolution_clock::now() - start;
-	LOG_NORMAL << "OK (" << dt.count() << " seconds)" << endl;
+	LOG_NORMAL("OK (" << dt.count() << " seconds)" << endl);
 
-	LOG_NORMAL << "Releasing memory...";
+	LOG_NORMAL("Releasing memory...");
 	start = std::chrono::high_resolution_clock::now();
 	delete db;
 	dt = std::chrono::high_resolution_clock::now() - start;
-	LOG_NORMAL << "OK (" << dt.count() << " seconds)" << endl;
+	LOG_NORMAL("OK (" << dt.count() << " seconds)" << endl);
 }

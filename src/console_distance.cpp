@@ -9,19 +9,19 @@ void DistanceConsole::run(const Params& params) {
 	if (params.files.size() < 2) {
 		throw usage_error(params.mode);
 	}
-	LOG_NORMAL << "Calculating distance measures" << endl;
+	LOG_NORMAL("Calculating distance measures" << endl);
 
 	const std::string& similarityFilename = params.files[0];
 
 	std::vector<num_kmers_t> dbKmerCounts;
 	uint32_t kmerLength;
 
-	LOG_NORMAL << "Loading file with common k-mer counts: " << similarityFilename << "...";
+	LOG_NORMAL("Loading file with common k-mer counts: " << similarityFilename << "...");
 	ifstream similarityFile(similarityFilename);
 	if (!similarityFile) {
 		throw runtime_error("Cannot open common k-mers table: " + similarityFilename);
 	}
-	LOG_NORMAL << "OK" << endl;
+	LOG_NORMAL("OK" << endl);
 
 	const size_t io_buf_size = 128 << 20;
 	char* io_buffer1 = new char[io_buf_size];
@@ -65,7 +65,7 @@ void DistanceConsole::run(const Params& params) {
 	char* line = new char[bufsize];
 	char* begin, * end, * p;
 
-	LOG_NORMAL << "Processing rows..." << endl;
+	LOG_NORMAL("Processing rows..." << endl);
 	bool triangle = false;
 	bool sparseOut = params.sparseOut && !params.phylipOut; // output in Phylip format is always dense
 
@@ -74,7 +74,7 @@ void DistanceConsole::run(const Params& params) {
 	// fixme: check if bufsize can be removed here - maybe some auto-adjustment of outBuffer can be applied
 	for (int row_id = 0; similarityFile.getline(line, bufsize); ++row_id) {
 		if ((row_id + 1) % 10 == 0) {
-			LOG_NORMAL << "\r" << row_id + 1 << "/" << dbKmerCounts.size() << "...                      " << std::flush;
+			LOG_NORMAL("\r" << row_id + 1 << "/" << dbKmerCounts.size() << "...                      ");
 		}
 
 		// extract name
@@ -203,8 +203,8 @@ void DistanceConsole::run(const Params& params) {
 		}
 	}
 
-	LOG_NORMAL << "\r" << dbKmerCounts.size() << "/" << dbKmerCounts.size() << "...";
-	LOG_NORMAL << "OK" << endl;
+	LOG_NORMAL("\r" << dbKmerCounts.size() << "/" << dbKmerCounts.size() << "...");
+	LOG_NORMAL("OK" << endl);
 
 	delete[] outBuffer;
 	delete[] line;

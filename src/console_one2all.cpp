@@ -13,7 +13,7 @@ void One2AllConsole::run(const Params& params) {
 		throw usage_error(params.mode);
 	}
 	
-	LOG_NORMAL << "One new sample  (from " << InputFile::format2string(params.inputFormat) << ") versus entire database comparison" << endl;
+	LOG_NORMAL("One new sample  (from " << InputFile::format2string(params.inputFormat) << ") versus entire database comparison" << endl);
 	
 	const std::string& dbFilename = params.files[0];
 	const std::string& sampleFasta = params.files[1];
@@ -28,15 +28,15 @@ void One2AllConsole::run(const Params& params) {
 
 	std::chrono::duration<double> dt{ 0 };
 
-	LOG_NORMAL << "Loading k-mer database " << dbFilename << ":" << endl;
+	LOG_NORMAL("Loading k-mer database " << dbFilename << ":" << endl);
 	auto start = std::chrono::high_resolution_clock::now();
 	if (!dbFile || !db.deserialize(dbFile)) {
 		throw runtime_error("Cannot open k-mer database " + dbFilename);
 	}
 	dt = std::chrono::high_resolution_clock::now() - start;
-	LOG_NORMAL << "OK (" << dt.count() << " seconds)" << endl << db.printStats() << endl;
+	LOG_NORMAL("OK (" << dt.count() << " seconds)" << endl << db.printStats() << endl);
 
-	LOG_NORMAL << "Loading sample kmers...";
+	LOG_NORMAL("Loading sample kmers...");
 
 	start = std::chrono::high_resolution_clock::now();
 
@@ -75,18 +75,18 @@ void One2AllConsole::run(const Params& params) {
 	}
 
 	dt = std::chrono::high_resolution_clock::now() - start;
-	LOG_NORMAL << "OK (" << dt.count() << " seconds)" << endl
+	LOG_NORMAL("OK (" << dt.count() << " seconds)" << endl
 		<< "Number of k-mers: " << queryKmersCount << endl
-		<< "Minhash fraction: " << db.getFraction() << endl;
+		<< "Minhash fraction: " << db.getFraction() << endl);
 
-	LOG_NORMAL << "Calculating similarity vector...";
+	LOG_NORMAL("Calculating similarity vector...");
 	start = std::chrono::high_resolution_clock::now();
 	std::vector<uint32_t> sims;
 	calculator.one2all(db, queryKmers, queryKmersCount, sims);
 	dt = std::chrono::high_resolution_clock::now() - start;
-	LOG_NORMAL << "OK (" << dt.count() << " seconds)" << endl;
+	LOG_NORMAL("OK (" << dt.count() << " seconds)" << endl);
 
-	LOG_NORMAL << "Storing similarity vector in " << similarityFile << "...";
+	LOG_NORMAL("Storing similarity vector in " << similarityFile << "...");
 	std::ofstream ofs(similarityFile);
 
 	ofs << "kmer-length: " << db.getKmerLength() << " fraction: " << db.getFraction() << " ,db-samples ,";
@@ -98,6 +98,6 @@ void One2AllConsole::run(const Params& params) {
 	std::copy(sims.begin(), sims.end(), ostream_iterator<uint32_t>(ofs, ","));
 
 	ofs.close();
-	LOG_NORMAL << "OK" << endl;
+	LOG_NORMAL("OK" << endl);
 }
 

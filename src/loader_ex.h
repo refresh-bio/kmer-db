@@ -40,7 +40,7 @@ public:
 	std::shared_ptr<SampleTask> popTask(int sampleId) {
 		std::shared_ptr<SampleTask> task;
 		if (queues.output.Pop(sampleId, task)) {
-			LOG_DEBUG << "output queue -> (sample " << sampleId + 1 << ")" << std::endl;
+			LOG_DEBUG("output queue -> (sample " << sampleId + 1 << ")" << std::endl);
 		}
 		return task;
 	}
@@ -48,7 +48,7 @@ public:
 	void releaseTask(SampleTask& t) {
 		if (--bufferRefCounters[t.bufferId] == 0) {
 			queues.freeBuffers.Push(t.bufferId);
-			LOG_DEBUG << "sample " << t.id + 1 << ": release buffer " << t.bufferId << std::endl ;
+			LOG_DEBUG("sample " << t.id + 1 << ": release buffer " << t.bufferId << std::endl);
 		}
 	}
 	

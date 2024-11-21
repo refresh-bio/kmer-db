@@ -7,8 +7,6 @@
     <ClCompile Include="log.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="pattern.cpp" />
-    <ClCompile Include="row_add_avx.cpp" />
-    <ClCompile Include="row_add_avx2.cpp" />
     <ClCompile Include="parallel_sorter.cpp" />
     <ClCompile Include="similarity_calculator.cpp" />
     <ClCompile Include="prefix_kmer_db.cpp" />
@@ -25,7 +23,9 @@
     <ClCompile Include="console_minhash.cpp" />
     <ClCompile Include="console_new2all.cpp" />
     <ClCompile Include="console_one2all.cpp" />
-    <ClCompile Include="row_add_neon.cpp" />
+    <ClCompile Include="simd\row_add_avx.cpp" />
+    <ClCompile Include="simd\row_add_avx2.cpp" />
+    <ClCompile Include="simd\row_add_neon.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="aligned_vector.h" />
@@ -42,7 +42,6 @@
     <ClInclude Include="pattern.h" />
     <ClInclude Include="queue.h" />
     <ClInclude Include="filter.h" />
-    <ClInclude Include="row_add.h" />
     <ClInclude Include="parallel_sorter.h" />
     <ClInclude Include="version.h" />
     <ClInclude Include="kmer_extract.h" />
@@ -60,5 +59,7 @@
     <ClInclude Include="..\libs\refresh\sort\lib\pdqsort_par.h" />
     <ClInclude Include="..\libs\refresh\active_thread_pool\lib\active_thread_pool.h" />
     <ClInclude Include="..\libs\refresh\compression\lib\file_wrapper.h" />
+    <ClInclude Include="bubble_helper.h" />
+    <ClInclude Include="simd\row_add.h" />
   </ItemGroup>
 </Project>

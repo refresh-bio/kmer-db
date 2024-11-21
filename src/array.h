@@ -11,6 +11,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include "sampler.h"
 #include "sparse_filters.h"
 #include "../libs/refresh/sort/lib/pdqsort_par.h"
+#include "bubble_helper.h"
 
 #include <vector>
 #include <iostream>
@@ -388,7 +389,7 @@ public:
 	// *****************************************************************************************
 	//
 	template <class Filter>
-	void compact(const Filter& filter, uint32_t num_threads)
+	void compact2(const Filter& filter, uint32_t num_threads, CBubbleHelper &bubbles)
 	{
 		data_compacted.resize(data.size());
 
@@ -402,6 +403,8 @@ public:
 
 		for (uint32_t thread_id = 0; thread_id < num_threads; ++thread_id)
 			fut.push_back(async([&, thread_id] {
+			vector<CBubbleHelper::bubble_adders_t> bubble_adders;
+
 			auto& my_row = tmp_rows[thread_id];
 			while (true)
 			{
@@ -410,10 +413,20 @@ public:
 				if (i >= data.size())
 					break;
 
+				if (!bubbles.empty())
+				{
+					bubbles.get_adders(i, bubble_adders);
+					for (auto adder : bubble_adders)
+						for (auto p = adder.first; p != adder.last; ++p)
+							data[i][*p] += adder.num_kmers;
+				}
+
 				auto empty_value = data[i].empty_value;
 				for (auto p = data[i].begin(); p != data[i].end(); ++p)
 					if (p->val != empty_value && filter(p->val, i, p->key))
 						my_row.push_back(make_pair(p->key, p->val));
+
+				data[i].release();
 
 				refresh::sort::pdqsort_branchless(my_row.begin(), my_row.end());
 				data_compacted[i].assign(my_row.begin(), my_row.end());
@@ -443,7 +456,8 @@ public:
 		const uint32_t idx_row_shift,
 		const uint32_t idx_col_shift,
 		const uint32_t k_len,
-		const uint32_t num_threads)
+		const uint32_t num_threads,
+		CBubbleHelper &bubbles)
 	{
 		atomic<uint32_t> row_id = 0;
 
@@ -458,6 +472,7 @@ public:
 			fut.push_back(async([&, thread_id] {
 			auto local_sampling_criterion = sampling_criterion ? sampling_criterion : [](num_kmers_t common, num_kmers_t seq1, num_kmers_t seq2, int k_len) ->double {return 1; };
 			uint32_t my_max_col_id = 0;
+			vector<CBubbleHelper::bubble_adders_t> bubble_adders;
 
 			while (true)
 			{
@@ -465,6 +480,14 @@ public:
 
 				if (i >= data.size())
 					break;
+
+				if (!bubbles.empty())
+				{
+					bubbles.get_adders(i, bubble_adders);
+					for (auto adder : bubble_adders)
+						for (auto p = adder.first; p != adder.last; ++p)
+							data[i][*p] += adder.num_kmers;
+				}
 
 				auto empty_value = data[i].empty_value;
 				for (auto p = data[i].begin(); p != data[i].end(); ++p)
@@ -476,6 +499,8 @@ public:
 						if (p->key > my_max_col_id)
 							my_max_col_id = p->key;
 					}
+
+				data[i].release();
 			}
 
 			max_col_ids[thread_id] = my_max_col_id;
@@ -611,6 +636,10 @@ public:
 		return (int) (out - out0);
 	}
 
+	size_t getNoInRow(size_t row_id)	const
+	{
+		return data_compacted[row_id].size();
+	}
 
 protected:
 	size_t size;

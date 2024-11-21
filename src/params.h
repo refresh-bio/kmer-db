@@ -11,10 +11,7 @@
 //
 
 class Params {
-public:
-
-
-	
+public:	
 	enum Mode {
 		build,
 		minhash,
@@ -54,6 +51,7 @@ public:
 	const std::string OPTION_THREADS = "-t";
 	const std::string OPTION_READER_THREADS = "-rt";
 	const std::string OPTION_BUFFER = "-buffer";
+	const std::string OPTION_BUBBLE_SIZE = "-bubble-size";
 
 	const std::string OPTION_MAX = "-max";
 	const std::string OPTION_MIN = "-min";
@@ -73,6 +71,7 @@ public:
 	int numThreads{ 0 };
 	int numReaderThreads{ 0 };
 	int cacheBufferMb{ 8 };
+	int bubbleSize{ 8000 };
 	bool multisampleFasta{ false };
 	
 	double fractionStart{ 0.0 };

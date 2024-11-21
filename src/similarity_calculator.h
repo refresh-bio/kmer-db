@@ -6,13 +6,13 @@ public:
 	SimilarityCalculator(int _num_threads, size_t cacheBufferMb);
 
 	void all2all(PrefixKmerDb& db, LowerTriangularMatrix<uint32_t>& matrix) const;
-	void all2all_sp(PrefixKmerDb& db, SparseMatrix<uint32_t>& matrix) const;
+	void all2all_sp(PrefixKmerDb& db, SparseMatrix<uint32_t>& matrix, CBubbleHelper& bubbles) const;
 
 	template <bool parallel = true>
 	void one2all(const PrefixKmerDb& db, const kmer_t* kmers, size_t kmersCount, std::vector<uint32_t>& vector) const;
 
 	void db2db(const PrefixKmerDb& db1, const PrefixKmerDb& db2, LowerTriangularMatrix<uint32_t>& matrix) const;
-	void db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, SparseMatrix<uint32_t>& matrix);
+	void db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, SparseMatrix<uint32_t>& matrix, CBubbleHelper& bubbles);
 
 protected:
 

@@ -35,18 +35,18 @@ void BuildConsole::run(const Params& params){
 		throw usage_error(params.mode);
 	}
 
-	LOG_NORMAL << "Building database (from " << InputFile::format2string(params.inputFormat) << ")" << endl;
+	LOG_NORMAL("Building database (from " << InputFile::format2string(params.inputFormat) << ")" << endl);
 //	const std::string& multipleSamples(params.files[0]);
 	const std::string multipleSamples(params.files[0]);
 	const std::string dbFilename(params.files[1]);
 
-	LOG_DEBUG << "Creating PrefixKmerDb object" << endl ;
+	LOG_DEBUG("Creating PrefixKmerDb object" << endl);
 	AbstractKmerDb* db = new PrefixKmerDb(params.numThreads);
 	std::shared_ptr<MinHashFilter> filter;
 
 	if (params.extendDb) {
 		std::ifstream ifs;
-		LOG_NORMAL << "Loading k-mer database " << dbFilename << "..." ;
+		LOG_NORMAL("Loading k-mer database " << dbFilename << "...");
 		ifs.open(dbFilename, std::ios::binary);
 		if (!ifs || !db->deserialize(ifs)) {
 			throw runtime_error("Cannot open k-mer database " + dbFilename);
@@ -59,18 +59,18 @@ void BuildConsole::run(const Params& params){
 
 	std::chrono::duration<double> sortingTime{ 0 }, processingTime{ 0 };
 	
-	LOG_NORMAL << "Processing samples..." << endl;
-	LOG_DEBUG << "Creating Loader object..." << endl ;
+	LOG_NORMAL("Processing samples..." << endl);
+	LOG_DEBUG("Creating Loader object..." << endl);
 
 	LoaderEx loader(filter, params.inputFormat, params.numReaderThreads, params.numThreads, params.multisampleFasta);
 	loader.configure(multipleSamples);
 
-	LOG_DEBUG << "Starting loop..." << endl ;
+	LOG_DEBUG("Starting loop..." << endl);
 	auto totalStart = std::chrono::high_resolution_clock::now();
 	int sample_id = 0;
 	for (; !loader.isCompleted(); ++sample_id) {
 		auto partialTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
-		LOG_VERBOSE << "Processing time: " << partialTime.count() <<  ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl ;
+		LOG_VERBOSE("Processing time: " << partialTime.count() << ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl);
 		
 		auto task = loader.popTask(sample_id);
 
@@ -78,10 +78,10 @@ void BuildConsole::run(const Params& params){
 			if ((sample_id + 1) % 10 == 0) {
 				size_t cnt = loader.getSamplesCount();
 				if (cnt > 0) {
-					LOG_NORMAL << "\r" << sample_id + 1 << "/" << cnt << "..." << std::flush;
+					LOG_NORMAL("\r" << sample_id + 1 << "/" << cnt << "...");
 				}
 				else {
-					LOG_NORMAL << "\r" << sample_id + 1 << "..." << std::flush;
+					LOG_NORMAL("\r" << sample_id + 1 << "...");
 				}
 			}
 
@@ -109,26 +109,26 @@ void BuildConsole::run(const Params& params){
 			processingTime += std::chrono::high_resolution_clock::now() - start2;
 			
 			loader.releaseTask(*task);
-			LOG_VERBOSE << db->printProgress() << endl ;
+			LOG_VERBOSE(db->printProgress() << endl);
 		}
 	}
 
-	LOG_NORMAL << "\r" << sample_id << "/" << sample_id << "                      " << endl << std::flush;
+	LOG_NORMAL("\r" << sample_id << "/" << sample_id << "                      " << endl);
 
 	auto totalTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
 
-	LOG_NORMAL << endl << endl << "EXECUTION TIMES" << endl
+	LOG_NORMAL(endl << endl << "EXECUTION TIMES" << endl
 		<< "Total: " << totalTime.count() << endl
 		<< "Kmer sorting/unique time: " << sortingTime.count() << endl
-		<< "Database update time:" << processingTime.count() << endl
+		<< "Database update time:" << processingTime.count() << endl);
 #ifdef COLLECT_DETAILED_TIMES
-		<< db->printDetailedTimes() << endl
+	LOG_NORMAL(db->printDetailedTimes() << endl);
 #endif
-		<< "STATISTICS" << endl << db->printStats() << endl;
+	LOG_NORMAL("STATISTICS" << endl << db->printStats() << endl);
 
 	std::chrono::duration<double> dt{ 0 };
 
-	LOG_NORMAL << "Serializing database..." << endl;
+	LOG_NORMAL("Serializing database..." << endl);
 
 	const size_t io_buffer_size = 64 << 20;
 	std::ofstream ofs;
@@ -139,9 +139,9 @@ void BuildConsole::run(const Params& params){
 	ofs.close();
 	delete[] io_buffer;
 
-	LOG_NORMAL << endl << "Releasing memory...";
+	LOG_NORMAL(endl << "Releasing memory...");
 	auto start = std::chrono::high_resolution_clock::now();
 	delete db;
 	dt = std::chrono::high_resolution_clock::now() - start;
-	LOG_NORMAL << "OK (" << dt.count() << " seconds)" << endl;
+	LOG_NORMAL("OK (" << dt.count() << " seconds)" << endl);
 }

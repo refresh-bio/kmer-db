@@ -7,7 +7,6 @@
 #include <chrono>
 #include <cstdint>
 
-
 void Db2DbConsole::run(const Params& params)
 {
 	if (params.files.size() != 3) {
@@ -30,31 +29,32 @@ void Db2DbConsole::run(const Params& params)
 
 	std::chrono::duration<double> loadingTime{ 0 }, processingTime{ 0 }, dt{ 0 };
 
-	// !!! TODO: zrobiæ równoleg³y odczyt obu baz
-	LOG_NORMAL << "Loading k-mer database " << dbFilename1 << "..." << endl;
+	// !!! TODO: parallel load of databases
+	LOG_NORMAL("Loading k-mer database " << dbFilename1 << "..." << endl);
 	auto start = std::chrono::high_resolution_clock::now();
 	if (!dbFile1 || !db1->deserialize(dbFile1)) {
 		throw runtime_error("Cannot open k-mer database " + dbFilename1);
 	}
 
-	LOG_NORMAL << "Loading k-mer database " << dbFilename2 << "..." << endl;
+	LOG_NORMAL("Loading k-mer database " << dbFilename2 << "..." << endl);
 	//	auto start = std::chrono::high_resolution_clock::now();
 	if (!dbFile2 || !db2->deserialize(dbFile2)) {
 		throw runtime_error("Cannot open k-mer database " + dbFilename2);
 	}
 
 	dt = std::chrono::high_resolution_clock::now() - start;
-	LOG_NORMAL << "OK (" << dt.count() << " seconds)" << endl << db1->printStats() << endl << db2->printStats() << endl;
+	LOG_NORMAL("OK (" << dt.count() << " seconds)" << endl << db1->printStats() << endl << db2->printStats() << endl);
 
 
-	LOG_NORMAL << "Calculating matrix of common k-mers...";
+	LOG_NORMAL("Calculating matrix of common k-mers...");
 	start = std::chrono::high_resolution_clock::now();
 	SparseMatrix<uint32_t> matrix;
-	calculator.db2db_sp(*db1, *db2, matrix);
+	CBubbleHelper bubbles;
+	calculator.db2db_sp(*db1, *db2, matrix, bubbles);
 	dt = std::chrono::high_resolution_clock::now() - start;
-	LOG_NORMAL << "OK (" << dt.count() << " seconds)" << endl;
+	LOG_NORMAL("OK (" << dt.count() << " seconds)" << endl);
 
-	LOG_NORMAL << "Storing matrix of common k-mers in " << similarityFilename << "...";
+	LOG_NORMAL("Storing matrix of common k-mers in " << similarityFilename << "...");
 	start = std::chrono::high_resolution_clock::now();
 	ofs << "kmer-length: " << db1->getKmerLength() << " fraction: " << db1->getFraction() << " ,db-samples ,";
 	std::copy(db1->getSampleNames().cbegin(), db1->getSampleNames().cend(), ostream_iterator<string>(ofs, ","));
@@ -112,14 +112,14 @@ void Db2DbConsole::run(const Params& params)
 	delete[] row;
 
 	dt = std::chrono::high_resolution_clock::now() - start;
-	LOG_NORMAL << "OK (" << dt.count() << " seconds)" << endl;
+	LOG_NORMAL("OK (" << dt.count() << " seconds)" << endl);
 
-	LOG_NORMAL << "Releasing memory...";
+	LOG_NORMAL("Releasing memory...");
 	start = std::chrono::high_resolution_clock::now();
 
 	delete db1;
 	delete db2;
 
 	dt = std::chrono::high_resolution_clock::now() - start;
-	LOG_NORMAL << "OK (" << dt.count() << " seconds)" << endl;
+	LOG_NORMAL("OK (" << dt.count() << " seconds)" << endl);
 }

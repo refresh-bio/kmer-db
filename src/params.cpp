@@ -63,7 +63,7 @@ bool Params::parse(int argc, char** argv) {
 	std::transform(argv + 1, argv + argc, params.begin(), [](char* c)->string { return c; });
 
 	if (findSwitch(params, SWITCH_VERSION)) {
-		LOG_NORMAL << VERSION;
+		LOG_NORMAL(VERSION);
 		return false;
 	}
 	
@@ -142,8 +142,8 @@ bool Params::parse(int argc, char** argv) {
 //
 void Params::showHeader() const {
 
-	LOG_NORMAL << "Kmer-db version " << VERSION << " (" << DATE << ")" << endl
-		<< "S. Deorowicz, A. Gudys, M. Dlugosz, M. Kokot, and A. Danek (c) 2018" << endl << endl;
+	LOG_NORMAL("Kmer-db version " << VERSION << " (" << DATE << ")" << endl
+		<< "S. Deorowicz, A. Gudys, M. Dlugosz, M. Kokot, and A. Danek (c) 2018" << endl << endl);
 }
 
 // *****************************************************************************************
@@ -151,8 +151,8 @@ void Params::showHeader() const {
 void Params::showInstructions(Mode mode) const {
 
 	if (mode == Mode::build) {
-		LOG_NORMAL
-			<< "Building a database:" << endl
+		LOG_NORMAL(
+			   "Building a database:" << endl
 			<< "    kmer-db " << MODE_BUILD
 			<< " [" << OPTION_LENGTH << " <kmer-length>]"
 			<< " [" << OPTION_FRACTION << " <fraction>]"
@@ -179,11 +179,11 @@ void Params::showInstructions(Mode mode) const {
 			<< "    " << OPTION_FRACTION << " <fraction> - fraction of all k-mers to be accepted by the minhash filter (default: 1)" << endl
 			<< "    " << SWITCH_MULTISAMPLE_FASTA << " - each sequence in a FASTA file is treated as a separate sample" << endl
 			<< "    " << SWITCH_EXTEND_DB << " - extend the existing database with new samples" << endl
-			<< "    " << OPTION_THREADS << " <threads> - number of threads (default: number of available cores)" << endl << endl;
+			<< "    " << OPTION_THREADS << " <threads> - number of threads (default: number of available cores)" << endl << endl);
 	}
 	else if (mode == Mode::all2all) {
-		LOG_NORMAL
-			<< "Counting common k-mers for all the samples in the database:" << endl
+		LOG_NORMAL(
+			   "Counting common k-mers for all the samples in the database:" << endl
 			<< "    kmer-db " << MODE_ALL_2_ALL
 			<< " [" << OPTION_BUFFER << " <size_mb>]"
 			<< " [" << OPTION_THREADS << " <threads>]" 
@@ -203,11 +203,11 @@ void Params::showInstructions(Mode mode) const {
 			<< "    " << OPTION_MAX << " [<criterion>:]<value> - retains elements with <criterion> lower than or equal to <value> (see details below)" << endl
 			<< "<criterion> can be num-kmers (number of common k-mers) or one of the distance/similarity measures: jaccard, min, max, cosine, mash, ani, ani-shorder." << endl
 			<< "No <criterion> indicates num-kmers. Multiple filters can be combined." << endl
-			<< endl;
+			<< endl);
 	}
 	else if (mode == Mode::all2all_sparse) {
-		LOG_NORMAL
-			<< "Counting common k-mers for all the samples in the database (sparse computation):" << endl
+		LOG_NORMAL(
+			   "Counting common k-mers for all the samples in the database (sparse computation):" << endl
 			<< "    kmer-db " << MODE_ALL_2_ALL_SPARSE
 			<< " [" << OPTION_BUFFER << " <size_mb>]"
 			<< " [" << OPTION_THREADS << " <threads>]" 
@@ -229,11 +229,11 @@ void Params::showInstructions(Mode mode) const {
 			<< "       (ii) the best elements with respect to <criterion>" << endl
 			<< "<criterion> can be num-kmers (number of common k-mers) or one of the distance/similarity measures: jaccard, min, max, cosine, mash, ani, ani-shorder." << endl
 			<< "No <criterion> indicates num-kmers (filtering) or random elements selection (sampling). Multiple filters can be combined." << endl
-			<< endl;
+			<< endl);
 	}
 	else if (mode == Mode::all2all_parts) {
-		LOG_NORMAL
-			<< "Counting common k-mers for all the samples in the database parts (sparse computation):" << endl
+		LOG_NORMAL(
+			   "Counting common k-mers for all the samples in the database parts (sparse computation):" << endl
 			<< "    kmer-db " << MODE_ALL_2_ALL_PARTS
 			<< " [" << OPTION_BUFFER << " <size_mb>]"
 			<< " [" << OPTION_THREADS << " <threads>]" 
@@ -255,7 +255,7 @@ void Params::showInstructions(Mode mode) const {
 			<< "       (ii) the best elements with respect to <criterion>" << endl
 			<< "<criterion> can be num-kmers (number of common k-mers) or one of the distance/similarity measures: jaccard, min, max, cosine, mash, ani, ani-shorder." << endl
 			<< "No <criterion> indicates num-kmers (filtering) or random elements selection (sampling). Multiple filters can be combined." << endl
-			<< endl;
+			<< endl);
 	}
 	/*
 	else if (mode == Mode::db2db) {
@@ -279,8 +279,8 @@ void Params::showInstructions(Mode mode) const {
 	 }
 	 */
 	else if (mode == Mode::new2all) {
-		LOG_NORMAL
-			<< "Counting common kmers between set of new samples and all the samples in the database:" << endl
+		LOG_NORMAL(
+			   "Counting common kmers between set of new samples and all the samples in the database:" << endl
 			<< "    kmer-db " << MODE_NEW_2_ALL
 			<< " [" << SWITCH_MULTISAMPLE_FASTA << " | " << SWITCH_KMC_SAMPLES << " | " << SWITCH_MINHASH_SAMPLES << "]"
 			<< " [" << SWITCH_SPARSE << " [" << OPTION_MIN << " [<criterion>:]<value>]* [" << OPTION_MAX << " [<criterion>:]<value>]* ] " 
@@ -300,11 +300,11 @@ void Params::showInstructions(Mode mode) const {
 			<< "    " << OPTION_MAX << " [<criterion>:]<value> - retains elements with <criterion> lower than or equal to <value> (see details below)" << endl
 			<< "<criterion> can be num-kmers (number of common k-mers) or one of the distance/similarity measures: jaccard, min, max, cosine, mash, ani, ani-shorder." << endl
 			<< "No <criterion> indicates num-kmers. Multiple filters can be combined." << endl
-			<< endl;
+			<< endl);
 	}
 	else if (mode == Mode::one2all) {
-		LOG_NORMAL
-			<< "Counting common kmers between single sample and all the samples in the database:" << endl
+		LOG_NORMAL(
+			   "Counting common kmers between single sample and all the samples in the database:" << endl
 			<< "    kmer-db " << MODE_ONE_2_ALL
 			<< " [" << SWITCH_KMC_SAMPLES << " | " << SWITCH_MINHASH_SAMPLES << "] <database> <sample> <common_table>" << endl << endl
 
@@ -312,11 +312,11 @@ void Params::showInstructions(Mode mode) const {
 			<< "    database (input) - k-mer database file." << endl
 			<< "    sample (input) - query sample in one of the supported formats:" << endl
 			<< "                     FASTA genomes/reads (default), KMC k-mers (" << SWITCH_KMC_SAMPLES << "), or minhashed k-mers (" << SWITCH_MINHASH_SAMPLES << "), " << endl
-			<< "    common_table (output) - CSV table with number of common k-mers." << endl << endl;
+			<< "    common_table (output) - CSV table with number of common k-mers." << endl << endl);
 	}
 	else if (mode == Mode::distance) {
-		LOG_NORMAL
-			<< "Calculating similarities/distances on the basis of common k-mers:" << endl
+		LOG_NORMAL(
+			   "Calculating similarities/distances on the basis of common k-mers:" << endl
 			<< "    kmer-db " << MODE_DISTANCE << " <measure>"
 			<< " [" << SWITCH_SPARSE << " [" << OPTION_MIN << "[<criterion>:]<value>]* [" << OPTION_MAX << " [<criterion>:]<value>]* ] "
 			<< "<common_table> <output_table>" << endl << endl
@@ -335,12 +335,12 @@ void Params::showInstructions(Mode mode) const {
 			<< "    " << OPTION_MAX << " [<criterion>:]<value> - retains elements with <criterion> lower than or equal to <value> (see details below)" << endl
 			<< "<criterion> can be num-kmers (number of common k-mers) or one of the distance/similarity measures: jaccard, min, max, cosine, mash, ani, ani-shorder." << endl
 			<< "If no criterion is specified, measure argument is used by default. Multiple filters can be combined." << endl
-			<< endl;
+			<< endl);
 
 	}
 	else if (mode == Mode::minhash) {
-		LOG_NORMAL
-			<< "Storing minhashed k-mers:" << endl
+		LOG_NORMAL(
+			   "Storing minhashed k-mers:" << endl
 			<< "    kmer-db " << MODE_MINHASH << " [" << OPTION_FRACTION << " <fraction> ][" << OPTION_LENGTH << " <kmer_length>][" << SWITCH_MULTISAMPLE_FASTA << "] <sample_list>" << endl
 			<< "    kmer-db " << MODE_MINHASH << " " << SWITCH_KMC_SAMPLES << " [" << OPTION_FRACTION << " <fraction>] <sample_list>" << endl << endl
 			<< "Positional arguments:" << endl
@@ -350,11 +350,11 @@ void Params::showInstructions(Mode mode) const {
 			<< "    " << OPTION_FRACTION << " <fraction> - fraction of all k-mers to be accepted by the minhash filter (default: 0.01)" << endl
 			<< "    " << OPTION_LENGTH << " <kmer_length> - length of k-mers (default: 18, maximum: 30)" << endl
 			<< "    " << SWITCH_MULTISAMPLE_FASTA << " - each sequence in a FASTA file is treated as a separate sample" << endl << endl
-			<< "For each sample from the list, a binary file with *.minhash* extension containing filtered k-mers is created" << endl << endl;
+			<< "For each sample from the list, a binary file with *.minhash* extension containing filtered k-mers is created" << endl << endl);
 	}
 	else {
-		LOG_NORMAL
-			<< "USAGE" << endl
+		LOG_NORMAL(
+			   "USAGE" << endl
 			<< "    kmer-db <mode> [options] <positional arguments>" << endl << endl
 
 			<< "Modes:" << endl
@@ -369,7 +369,7 @@ void Params::showInstructions(Mode mode) const {
 			<< "Common options:" << endl
 			<< "    " << OPTION_THREADS << " <threads> - number of threads (default: number of available cores)" << endl << endl
 			<< "The meaning of other options and positional arguments depends on the selected mode. For more information, run:" << endl
-			<< "kmer-db <mode> -help" << endl << endl;
+			<< "kmer-db <mode> -help" << endl << endl);
 	}
 }
 
@@ -466,6 +466,8 @@ bool Params::parse_all2all(std::vector<string>& params) {
 	if (cacheBufferMb <= 0) {
 		cacheBufferMb = 8;
 	}
+
+	findOption(params, OPTION_BUBBLE_SIZE, bubbleSize);	// min size of a bubble
 
 	sparseOut = findSwitch(params, SWITCH_SPARSE);
 

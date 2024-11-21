@@ -13,7 +13,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include "array.h"
 #include "queue.h"
 #include "aligned_vector.h"
-#include "row_add.h"
+#include "simd/row_add.h"
 #include "parallel_sorter.h"
 
 #include <map>
@@ -99,7 +99,7 @@ public:
 		uint32_t kmerLength, 
 		double fraction,
 		refresh::active_thread_pool& atp) {
-		LOG_VERBOSE << "Adding sample " << sampleNames.size() + 1 << ": " << sampleName << " (" << kmersCount << " kmers)" << endl ;
+		LOG_VERBOSE("Adding sample " << sampleNames.size() + 1 << ": " << sampleName << " (" << kmersCount << " kmers)" << endl);
 		
 		if (!isInitialized) {
 			initialize(kmerLength, fraction);

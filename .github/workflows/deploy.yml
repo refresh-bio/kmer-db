@@ -43,9 +43,9 @@ jobs:
     steps:
     - name: make 
       run: |
-        make -j32 CXX=g++-${{matrix.compiler}} CC=gcc-${{matrix.compiler}} STATIC_LINK=true PLATFORM=${{ matrix.platform }}
+        gmake -j32 CXX=g++-${{matrix.compiler}} CC=gcc-${{matrix.compiler}} STATIC_LINK=true PLATFORM=${{ matrix.platform }}
     - name: tar artifacts
-      run: tar -cvzf kmer-db.tar.gz kmer-db LICENSE
+      run: tar -cvzf kmer-db.tar.gz LICENSE -C ./bin kmer-db
     
 ########################################################################################
   help:
@@ -59,10 +59,10 @@ jobs:
         
     steps:
     - name: help
-      run: ./kmer-db
+      run: ./bin/kmer-db
     
     - name: version
-      run: ./kmer-db -version
+      run: ./bin/kmer-db -version
 
 ########################################################################################
   upload:

@@ -19,7 +19,7 @@ void All2AllSparseConsole::run(const Params& params) {
 		throw usage_error(params.mode);
 	}
 
-	LOG_NORMAL << "All versus all comparison (sparse computation)" << endl;
+	LOG_NORMAL("All versus all comparison (sparse computation)" << endl);
 
 	const std::string& dbFilename = params.files[0];
 	const std::string& similarityFile = params.files[1];
@@ -30,21 +30,22 @@ void All2AllSparseConsole::run(const Params& params) {
 	SimilarityCalculator calculator(params.numThreads, params.cacheBufferMb);
 
 	std::chrono::duration<double> dt{ 0 };
-	LOG_NORMAL << "Loading k-mer database " << dbFilename << "..." << endl;
+	LOG_NORMAL("Loading k-mer database " << dbFilename << "..." << endl);
 	auto start = std::chrono::high_resolution_clock::now();
 	if (!dbFile || !db->deserialize(dbFile, AbstractKmerDb::DeserializationMode::SkipHashtables)) {
 		throw runtime_error("Cannot open k-mer database " + dbFilename);
 	}
 	dt = std::chrono::high_resolution_clock::now() - start;
 
-	LOG_NORMAL << "Calculating matrix of common k-mers...";
+	LOG_NORMAL("Calculating matrix of common k-mers...");
 	start = std::chrono::high_resolution_clock::now();
 	SparseMatrix<uint32_t> matrix;
-	calculator.all2all_sp(*db, matrix);
+	CBubbleHelper bubbles(params.bubbleSize);
+	calculator.all2all_sp(*db, matrix, bubbles);
 	dt = std::chrono::high_resolution_clock::now() - start;
-	LOG_NORMAL << "OK (" << dt.count() << " seconds)" << endl;
+	LOG_NORMAL("OK (" << dt.count() << " seconds)" << endl);
 
-	LOG_NORMAL << "Storing matrix of common k-mers in " << similarityFile << "...";
+	LOG_NORMAL("Storing matrix of common k-mers in " << similarityFile << "...");
 	start = std::chrono::high_resolution_clock::now();
 	ofs << "kmer-length: " << db->getKmerLength() << " fraction: " << db->getFraction() << " ,db-samples ,";
 	std::copy(db->getSampleNames().cbegin(), db->getSampleNames().cend(), ostream_iterator<string>(ofs, ","));
@@ -70,19 +71,28 @@ void All2AllSparseConsole::run(const Params& params) {
 
 	if (do_sampling)
 	{
-		matrix.add_to_sampler(filter, sampler, params.samplingCriterion, db->getSampleKmersCount(), db->getSampleKmersCount(), 0, 0, db->getKmerLength(), params.numThreads);
+		// !!! TODO: add support for bubbles
+		matrix.add_to_sampler(filter, sampler, params.samplingCriterion, db->getSampleKmersCount(), db->getSampleKmersCount(), 0, 0, db->getKmerLength(), params.numThreads, bubbles);
 		matrix.clear();
 	}
 	else
-		matrix.compact(filter, params.numThreads);
+		matrix.compact2(filter, params.numThreads, bubbles);
+
+	size_t no_pairs_saved = 0;
 
 	for (size_t sid = 0; sid < db->getSamplesCount(); ++sid) {
 		ptr = row;
 		ptr += sprintf(ptr, "%s,%lu,", db->getSampleNames()[sid].c_str(), (unsigned long)db->getSampleKmersCount()[sid]);
 		if (do_sampling)
+		{
 			ptr += sampler.saveRowSparse(sid, ptr, 0);
+			no_pairs_saved += sampler.getNoInRow(sid);
+		}
 		else
+		{
 			ptr += matrix.saveRowSparse(sid, ptr, 0);
+			no_pairs_saved += matrix.getNoInRow(sid);
+		}
 		*ptr++ = '\n';
 		ofs.write(row, ptr - row);
 	}
@@ -90,11 +100,13 @@ void All2AllSparseConsole::run(const Params& params) {
 	delete[] row;
 
 	dt = std::chrono::high_resolution_clock::now() - start;
-	LOG_NORMAL << "OK (" << dt.count() << " seconds)" << endl;
+	LOG_NORMAL("OK (" << dt.count() << " seconds)" << endl);
 
-	LOG_NORMAL << "Releasing memory...";
+	LOG_NORMAL("Releasing memory...");
 	start = std::chrono::high_resolution_clock::now();
 	delete db;
 	dt = std::chrono::high_resolution_clock::now() - start;
-	LOG_NORMAL << "OK (" << dt.count() << " seconds)" << endl;
+	LOG_NORMAL("OK (" << dt.count() << " seconds)" << endl);
+
+	LOG_NORMAL("No. saved pairs: " << no_pairs_saved << endl);
 }

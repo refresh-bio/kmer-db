@@ -35,7 +35,7 @@ int main(int argc, char **argv)
 		struct tm* timeinfo;
 		time(&rawtime);
 		timeinfo = localtime(&rawtime);
-		LOG_NORMAL << "Analysis started at " << asctime(timeinfo) << endl;
+		LOG_NORMAL("Analysis started at " << asctime(timeinfo) << endl);
 
 		auto console = ConsoleFactory::create(params.mode);
 		if (!console) {
@@ -46,15 +46,15 @@ int main(int argc, char **argv)
 
 		time(&rawtime);
 		timeinfo = localtime(&rawtime);
-		LOG_NORMAL << endl << "Analysis finished at " << asctime(timeinfo) << endl;
+		LOG_NORMAL(endl << "Analysis finished at " << asctime(timeinfo) << endl);
 	}
 	catch (usage_error& err) {
-		LOG_NORMAL << "ERROR: Incorrect usage" << endl << "See detailed instructions below" << endl << endl;
+		LOG_NORMAL("ERROR: Incorrect usage" << endl << "See detailed instructions below" << endl << endl);
 		params.showInstructions(err.getMode());
 		return -1;
 	}
 	catch (std::runtime_error& err) {
-		LOG_NORMAL << "ERROR: " << err.what() << endl;
+		LOG_NORMAL("ERROR: " << err.what() << endl);
 		return -1;
 	}
 

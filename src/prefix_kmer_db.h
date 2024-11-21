@@ -3,6 +3,7 @@
 #include <refresh/active_thread_pool/lib/active_thread_pool.h>
 #include <atomic>
 #include <numeric>
+#include "bubble_helper.h"
 
 //#define COLLECT_DETAILED_TIMES
 

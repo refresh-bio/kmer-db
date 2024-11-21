@@ -15,7 +15,7 @@ void New2AllConsole::run(const Params& params)
 		throw usage_error(params.mode);
 	}
 
-	LOG_NORMAL << "Set of new samples  (from " << InputFile::format2string(params.inputFormat) << ") versus entire database comparison" << endl;
+	LOG_NORMAL("Set of new samples  (from " << InputFile::format2string(params.inputFormat) << ") versus entire database comparison" << endl);
 
 	const std::string& dbFilename = params.files[0];
 	const std::string& multipleSamples = params.files[1];
@@ -27,24 +27,24 @@ void New2AllConsole::run(const Params& params)
 
 	std::chrono::duration<double> loadingTime{ 0 }, processingTime{ 0 }, dt{ 0 };
 
-	LOG_NORMAL << "Loading k-mer database " << dbFilename << "..." << endl;
+	LOG_NORMAL("Loading k-mer database " << dbFilename << "..." << endl);
 	auto start = std::chrono::high_resolution_clock::now();
 	if (!dbFile || !db.deserialize(dbFile)) {
 		throw runtime_error("Cannot open k-mer database " + dbFilename);
 	}
 	dt = std::chrono::high_resolution_clock::now() - start;
-	LOG_NORMAL << "OK (" << dt.count() << " seconds)" << endl << db.printStats() << endl;
+	LOG_NORMAL("OK (" << dt.count() << " seconds)" << endl << db.printStats() << endl);
 
-	LOG_DEBUG << "Creating Loader object..." << endl;
+	LOG_DEBUG("Creating Loader object..." << endl);
 	shared_ptr<MinHashFilter> filter = shared_ptr<MinHashFilter>(new MinHashFilter(db.getFraction(), db.getStartFraction(), db.getKmerLength()));
 
 	LoaderEx loader(filter, params.inputFormat, params.numReaderThreads, params.numThreads, params.multisampleFasta);
 	loader.configure(multipleSamples);
-	LOG_NORMAL << endl;
+	LOG_NORMAL(endl);
 
 	std::vector<uint32_t> sims;
 
-	LOG_NORMAL << "Processing queries..." << endl;
+	LOG_NORMAL("Processing queries..." << endl);
 	auto totalStart = std::chrono::high_resolution_clock::now();
 
 	// create set of buffers for storing similarities
@@ -64,7 +64,7 @@ void New2AllConsole::run(const Params& params)
 			while (!loader.isCompleted()) {
 				std::shared_ptr<SampleTask> task;
 				if ((task = loader.popTask(task_id)) && freeBuffersQueue.Pop(task->bufferId2)) {
-					LOG_DEBUG << "loader queue " << task_id + 1 << " -> (" << task->id + 1 << ", " << task->sampleName << ")" << endl;
+					LOG_DEBUG("loader queue " << task_id + 1 << " -> (" << task->id + 1 << ", " << task->sampleName << ")" << endl);
 					buffers[task->bufferId2].clear();
 
 					// only unique k-mers are needed
@@ -73,14 +73,14 @@ void New2AllConsole::run(const Params& params)
 					calculator.one2all<false>(db, task->kmers, task->kmersCount, buffers[task->bufferId2]);
 					similarityQueue.Push(task_id, task);
 
-					LOG_DEBUG << "(" << task->id + 1 << ", " << task->sampleName << ") -> similarity queue, tid:" << tid << ", buf:" << task->bufferId2 << endl;
+					LOG_DEBUG("(" << task->id + 1 << ", " << task->sampleName << ") -> similarity queue, tid:" << tid << ", buf:" << task->bufferId2 << endl);
 					task_id = sample_id.fetch_add(1);
 
 				}
 			}
 
 			similarityQueue.MarkCompleted();
-			LOG_DEBUG << "similarity thread completed: " << tid << endl;
+			LOG_DEBUG("similarity thread completed: " << tid << endl);
 			});
 	}
 
@@ -107,10 +107,10 @@ void New2AllConsole::run(const Params& params)
 		if (similarityQueue.Pop(task_id, task)) {
 
 			if ((task_id + 1) % 10 == 0) {
-				LOG_NORMAL << "\r" << task_id + 1 << "...                      " << std::flush;
+				LOG_NORMAL("\r" << task_id + 1 << "...                      ");
 			}
 
-			LOG_DEBUG << "similarity queue -> (" << task_id + 1 << ", " << task->sampleName << "), buf:" << task->bufferId2 << endl;
+			LOG_DEBUG("similarity queue -> (" << task_id + 1 << ", " << task->sampleName << "), buf:" << task->bufferId2 << endl);
 			auto& buf = buffers[task->bufferId2];
 
 			ptr = row;
@@ -156,6 +156,6 @@ void New2AllConsole::run(const Params& params)
 
 	auto totalTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
 
-	LOG_NORMAL << endl << endl << "EXECUTION TIMES" << endl
-		<< "Total: " << totalTime.count() << endl;
+	LOG_NORMAL(endl << endl << "EXECUTION TIMES" << endl
+		<< "Total: " << totalTime.count() << endl);
 }

@@ -107,7 +107,7 @@ void LoaderEx::prefetcherJob(std::shared_ptr<AbstractFilter> filter) {
 		std::shared_ptr<InputTask> task;
 		
 		if (this->queues.input.Pop(task)) {
-			LOG_DEBUG << "input queue -> (file " << task->fileId + 1 << ")" << endl ;
+			LOG_DEBUG("input queue -> (file " << task->fileId + 1 << ")" << endl);
 
 			if (this->inputFormat == InputFile::KMC) {
 				task->file = std::make_shared<KmcInputFile>(filter->clone());
@@ -121,16 +121,16 @@ void LoaderEx::prefetcherJob(std::shared_ptr<AbstractFilter> filter) {
 
 			if (task->file->open(task->filePath)) {
 				queues.readers.Push(task);
-				LOG_DEBUG << "(file " << task->fileId + 1 << ", " << task->filePath << ") -> readers queue " << endl ;
+				LOG_DEBUG("(file " << task->fileId + 1 << ", " << task->filePath << ") -> readers queue " << endl);
 			}
 			else {
-				LOG_NORMAL << "failed:" << task->filePath << endl;
+				LOG_NORMAL("failed:" << task->filePath << endl);
 			}
 		}
 	}
 
 	queues.readers.MarkCompleted();
-	LOG_DEBUG << "reader thread completed" << endl ;
+	LOG_DEBUG("reader thread completed" << endl);
 }
 
 // *****************************************************************************************
@@ -145,7 +145,7 @@ void LoaderEx::readerJob(int tid) {
 		// get buffer and input task
 		if (this->queues.freeBuffers.Pop(bufferId) && this->queues.readers.Pop(inputTask)) {
 
-			LOG_DEBUG << "readers queue -> (file " << inputTask->fileId + 1 << "), tid: " << tid << endl;
+			LOG_DEBUG("readers queue -> (file " << inputTask->fileId + 1 << "), tid: " << tid << endl);
 
 			auto sampleTask = make_shared<SampleTask>(
 				inputTask->fileId,
@@ -160,17 +160,18 @@ void LoaderEx::readerJob(int tid) {
 			if (ok) {
 				++bufferRefCounters[bufferId];
 				queues.output.Push((int)sampleTask->id, sampleTask);
-				LOG_DEBUG << "(sample " << sampleTask->id + 1 << ", " << sampleTask->sampleName <<") -> loader output queue, buf: " << bufferId << std::endl ;
-				LOG_VERBOSE << "File loaded successfully: " << inputTask->fileId + 1 << endl ;
+				
+				LOG_DEBUG("(sample " << sampleTask->id + 1 << ", " << sampleTask->sampleName <<") -> loader output queue, buf: " << bufferId << std::endl);
+				LOG_VERBOSE("File loaded successfully: " << inputTask->fileId + 1 << endl);
 			}
 			else {
-				LOG_NORMAL << "File load failed: " << inputTask->fileId + 1 << endl << std::flush;
+				LOG_NORMAL("File load failed: " << inputTask->fileId + 1 << endl);
 			}
 		}
 	}
 
 	queues.output.MarkCompleted();
-	LOG_DEBUG << "loader thread completed: " << tid << endl ;
+	LOG_DEBUG("loader thread completed: " << tid << endl);
 }
 
 // *****************************************************************************************
@@ -194,12 +195,14 @@ void LoaderEx::multifastaReaderJob() {
 		// initialize multifasta file
 		if (genomicFile->initMultiFasta()) {
 
-			LOG_DEBUG << "multifasta initialized: " << inputTask->fileId + 1 << endl ;
+			LOG_DEBUG("multifasta initialized : " << inputTask->fileId + 1 << endl);
 
 			while (true) {
-				LOG_DEBUG << "wait for buf for sample " << sample_id + 1 << endl;
+				
+				LOG_DEBUG("wait for buf for sample " << sample_id + 1 << endl);
 				this->queues.freeBuffers.Pop(bufferId); // wait for free buffer
-				LOG_DEBUG << "acquired buf " << bufferId << " for sample " << sample_id + 1 << endl;
+			
+				LOG_DEBUG("acquired buf " << bufferId << " for sample " << sample_id + 1 << endl);
 			
 				auto sampleTask = make_shared<SampleTask>(
 					sample_id,
@@ -217,7 +220,7 @@ void LoaderEx::multifastaReaderJob() {
 				queues.output.Push((int)sampleTask->id, sampleTask);
 				++count;
 
-				LOG_DEBUG << "(sample " << sampleTask->id + 1 << ") -> output queue, buf: " << bufferId << std::endl;
+				LOG_DEBUG("(sample " << sampleTask->id + 1 << ") -> output queue, buf: " << bufferId << std::endl);
 
 				// no more samples
 				if (!ok) {
@@ -227,14 +230,14 @@ void LoaderEx::multifastaReaderJob() {
 		}
 
 		if (count > 0) {
-			LOG_VERBOSE << "File loaded successfully: " << inputTask->fileId + 1 << endl;
+			LOG_VERBOSE("File loaded successfully: " << inputTask->fileId + 1 << endl);
 		}
 		else {
-			LOG_NORMAL << "File load failed: " << inputTask->fileId + 1 << endl << std::flush;
+			LOG_NORMAL("File load failed: " << inputTask->fileId + 1 << endl);
 		}
 	}
 	queues.output.MarkCompleted();
 
-	LOG_DEBUG << "output queue: mark completed" << endl ;
+	LOG_DEBUG("output queue: mark completed" << endl);
 }
 

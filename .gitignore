@@ -20,3 +20,5 @@
 /kmer-db
 /src/kmer_db/x64
 /libs/nasm
+/bin
+/obj

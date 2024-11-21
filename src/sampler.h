@@ -136,4 +136,9 @@ public:
 
 		return (int) (out - out0);
 	}
+
+	size_t getNoInRow(size_t row_id)	const
+	{
+		return data[row_id].size();
+	}
 };

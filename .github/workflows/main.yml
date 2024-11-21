@@ -9,26 +9,32 @@ on:
 
 jobs:
 
+
 ########################################################################################
   make:
     name: Make
     strategy:
       fail-fast: false
       matrix:
-        machine: [ubuntu-latest, macOS-12]
+        machine: [ubuntu-latest]
+        gmake_install_command: ['gmake --version']
+        include:
+        - {machine: macOS-13, gmake_install_command: 'brew install make && gmake --version'}
     runs-on: ['${{ matrix.machine }}']   
    
     steps:
     - uses: actions/checkout@v4
       with:
         submodules: recursive
+    - name: install gmake
+      run: ${{ matrix.gmake_install_command }}    
+    
     - name: make
       run: | 
-        g++ --version
-        make -j CXX=g++-12
+        gmake -j CXX=g++-12 CC=gcc-12
 
     - name: tar artifacts
-      run: tar -cvf kmer-db.tar ./kmer-db ./test/virus
+      run: tar -cvf kmer-db.tar ./test/virus -C ./bin kmer-db
     
     - uses: actions/upload-artifact@v4
       with:
@@ -42,7 +48,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        machine: [ubuntu-latest, macOS-12]
+        machine: [ubuntu-latest, macOS-13]
     runs-on: ['${{ matrix.machine }}']
     env: 
       INPUT_DIR: ./test/virus

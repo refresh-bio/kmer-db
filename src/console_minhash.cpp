@@ -3,30 +3,29 @@
 #include "loader_ex.h"
 #include "kmer_extract.h"
 
-
 void MinhashConsole::run(const Params& params) {
 	
 	if (params.files.size() != 1) {
 		throw usage_error(params.mode);
 	}
 
-	LOG_NORMAL << "Minhashing samples..." << endl;
+	LOG_NORMAL("Minhashing samples..." << endl);
 
 	const std::string& multipleKmcSamples = params.files[0];
 	std::chrono::duration<double> loadingTime{ 0 }, processingTime{ 0 };
 
-	LOG_DEBUG << "Creating Loader object..." << endl;
+	LOG_DEBUG("Creating Loader object..." << endl);
 
 	auto filter = std::make_shared<MinHashFilter>(params.fraction, 0, params.kmerLength);
 
 	LoaderEx loader(filter, params.inputFormat, params.numReaderThreads, params.numThreads, params.multisampleFasta);
 	loader.configure(multipleKmcSamples);
 
-	LOG_DEBUG << "Starting loop..." << endl;
+	LOG_DEBUG("Starting loop..." << endl);
 	auto totalStart = std::chrono::high_resolution_clock::now();
 	for (int i = 0; !loader.isCompleted(); ++i) {
 		auto partialTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - totalStart);
-		LOG_VERBOSE << "Processing time: " << partialTime.count() << ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl;
+		LOG_VERBOSE("Processing time: " << partialTime.count() << ", loader buffers: " << (loader.getBytes() >> 20) << " MB" << endl);
 
 		auto task = loader.popTask(i);
 

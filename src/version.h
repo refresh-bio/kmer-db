@@ -1,11 +1,17 @@
 #pragma once
 
-#define VERSION "2.2.3"
-#define DATE "21.10.2024"
+#define VERSION "2.2.5"
+#define DATE "02.11.2024"
 
 /* 
 
 Version history
+
+2.2.5 (02.11.2024)
+- Improved logging.
+
+2.2.4 (31.10.2024)
+- Improved support of patterns shared by large number of samples ('bubbles').
 
 2.2.3 (21.10.2024)
 - Added `-version` switch.

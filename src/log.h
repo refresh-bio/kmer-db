@@ -15,9 +15,9 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include <mutex>
 #include <sstream>
 
-#define LOG_VERBOSE Log::getInstance(Log::LEVEL_VERBOSE)
-#define LOG_DEBUG Log::getInstance(Log::LEVEL_DEBUG)
-#define LOG_NORMAL Log::getInstance(Log::LEVEL_NORMAL)
+#define LOG_VERBOSE(msg) { if (Log::getInstance(Log::LEVEL_VERBOSE)) { Log::getInstance(Log::LEVEL_VERBOSE) << msg << std::flush; }}
+#define LOG_DEBUG(msg) { if (Log::getInstance(Log::LEVEL_DEBUG)) { Log::getInstance(Log::LEVEL_DEBUG) << msg << std::flush; }}
+#define LOG_NORMAL(msg) { Log::getInstance(Log::LEVEL_NORMAL) << msg << std::flush; }
 
 
 class LockedStream {
@@ -131,6 +131,11 @@ public:
 	}
 
 	static std::string formatLargeNumber(uint64_t num, int minWidth = 0);
+
+	operator bool() const
+	{
+		return enabled;
+	}
 
 protected:
 	bool enabled;

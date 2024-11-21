@@ -1,9 +1,7 @@
-// build -k 25 -t 32 -multisample-fasta fl.txt part_00000.kdb
-// all2all-sp -sparse -t 32 part_00000.kdb part_00000.a2as
-
 #include "similarity_calculator.h"
 #include "parallel_sorter.h"
 #include "../libs/refresh/sort/lib/pdqsort_par.h"
+#include "../libs/refresh/logs/lib/progress.h"
 
 #if defined(ARCH_X64)
 #include <emmintrin.h>
@@ -18,6 +16,8 @@
 #include "instr_set_detect.h"
 #include <barrier>
 #include <future>
+
+#include "bubble_helper.h"
 
 // *****************************************************************************************
 //
@@ -290,7 +290,7 @@ void SimilarityCalculator::all2all(PrefixKmerDb& db, LowerTriangularMatrix<uint3
 	for (size_t pid = 0; pid < patterns.size(); ) {
 		
 		if (pid * 100 / patterns.size() >= percent) {
-			LOG_NORMAL << "\r" << percent << "%" << std::flush;
+			LOG_NORMAL("\r" << percent << "%");
 			++percent;
 		}
 
@@ -426,23 +426,23 @@ void SimilarityCalculator::all2all(PrefixKmerDb& db, LowerTriangularMatrix<uint3
 	for (auto &w : workers_histogram)
 		w.join();
 
-	LOG_NORMAL << "\r100%" << std::flush << "\r" << std::flush;
+	LOG_NORMAL("\r100%" << std::flush << "\r");
 
-	LOG_VERBOSE << "  Decomp   time: " << decomp_time << endl;
-	LOG_VERBOSE << "  Hist     time: " << hist_time << endl;
-	LOG_VERBOSE << "  Sample2p time: " << patterns_time << endl;
-
+	LOG_VERBOSE("  Decomp   time: " << decomp_time << endl);
+	LOG_VERBOSE("  Hist     time: " << hist_time << endl);
+	LOG_VERBOSE("  Sample2p time: " << patterns_time << endl);
+	
 #ifdef ALL_STATS
-	LOG_NORMAL << "Number of additions:" << numAdditions << endl;
+	LOG_NORMAL("Number of additions:" << numAdditions << endl);
 #endif
 }
 
 // *****************************************************************************************
 //
-void SimilarityCalculator::all2all_sp(PrefixKmerDb& db, SparseMatrix<uint32_t>& matrix) const
+void SimilarityCalculator::all2all_sp(PrefixKmerDb& db, SparseMatrix<uint32_t>& matrix, CBubbleHelper &bubbles) const
 {
 	auto& patterns = db.getPatterns();
-	
+
 	matrix.resize(db.getSamplesCount());
 
 	size_t buf_size = cacheBufferMb * 1000000 / sizeof(uint32_t);
@@ -476,13 +476,16 @@ void SimilarityCalculator::all2all_sp(PrefixKmerDb& db, SparseMatrix<uint32_t>& 
 		auto& patterns = db.getPatterns();
 		size_t buf_pos = 0;
 
-	
+		refresh::progress_state progress(patterns.size(), "", "%", 1);
+
+		LOG_NORMAL("\r" << progress.str());
+
 		for (size_t i = 0; i < patterns.size(); ++i)
 		{
-			if (i * 100 / patterns.size() >= percent) {
+/*			if (i * 100 / patterns.size() >= percent) {
 				LOG_NORMAL << "\r" << percent << "%" << std::flush;
 				++percent;
-			}
+			}*/
 			
 			const auto& ps = patterns[i];
 
@@ -500,9 +503,21 @@ void SimilarityCalculator::all2all_sp(PrefixKmerDb& db, SparseMatrix<uint32_t>& 
 			uint32_t* buf_ptr = patternsBuffer_next.data() + buf_pos;
 			decode_pattern_samples(patterns, i, buf_ptr);
 
+			if (progress.increment(1))
+				LOG_NORMAL("\r" << progress.str());
+
+			if (bubbles.is_bubble(ps.get_num_samples()))
+			{
+				bubbles.add(ps.get_num_kmers(), buf_ptr, buf_ptr + ps.get_num_samples());
+				pattern_ptrs_next.emplace_back(0, buf_ptr);											// this pattern will be handled as a bubble
+				continue;
+			}
+
 			pattern_ptrs_next.emplace_back(ps.get_num_samples(), buf_ptr);
 			buf_pos += ps.get_num_samples();
 		}
+
+		LOG_NORMAL(endl);
 
 		bar_patterns.arrive_and_wait();
 		swap(pattern_ptrs_cur, pattern_ptrs_next);
@@ -636,7 +651,7 @@ void SimilarityCalculator::all2all_sp(PrefixKmerDb& db, SparseMatrix<uint32_t>& 
 	auto t2 = std::chrono::high_resolution_clock::now();
 	std::chrono::duration<double> dt1 = t2 - t1;
 
-	LOG_NORMAL << "\r100%" << std::flush << "\r" << std::flush;
+	LOG_NORMAL("\r100%" << std::flush << "\r");
 
 	//LOG_VERBOSE << "All2All Sparse computation time: " << dt1.count() << endl;
 }
@@ -849,7 +864,7 @@ void SimilarityCalculator::one2all<false>(const PrefixKmerDb& db, const kmer_t* 
 	patterns2count.clear();
 
 	dt = std::chrono::high_resolution_clock::now() - start;
-	LOG_VERBOSE << "Pattern listing time: " << dt.count() << endl ;
+	LOG_VERBOSE("Pattern listing time: " << dt.count() << endl);
 
 	start = std::chrono::high_resolution_clock::now();
 	
@@ -906,7 +921,7 @@ void SimilarityCalculator::one2all<false>(const PrefixKmerDb& db, const kmer_t* 
 	}
 
 	dt = std::chrono::high_resolution_clock::now() - start;
-	LOG_VERBOSE << "Pattern unpacking time: " << dt.count() << endl ;
+	LOG_VERBOSE("Pattern unpacking time: " << dt.count() << endl);
 }
 
 // *****************************************************************************************
@@ -1080,10 +1095,8 @@ void SimilarityCalculator::db2db(const PrefixKmerDb& db1, const PrefixKmerDb& db
 
 // *****************************************************************************************
 //
-void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, SparseMatrix<uint32_t>& matrix) 
+void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, SparseMatrix<uint32_t>& matrix, CBubbleHelper& bubbles)
 {
-//	auto& ht1 = db1.getHashtables();
-//	auto& ht2 = db2.getHashtables();
 	auto& sk1 = db1.getSuffixKmers();
 	auto& sk2 = db2.getSuffixKmers();
 
@@ -1092,25 +1105,21 @@ void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, Sparse
 
 	matrix.resize(samples_count1 + samples_count2);
 
+	bubbles.clear();
+
 	vector<thread> threads;
 	vector<vector<pair<pattern_id_t, pattern_id_t>>> kmer_matchings(num_threads);
 
 	vector<pair<size_t, int>> prefix_order;
 
-//	prefix_order.reserve(ht1.size());
 	prefix_order.reserve(sk1.size());
 
-//	for (size_t i = 0; i < ht1.size(); ++i)
-//		prefix_order.emplace_back(ht1[i].get_size() + ht2[i].get_size(), i);
 	for (size_t i = 0; i < sk1.size(); ++i)
 		prefix_order.emplace_back(sk1[i].size() + sk2[i].size(), i);
 
-//	sort(prefix_order.rbegin(), prefix_order.rend());
 	refresh::sort::pdqsort_branchless(prefix_order.rbegin(), prefix_order.rend());
 
 	atomic<int> prefix = 0;
-
-//	LOG_NORMAL << "\nK-mer comparing: " + to_string(0) + " of " + to_string(ht1.size()) << "\r";
 
 	// Find pairs of same k-mers in both databases
 	for (int i = 0; i < num_threads; ++i)
@@ -1124,18 +1133,13 @@ void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, Sparse
 		while (true)
 		{
 			int c_id = prefix.fetch_add(1);
-//			if (c_id >= ht1.size())
 			if (c_id >= (int)sk1.size())
 				break;
 
 			int h_id = prefix_order[c_id].second;
-//			const auto& sht1 = ht1[h_id];
-//			const auto& sht2 = ht2[h_id];
 			auto& lsk1 = sk1[h_id];
 			auto& lsk2 = sk2[h_id];
 
-//			sort(lsk1.begin(), lsk1.end());
-//			sort(lsk2.begin(), lsk2.end());
 			refresh::sort::pdqsort_branchless(lsk1.begin(), lsk1.end());
 			refresh::sort::pdqsort_branchless(lsk2.begin(), lsk2.end());
 
@@ -1151,35 +1155,11 @@ void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, Sparse
 				else
 					++i2;
 			}
-
-//			if (sht1.get_size() < sht2.get_size())
-/* {
-				for (auto p = sht1.cbegin(); p != sht1.cend(); ++p)
-					if (p->val != sht1.empty_value)
-					{
-						auto q = sht2.find(p->key);
-						if (q != nullptr)
-							my_res.emplace_back(p->val, *q);
-					}
-			}*/
-/*			else
-			{
-				for (auto q = sht2.cbegin(); q != sht2.cend(); ++q)
-					if (q->val != sht2.empty_value)
-					{
-						auto p = sht1.find(q->key);
-						if (p != nullptr)
-							my_res.emplace_back(*p, q->val);
-					}
-			}*/
-
 		}
 			});
 
 	for (auto& t : threads)
 		t.join();
-
-//	LOG_NORMAL << "K-mer comparing: " + to_string(ht1.size()) + " of " + to_string(ht1.size()) << "\n";
 
 	threads.clear();
 
@@ -1190,7 +1170,7 @@ void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, Sparse
 	for (const auto& x : kmer_matchings)
 		n_pairs += x.size();
 
-	LOG_DEBUG << "No. of matched pairs: " << n_pairs << endl;
+	LOG_DEBUG("No. of matched pairs: " << n_pairs << endl);
 
 	global_kmer_matchings.reserve(n_pairs);
 
@@ -1200,8 +1180,6 @@ void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, Sparse
 	kmer_matchings.clear();
 	kmer_matchings.shrink_to_fit();
 
-//	sort(global_kmer_matchings.begin(), global_kmer_matchings.end());
-//	ParallelSort(global_kmer_matchings.data(), global_kmer_matchings.size(), num_threads, &atp);
 	refresh::sort::pdqsort_branchless_tp(num_threads, global_kmer_matchings.begin(), global_kmer_matchings.end(), atp);
 
 	if (!global_kmer_matchings.empty())
@@ -1217,9 +1195,7 @@ void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, Sparse
 	// Calculate matrix
 	auto no_samples1 = db1.getSamplesCount();
 	auto no_samples2 = db2.getSamplesCount();
-//	matrix.resize(no_samples1 + no_samples2);
 	matrix.resize(no_samples1);
-	//	matrix.clear();
 
 	size_t buf_size = max<size_t>(2*(no_samples1 + no_samples2), cacheBufferMb * 1000000) / sizeof(uint32_t);
 	std::vector<uint32_t> patternsBuffer_cur(buf_size);
@@ -1239,14 +1215,18 @@ void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, Sparse
 		auto& patterns2 = db2.getPatterns();
 		size_t buf_pos = 0;
 
-		LOG_DEBUG << "Pattern pairs: " << 0 << " of " << global_kmer_matchings_counts.size() << "\r" << std::flush;
+		LOG_DEBUG("Pattern pairs: " << 0 << " of " << global_kmer_matchings_counts.size() << "\r");
+
+		refresh::progress_state progress(global_kmer_matchings_counts.size(), "", "%", 1);
+
+		LOG_NORMAL("\r" << progress.str());
 
 		for (size_t i = 0; i < global_kmer_matchings_counts.size(); ++i)
 		{
-			if (i * 100 / global_kmer_matchings_counts.size() >= percent) {
+/*			if (i * 100 / global_kmer_matchings_counts.size() >= percent) {
 				LOG_NORMAL << "\r" << percent << "%" << std::flush;
 				++percent;
-			}
+			}*/
 
 			auto pid1 = global_kmer_matchings_counts[i].first.first;
 			auto pid2 = global_kmer_matchings_counts[i].first.second;
@@ -1265,7 +1245,7 @@ void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, Sparse
 
 				buf_pos = 0;
 
-				LOG_DEBUG << "Pattern pairs: " << i << " of " << global_kmer_matchings_counts.size() << "\r" << std::flush;	
+				LOG_DEBUG("Pattern pairs: " << i << " of " << global_kmer_matchings_counts.size() << "\r");
 			}
 
 			uint32_t* buf_ptr1 = patternsBuffer_next.data() + buf_pos;
@@ -1276,16 +1256,29 @@ void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, Sparse
 			decode_pattern_samples(patterns1, pid1, buf_ptr1);
 			decode_pattern_samples(patterns2, pid2, buf_ptr2);
 
+			if(progress.increment(1))
+				LOG_NORMAL("\r" << progress.str());
+
+			if (bubbles.is_bubble(ps1.get_num_samples(), ps2.get_num_samples()))
+			{
+				bubbles.add(global_kmer_matchings_counts[i].second, buf_ptr1, buf_ptr1 + ps1.get_num_samples(), buf_ptr2, buf_ptr2 + ps2.get_num_samples());					
+					
+				pattern_ptrs_next.emplace_back(0, 0, buf_ptr1, buf_ptr2);						// bubble is handled in the other way
+				continue;
+			}
+
 			pattern_ptrs_next.emplace_back(ps1.get_num_samples(), ps2.get_num_samples(), buf_ptr1, buf_ptr2);
 		}
+
+		LOG_NORMAL(endl);
 
 		bar_patterns.arrive_and_wait();
 		swap(pattern_ptrs_cur, pattern_ptrs_next);
 		swap(patternsBuffer_cur, patternsBuffer_next);
 		bar_patterns.arrive_and_wait();
 
-		LOG_DEBUG << "Pattern: " << global_kmer_matchings_counts.size() << 
-			" of " << global_kmer_matchings_counts.size() << "\r" << std::flush;
+		LOG_DEBUG("Pattern: " << global_kmer_matchings_counts.size() <<
+			" of " << global_kmer_matchings_counts.size() << "\r");
 		
 		if (!patternsBuffer_cur.empty())
 		{
@@ -1416,5 +1409,5 @@ void SimilarityCalculator::db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, Sparse
 	auto t2 = std::chrono::high_resolution_clock::now();
 	std::chrono::duration<double> dt1 = t2 - t1;
 
-	LOG_VERBOSE << "Db2Db Sparse computation time: " << dt1.count() << endl;
+	LOG_VERBOSE("Db2Db Sparse computation time: " << dt1.count() << endl);
 }
