@@ -153,32 +153,45 @@ void Params::showInstructions(Mode mode) const {
 	if (mode == Mode::build) {
 		LOG_NORMAL(
 			   "Building a database:" << endl
-			<< "    kmer-db " << MODE_BUILD
+	 << "    kmer-db " << MODE_BUILD
 			<< " [" << OPTION_LENGTH << " <kmer-length>]"
 			<< " [" << OPTION_FRACTION << " <fraction>]"
 			<< " [" << SWITCH_MULTISAMPLE_FASTA << "]"
 			<< " [" << SWITCH_EXTEND_DB << "]"
-			<< " [" << OPTION_THREADS << " <threads>] <sample_list> <database>" << endl
+			<< " [" << OPTION_ALPHABET << "<alphabet_type>]"
+			<< " [" << SWITCH_PRESERVE_STRAND << "]"
+			<< " [" << OPTION_THREADS << " <threads>] <samples> <database>" << endl
 
 			<< "    kmer-db " << MODE_BUILD << " " << SWITCH_KMC_SAMPLES
 			<< " [" << OPTION_FRACTION << " <fraction>]"
 			<< " [" << SWITCH_EXTEND_DB << "]"
-			<< " [" << OPTION_THREADS << " <threads>] <sample_list> <database>" << endl
+			<< " [" << OPTION_THREADS << " <threads>] <samples> <database>" << endl
 
 			<< "    kmer-db " << MODE_BUILD << " " << SWITCH_MINHASH_SAMPLES
 			<< " [" << SWITCH_EXTEND_DB << "]"
-			<< " [" << OPTION_THREADS << " <threads>] <sample_list> <database>" << endl << endl
+			<< " [" << OPTION_THREADS << " <threads>] <samples> <database>" << endl << endl
 
 			<< "Positional arguments:" << endl
-			<< "    sample_list (input) - file containing list of samples in one of the following formats:" << endl
-			<< "                          FASTA genomes/reads (default), KMC k-mers (" << SWITCH_KMC_SAMPLES << "), or minhashed k-mers (" << SWITCH_MINHASH_SAMPLES << ")," << endl
+			<< "    samples (input) - one of the following:" << endl 
+			<< "        a. FASTA file (fa, fna, fasta, fa.gz, fna.gz, fasta.gz) with one or multiple (" << SWITCH_MULTISAMPLE_FASTA << ") samples" << endl
+			<< "        b. file with list of samples in one of the formats: " << endl
+			<< "            * FASTA genomes/reads (default)," << endl 
+			<< "            * KMC k-mers (" << SWITCH_KMC_SAMPLES << ")," << endl
+			<< "            * minhashed k-mers (" << SWITCH_MINHASH_SAMPLES << ")" << endl
 			<< "    database (output) - file with generated k-mer database," << endl
 
 			<< "Options: " << endl
-			<< "    " << OPTION_LENGTH << " <kmer_length> - length of k-mers (default: 18, maximum: 30)" << endl
+			<< "    " << OPTION_LENGTH << " <kmer_length> - length of k-mers (default: 18, maximum depends on the alphabet - 31 for default nt)" << endl
 			<< "    " << OPTION_FRACTION << " <fraction> - fraction of all k-mers to be accepted by the minhash filter (default: 1)" << endl
 			<< "    " << SWITCH_MULTISAMPLE_FASTA << " - each sequence in a FASTA file is treated as a separate sample" << endl
 			<< "    " << SWITCH_EXTEND_DB << " - extend the existing database with new samples" << endl
+			<< "    " << OPTION_ALPHABET << " - alphabet:" << endl
+			<< "        * nt (4 symbol nucleotide with indistinguishable T/U; default)" << endl 
+			<< "        * aa (20 symbol amino acid)" << endl
+			<< "        * aa12_mmseqs (amino acid reduced to 12 symbols as in MMseqs: AST,C,DN,EQ,FY,G,H,IV,KR,LM,P,W" << endl
+			<< "        * aa11_diamond (amino acid reduced to 11 symbols as in Diamond: KREDQN,C,G,H,ILV,M,F,Y,W,P,STA" << endl
+			<< "        * aa6_dayhoff (amino acid reduced to 6 symbols as proposed by Dayhoff: STPAG,NDEQ,HRK,MILV,FYW,C" << endl
+			<< "    " << SWITCH_PRESERVE_STRAND << " - preserve strand instead of taking canonical k-mers (allowed only in nt alphabet; default: off)" << endl 
 			<< "    " << OPTION_THREADS << " <threads> - number of threads (default: number of available cores)" << endl << endl);
 	}
 	else if (mode == Mode::all2all) {
@@ -284,12 +297,16 @@ void Params::showInstructions(Mode mode) const {
 			<< "    kmer-db " << MODE_NEW_2_ALL
 			<< " [" << SWITCH_MULTISAMPLE_FASTA << " | " << SWITCH_KMC_SAMPLES << " | " << SWITCH_MINHASH_SAMPLES << "]"
 			<< " [" << SWITCH_SPARSE << " [" << OPTION_MIN << " [<criterion>:]<value>]* [" << OPTION_MAX << " [<criterion>:]<value>]* ] " 
-			<< " [" << OPTION_THREADS << " <threads>] <database> <sample_list> <common_table>" << endl << endl
+			<< " [" << OPTION_THREADS << " <threads>] <database> <samples> <common_table>" << endl << endl
 
 			<< "Positional arguments:" << endl
 			<< "    database (input) - k-mer database file" << endl
-			<< "    sample_list (input) - file containing list of samples in one of the following formats:" << endl
-			<< "                          FASTA genomes/reads (default), KMC k-mers (" << SWITCH_KMC_SAMPLES << "), or minhashed k-mers (" << SWITCH_MINHASH_SAMPLES << ")" << endl
+			<< "    samples (input) - one of the following : " << endl 
+			<< "        a. FASTA file (fa, fna, fasta, fa.gz, fna.gz, fasta.gz) with one or multiple (" << SWITCH_MULTISAMPLE_FASTA << ") samples" << endl
+			<< "        b. file with list of samples in one of the formats: " << endl
+			<< "            * FASTA genomes/reads (default)," << endl
+			<< "            * KMC k-mers (" << SWITCH_KMC_SAMPLES << ")," << endl
+			<< "            * minhashed k-mers (" << SWITCH_MINHASH_SAMPLES << ")" << endl
 			<< "    common_table (output) - CSV table with number of common k-mers" << endl
 
 			<< "Options:" << endl
@@ -341,15 +358,37 @@ void Params::showInstructions(Mode mode) const {
 	else if (mode == Mode::minhash) {
 		LOG_NORMAL(
 			   "Storing minhashed k-mers:" << endl
-			<< "    kmer-db " << MODE_MINHASH << " [" << OPTION_FRACTION << " <fraction> ][" << OPTION_LENGTH << " <kmer_length>][" << SWITCH_MULTISAMPLE_FASTA << "] <sample_list>" << endl
-			<< "    kmer-db " << MODE_MINHASH << " " << SWITCH_KMC_SAMPLES << " [" << OPTION_FRACTION << " <fraction>] <sample_list>" << endl << endl
+			<< "    kmer-db " << MODE_MINHASH 
+			<< " [" << OPTION_FRACTION << " <fraction> ]" 
+			<< " [" << OPTION_LENGTH << " <kmer_length>]"  
+			<< " [" << SWITCH_MULTISAMPLE_FASTA << "]"
+			<< " [" << OPTION_ALPHABET << "<alphabet_type>]"
+			<< " [" << SWITCH_PRESERVE_STRAND << "]"
+			<< " <samples>" << endl
+
+			<< "    kmer-db " << MODE_MINHASH << " " << SWITCH_KMC_SAMPLES 
+			<< " [" << OPTION_FRACTION << " <fraction>]"
+			<< " <samples>" << endl << endl
+			
 			<< "Positional arguments:" << endl
-			<< "    sample (input) - query sample in one of the supported formats:" << endl
-			<< "                     FASTA genomes/reads (default) or KMC k-mers (" << SWITCH_KMC_SAMPLES << ")" << endl
+			<< "    samples (input) - one of the following : " << endl 
+			<< "        a. FASTA file (fa, fna, fasta, fa.gz, fna.gz, fasta.gz) with one or multiple (" << SWITCH_MULTISAMPLE_FASTA << ") samples" << endl
+			<< "        b. file with list of samples in one of the formats: " << endl
+			<< "            * FASTA genomes/reads (default)," << endl
+			<< "            * KMC k-mers (" << SWITCH_KMC_SAMPLES << ")," << endl << endl
+
 			<< "Options:" << endl
 			<< "    " << OPTION_FRACTION << " <fraction> - fraction of all k-mers to be accepted by the minhash filter (default: 0.01)" << endl
 			<< "    " << OPTION_LENGTH << " <kmer_length> - length of k-mers (default: 18, maximum: 30)" << endl
 			<< "    " << SWITCH_MULTISAMPLE_FASTA << " - each sequence in a FASTA file is treated as a separate sample" << endl << endl
+			<< "    " << OPTION_ALPHABET << " - alphabet:" << endl
+			<< "        * nt (4 symbol nucleotide with indistinguishable T/U; default)" << endl
+			<< "        * aa (20 symbol amino acid)" << endl
+			<< "        * aa12_mmseqs (amino acid reduced to 12 symbols as in MMseqs: AST,C,DN,EQ,FY,G,H,IV,KR,LM,P,W" << endl
+			<< "        * aa11_diamond (amino acid reduced to 11 symbols as in Diamond: KREDQN,C,G,H,ILV,M,F,Y,W,P,STA" << endl
+			<< "        * aa6_dayhoff (amino acid reduced to 6 symbols as proposed by Dayhoff: STPAG,NDEQ,HRK,MILV,FYW,C" << endl
+			<< "    " << SWITCH_PRESERVE_STRAND << " - preserve strand instead of taking canonical k-mers (allowed only in nt alphabet; default: off)" << endl << endl
+
 			<< "For each sample from the list, a binary file with *.minhash* extension containing filtered k-mers is created" << endl << endl);
 	}
 	else {
@@ -428,13 +467,27 @@ bool Params::parse_build(std::vector<string>& params) {
 
 		if (!switchKmc) {
 			multisampleFasta = findSwitch(params, SWITCH_MULTISAMPLE_FASTA);
-			findOption(params, OPTION_LENGTH, kmerLength);				// kmer length
-			nonCanonical = findSwitch(params, SWITCH_NON_CANONICAL);
-
+			
 			inputFormat = InputFile::GENOME;
 
-			if (kmerLength > 30) {
-				throw std::runtime_error("K-mer length cannot not exceed 30.");
+			string alphabetName;
+			if (findOption(params, OPTION_ALPHABET, alphabetName)) {
+				alphabet = std::shared_ptr<Alphabet>(AlphabetFactory::instance().create(alphabetName));
+			}
+
+			// override alphabet type when needed
+			if (findSwitch(params, SWITCH_PRESERVE_STRAND)) {
+				if (alphabet->type == AlphabetType::nt) {
+					alphabet = std::shared_ptr<Alphabet>(AlphabetFactory::instance().create(AlphabetType::nt_preserve));
+				}
+				else {
+					throw std::runtime_error("Switch " + SWITCH_PRESERVE_STRAND + " applies only to nt alphabet");
+				}
+			}
+
+			findOption(params, OPTION_LENGTH, kmerLength);				// kmer length
+			if (kmerLength > alphabet->maxKmerLen) {
+				throw std::runtime_error("K-mer length for the given alphabet cannot exceed " + alphabet->maxKmerLen);
 			}
 		}
 		else {
@@ -454,6 +507,7 @@ bool Params::parse_build(std::vector<string>& params) {
 	}
 
 	extendDb = findSwitch(params, SWITCH_EXTEND_DB);
+	
 
 	return true;
 }
@@ -630,10 +684,26 @@ bool Params::parse_minhash(std::vector<string>& params) {
 		multisampleFasta = findSwitch(params, SWITCH_MULTISAMPLE_FASTA);
 		findOption(params, OPTION_LENGTH, kmerLength);				// kmer length
 
-		if (kmerLength > 30) {
-			throw std::runtime_error("K-mer length cannot not exceed 30.");
-		}
 		inputFormat = InputFile::GENOME;
+
+		string alphabetName;
+		if (findOption(params, OPTION_ALPHABET, alphabetName)) {
+			alphabet = std::shared_ptr<Alphabet>(AlphabetFactory::instance().create(alphabetName));
+		}
+
+		// override alphabet type when needed
+		if (findSwitch(params, SWITCH_PRESERVE_STRAND)) {
+			if (alphabet->type == AlphabetType::nt) {
+				alphabet = std::shared_ptr<Alphabet>(AlphabetFactory::instance().create(AlphabetType::nt_preserve));
+			}
+			else {
+				throw std::runtime_error("Switch " + SWITCH_PRESERVE_STRAND + " applies only to nt alphabet");
+			}
+		}
+
+		if (kmerLength > alphabet->maxKmerLen) {
+			throw std::runtime_error("K-mer length for the given alphabet cannot exceed " + alphabet->maxKmerLen);
+		}
 	}
 
 	return true;

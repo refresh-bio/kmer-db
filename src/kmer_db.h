@@ -15,6 +15,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include "aligned_vector.h"
 #include "simd/row_add.h"
 #include "parallel_sorter.h"
+#include "alphabet.h"
 
 #include <map>
 #include <fstream>
@@ -36,13 +37,16 @@ protected:
 
 	double startFraction;
 
+	AlphabetType alphabetType;
+
 	std::vector<string> sampleNames;
 
 	std::vector<uint32_t> sampleKmersCount;
 
-	virtual void initialize(uint32_t kmerLength, double fraction) {
+	virtual void initialize(uint32_t kmerLength, double fraction, AlphabetType alphabetType) {
 		this->kmerLength = kmerLength;
 		this->fraction = fraction;
+		this->alphabetType = alphabetType;
 		this->isInitialized = true;
 	}
 
@@ -55,7 +59,8 @@ public:
 		CompactedHashtables
 	};
 
-	AbstractKmerDb() : kmerLength(0), isInitialized(false), fraction(0), startFraction(0)  {}
+	AbstractKmerDb() : 
+		kmerLength(0), isInitialized(false), fraction(0), startFraction(0), alphabetType(AlphabetType::unknown)  {}
 
 	virtual ~AbstractKmerDb() {}
 
@@ -64,6 +69,8 @@ public:
 	double getFraction() const { return fraction; }
 
 	double getStartFraction() const { return startFraction; }
+
+	AlphabetType getAlphabetType() const { return alphabetType; }
 
 	size_t getSamplesCount() const { return sampleNames.size(); }
 
@@ -98,11 +105,12 @@ public:
 		uint32_t kmersCount,
 		uint32_t kmerLength, 
 		double fraction,
+		AlphabetType alphabetType,
 		refresh::active_thread_pool& atp) {
 		LOG_VERBOSE("Adding sample " << sampleNames.size() + 1 << ": " << sampleName << " (" << kmersCount << " kmers)" << endl);
 		
 		if (!isInitialized) {
-			initialize(kmerLength, fraction);
+			initialize(kmerLength, fraction, alphabetType);
 		}
 
 		if (this->kmerLength != kmerLength) {
@@ -110,6 +118,10 @@ public:
 		}
 		if (this->fraction != fraction) {
 			throw std::runtime_error("Error in AbstractKmerDb::addKmers(): adding kmers of different minhash fraction");
+		}
+
+		if (this->alphabetType != alphabetType) {
+			throw std::runtime_error("Error in AbstractKmerDb::addKmers(): adding samples from different alphabet");
 		}
 
 		sample_id_t newId = (sample_id_t) sampleNames.size();

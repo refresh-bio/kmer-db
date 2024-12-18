@@ -1,8 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="kmc_api\kmc_file.cpp" />
-    <ClCompile Include="kmc_api\kmer_api.cpp" />
     <ClCompile Include="kmc_api\mmer.cpp" />
     <ClCompile Include="log.cpp" />
     <ClCompile Include="main.cpp" />
@@ -10,8 +8,6 @@
     <ClCompile Include="parallel_sorter.cpp" />
     <ClCompile Include="similarity_calculator.cpp" />
     <ClCompile Include="prefix_kmer_db.cpp" />
-    <ClCompile Include="loader_ex.cpp" />
-    <ClCompile Include="input_file.cpp" />
     <ClCompile Include="..\libs\mimalloc\src\static.c" />
     <ClCompile Include="params.cpp" />
     <ClCompile Include="console_all2all.cpp" />
@@ -26,6 +22,18 @@
     <ClCompile Include="simd\row_add_avx.cpp" />
     <ClCompile Include="simd\row_add_avx2.cpp" />
     <ClCompile Include="simd\row_add_neon.cpp" />
+    <ClCompile Include="input_file.cpp">
+      <Filter>input</Filter>
+    </ClCompile>
+    <ClCompile Include="kmc_api\kmc_file.cpp">
+      <Filter>input</Filter>
+    </ClCompile>
+    <ClCompile Include="kmc_api\kmer_api.cpp">
+      <Filter>input</Filter>
+    </ClCompile>
+    <ClCompile Include="loader_ex.cpp">
+      <Filter>input</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="aligned_vector.h" />
@@ -34,9 +42,6 @@
     <ClInclude Include="elias_gamma.h" />
     <ClInclude Include="hashmap_lp.h" />
     <ClInclude Include="kmer_db.h" />
-    <ClInclude Include="kmc_api\kmc_file.h" />
-    <ClInclude Include="kmc_api\kmer_api.h" />
-    <ClInclude Include="kmc_api\kmer_defs.h" />
     <ClInclude Include="kmc_api\mmer.h" />
     <ClInclude Include="log.h" />
     <ClInclude Include="pattern.h" />
@@ -48,9 +53,6 @@
     <ClInclude Include="similarity_calculator.h" />
     <ClInclude Include="prefix_kmer_db.h" />
     <ClInclude Include="types.h" />
-    <ClInclude Include="loader_ex.h" />
-    <ClInclude Include="input_file.h" />
-    <ClInclude Include="loader_tasks.h" />
     <ClInclude Include="conversion.h" />
     <ClInclude Include="params.h" />
     <ClInclude Include="instr_set_detect.h" />
@@ -58,8 +60,46 @@
     <ClInclude Include="sampler.h" />
     <ClInclude Include="..\libs\refresh\sort\lib\pdqsort_par.h" />
     <ClInclude Include="..\libs\refresh\active_thread_pool\lib\active_thread_pool.h" />
-    <ClInclude Include="..\libs\refresh\compression\lib\file_wrapper.h" />
     <ClInclude Include="bubble_helper.h" />
     <ClInclude Include="simd\row_add.h" />
+    <ClInclude Include="alphabet.h" />
+    <ClInclude Include="input_file.h">
+      <Filter>input</Filter>
+    </ClInclude>
+    <ClInclude Include="genome_input_file.h">
+      <Filter>input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libs\refresh\compression\lib\file_wrapper.h">
+      <Filter>input</Filter>
+    </ClInclude>
+    <ClInclude Include="kmc_api\kmc_file.h">
+      <Filter>input</Filter>
+    </ClInclude>
+    <ClInclude Include="kmc_api\kmer_api.h">
+      <Filter>input</Filter>
+    </ClInclude>
+    <ClInclude Include="loader_ex.h">
+      <Filter>input</Filter>
+    </ClInclude>
+    <ClInclude Include="loader_tasks.h">
+      <Filter>input</Filter>
+    </ClInclude>
+    <ClInclude Include="kmc_input_file.h">
+      <Filter>input</Filter>
+    </ClInclude>
+    <ClInclude Include="minhashed_input_file.h">
+      <Filter>input</Filter>
+    </ClInclude>
+    <ClInclude Include="input_file_factory.h">
+      <Filter>input</Filter>
+    </ClInclude>
+    <ClInclude Include="kmc_api\kmer_defs.h">
+      <Filter>input</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="input">
+      <UniqueIdentifier>{f86f7d73-a327-4e3c-a22e-f1322af7f6d9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>

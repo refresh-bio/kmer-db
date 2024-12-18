@@ -33,148 +33,51 @@ public:
 		return "";
 	}
 
-	InputFile(std::shared_ptr<AbstractFilter> filter) : filter(filter) {}
-	virtual ~InputFile() {};
-
 	virtual bool open(const std::string& filename) = 0;
+	
 	virtual bool load(
 		std::vector<kmer_t>& kmersBuffer, 
 		std::vector<uint32_t>& positionsBuffer, 
 		kmer_t*& kmers,
 		size_t& kmersCount, 
 		uint32_t& kmerLength, 
-		double& filterValue,
-		bool nonCanonical) = 0;
+		double& filterValue) = 0;
 
-
-	static std::string removePathFromFile(const std::string& filePath) {
-		size_t pos = filePath.find_last_of("/\\");
-		if (pos != string::npos) {
-			return filePath.substr(pos + 1);
-		}
-		else {
-			return filePath;
-		}
-	}
-
-protected:
-
-	std::shared_ptr<AbstractFilter> filter;
-
+	virtual ~InputFile() {}
 };
 
-// *****************************************************************************************
+
+//******************************************************************************************
 //
-class GenomeInputFile : public InputFile {
+class IMultiSampleFile {
+
 public:
-	GenomeInputFile(std::shared_ptr<AbstractFilter> filter, bool storePositions)
-		: InputFile(filter), status(false), storePositions(storePositions) {}
 
-	virtual ~GenomeInputFile() {}
+	virtual bool initMultiFasta() = 0;
 
-	bool open(const std::string& filename) override;
-	
-	bool load(
+	virtual bool loadNext(
 		std::vector<kmer_t>& kmersBuffer,
 		std::vector<uint32_t>& positionsBuffer,
 		kmer_t*& kmers,
 		size_t& kmersCount,
 		uint32_t& kmerLength,
 		double& filterValue,
-		bool nonCanonical) override;
-
-	bool initMultiFasta();
-	
-	bool loadNext(
-		std::vector<kmer_t>& kmersBuffer,
-		std::vector<uint32_t>& positionsBuffer,
-		kmer_t*& kmers,
-		size_t& kmersCount,
-		uint32_t& kmerLength,
-		double& filterValue,
-		bool nonCanonical,
 		std::string& sampleName,
-		atomic<size_t>& total_kmers_in_kmers_collections
-	);
+		atomic<size_t>& total_kmers_in_kmers_collections) = 0;
 
-	
-protected:
-	size_t rawSize;
-	char* rawData;
-
-	bool status;
-	bool storePositions;
-
-	// multifasta fields
-	std::vector<char*> chromosomes;
-	std::vector<size_t> lengths;
-	std::vector<char*> headers;
-
-	size_t multifastaIndex;
-	
-	bool extractSubsequences(
-		char* data,
-		size_t& totalLen,
-		std::vector<char*>& subsequences,
-		std::vector<size_t>& lengths,
-		std::vector<char*>& headers);
+	virtual ~IMultiSampleFile() {}
 };
+
 
 // *****************************************************************************************
 //
-class MihashedInputFile : public InputFile {
+template <class Filter>
+class FilteredInputFile : public InputFile {
 public:
-	MihashedInputFile(std::shared_ptr<AbstractFilter> filter) : InputFile(filter), status(false) {}
-	virtual ~MihashedInputFile() {}
-
-	bool open(const std::string& filename) override;
-	
-	bool load(
-		std::vector<kmer_t>& kmersBuffer,
-		std::vector<uint32_t>& positionsBuffer,
-		kmer_t*& kmers,
-		size_t& kmersCount,
-		uint32_t& kmerLength,
-		double& filterValue,
-		bool nonCanonical) override;
-
-	bool store(const std::string& filename, const kmer_t* kmers, size_t kmersCount, uint32_t kmerLength, double filterValue);
+	FilteredInputFile(std::shared_ptr<Filter>& filter) : filter(filter) {}
 
 protected:
-	const uint32_t MINHASH_FORMAT_SIGNATURE = 0xfedcba98;
-
-	std::vector<kmer_t> kmers;
-
-	uint32_t kmerLength;
-
-	double fraction;
-
-	bool status;
+	std::shared_ptr<Filter> filter;
 };
 
-// *****************************************************************************************
-//
-class KmcInputFile : public InputFile {
-public:
-	
-	KmcInputFile(std::shared_ptr<AbstractFilter> filter) : InputFile(filter) {}
-	virtual ~KmcInputFile() {}
 
-	bool open(const std::string& filename) override {
-		kmcfile = std::make_shared<CKMCFile>();
-		return kmcfile->OpenForListing(filename);
-	}
-
-	bool load(
-		std::vector<kmer_t>& kmersBuffer,
-		std::vector<uint32_t>& positionsBuffer,
-		kmer_t*& kmers,
-		size_t& kmersCount,
-		uint32_t& kmerLength,
-		double& filterValue,
-		bool nonCanonical) override;
-
-protected:
-	std::shared_ptr<CKMCFile> kmcfile{ nullptr };
-
-};

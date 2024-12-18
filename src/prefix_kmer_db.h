@@ -121,6 +121,7 @@ public:
 		uint32_t kmersCount,
 		uint32_t kmerLength,
 		double fraction,
+		AlphabetType alphabetType,
 		refresh::active_thread_pool &atp) override;
 
 	void serialize(std::ofstream& file, bool rawHashtables) const override;
@@ -244,7 +245,7 @@ protected:
 
 	} stats;
 
-	void initialize(uint32_t kmerLength, double fraction) override;
+	void initialize(uint32_t kmerLength, double fraction, AlphabetType alphabetType);
 
 	void hashtableJobATP();
 	void patternJobATP();

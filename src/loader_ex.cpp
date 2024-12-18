@@ -7,17 +7,21 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 */
 
 #include "loader_ex.h"
+#include "input_file_factory.h"
 
 #include <string>
 #include <sstream>
 #include <memory>
+#include <filesystem>
+#include <set>
 
 using namespace std;
 
 // *****************************************************************************************
 //
 LoaderEx::LoaderEx(
-	std::shared_ptr<AbstractFilter> filter, 
+	std::shared_ptr<AbstractFilter> filter,
+	std::shared_ptr<Alphabet> alphabet,
 	InputFile::Format inputFormat, 
 	int suggestedNumThreads, 
 	int numConsumers,
@@ -48,7 +52,7 @@ LoaderEx::LoaderEx(
 	}
 
 	// run prefetcher thread
-	prefetcher = std::thread(&LoaderEx::prefetcherJob, this, filter);
+	prefetcher = std::thread(&LoaderEx::prefetcherJob, this, filter, alphabet);
 
 	// run loader threads
 	if (multisampleFasta) {
@@ -80,16 +84,35 @@ LoaderEx::~LoaderEx() {
 // *****************************************************************************************
 //
 int LoaderEx::configure(const std::string& multipleSamples) {
-	std::ifstream ifs(multipleSamples);
-
-	if (!ifs) {
-		throw std::runtime_error("Unable to open input file " + multisampleFasta);
+	
+	// determine if single FASTA file was provided as an input
+	set<string> extensions{
+		".fa", ".fna", ".fasta", ".fastq",
+		".gz", ".fa.gz", ".fna.gz", ".fasta.gz", ".fastq.gz" };
+	
+	bool isFasta = false;
+	for (const auto& ext : extensions) {
+		if (std::equal(ext.rbegin(), ext.rend(), multipleSamples.rbegin())) {
+			isFasta = true;
+			break;
+		}
 	}
 
-	string fname;
-	
-	while (ifs >> fname) {
-		fileNames.push_back(fname);
+	if (isFasta) {
+		fileNames.push_back(multipleSamples);
+	}
+	else {
+		std::ifstream ifs(multipleSamples);
+
+		if (!ifs) {
+			throw std::runtime_error("Unable to open input file " + multisampleFasta);
+		}
+
+		string fname;
+
+		while (ifs >> fname) {
+			fileNames.push_back(fname);
+		}
 	}
 
 	for (size_t i = 0; i < fileNames.size(); ++i) {
@@ -102,22 +125,14 @@ int LoaderEx::configure(const std::string& multipleSamples) {
 
 // *****************************************************************************************
 //
-void LoaderEx::prefetcherJob(std::shared_ptr<AbstractFilter> filter) {
+void LoaderEx::prefetcherJob(std::shared_ptr<AbstractFilter> filter, std::shared_ptr<Alphabet> alphabet) {
 	while (!this->queues.input.IsCompleted()) {
 		std::shared_ptr<InputTask> task;
 		
 		if (this->queues.input.Pop(task)) {
 			LOG_DEBUG("input queue -> (file " << task->fileId + 1 << ")" << endl);
 
-			if (this->inputFormat == InputFile::KMC) {
-				task->file = std::make_shared<KmcInputFile>(filter->clone());
-			}
-			else if (this->inputFormat == InputFile::MINHASH) {
-				task->file = std::make_shared<MihashedInputFile>(filter->clone());
-			}
-			else {
-				task->file = std::make_shared<GenomeInputFile>(filter->clone(), this->storePositions);
-			}
+			task->file = std::shared_ptr<InputFile>(InputFileFactory::create(this->inputFormat, filter, alphabet));
 
 			if (task->file->open(task->filePath)) {
 				queues.readers.Push(task);
@@ -150,12 +165,12 @@ void LoaderEx::readerJob(int tid) {
 			auto sampleTask = make_shared<SampleTask>(
 				inputTask->fileId,
 				inputTask->filePath,
-				InputFile::removePathFromFile(inputTask->filePath),
+				std::filesystem::path(inputTask->filePath).filename().string(),
 				bufferId);
 
 			ok = inputTask->file->load(
 				kmersCollections[bufferId], positionsCollections[bufferId],
-				sampleTask->kmers, sampleTask->kmersCount, sampleTask->kmerLength, sampleTask->fraction, false);
+				sampleTask->kmers, sampleTask->kmersCount, sampleTask->kmerLength, sampleTask->fraction);
 
 			if (ok) {
 				++bufferRefCounters[bufferId];
@@ -190,7 +205,7 @@ void LoaderEx::multifastaReaderJob() {
 			continue;
 		}
 
-		auto genomicFile = std::dynamic_pointer_cast<GenomeInputFile>(inputTask->file);
+		auto genomicFile = std::dynamic_pointer_cast<IMultiSampleFile>(inputTask->file);
 
 		// initialize multifasta file
 		if (genomicFile->initMultiFasta()) {
@@ -212,7 +227,7 @@ void LoaderEx::multifastaReaderJob() {
 
 				bool ok = genomicFile->loadNext(
 					kmersCollections[bufferId], positionsCollections[bufferId],
-					sampleTask->kmers, sampleTask->kmersCount, sampleTask->kmerLength, sampleTask->fraction, false, sampleTask->sampleName,
+					sampleTask->kmers, sampleTask->kmersCount, sampleTask->kmerLength, sampleTask->fraction, sampleTask->sampleName,
 					total_kmers_in_kmers_collections);
 
 				++sample_id;

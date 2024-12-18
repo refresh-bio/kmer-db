@@ -1,11 +1,14 @@
 #pragma once
 
-#define VERSION "2.2.5"
-#define DATE "02.11.2024"
+#define VERSION "2.3.0"
+#define DATE "16.12.2024"
 
 /* 
 
 Version history
+
+2.3.0 (16.12.2024)
+- Added amino acid alphabets and -preserve-strand option.
 
 2.2.5 (02.11.2024)
 - Improved logging.

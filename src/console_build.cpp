@@ -43,6 +43,7 @@ void BuildConsole::run(const Params& params){
 	LOG_DEBUG("Creating PrefixKmerDb object" << endl);
 	AbstractKmerDb* db = new PrefixKmerDb(params.numThreads);
 	std::shared_ptr<MinHashFilter> filter;
+	std::shared_ptr<Alphabet> alphabet;
 
 	if (params.extendDb) {
 		std::ifstream ifs;
@@ -51,10 +52,12 @@ void BuildConsole::run(const Params& params){
 		if (!ifs || !db->deserialize(ifs)) {
 			throw runtime_error("Cannot open k-mer database " + dbFilename);
 		}
-		filter = std::make_shared<MinHashFilter>(db->getFraction(), db->getStartFraction(), db->getKmerLength());
+		filter = std::shared_ptr<MinHashFilter>(FilterFactory::create(db->getFraction(), db->getStartFraction(), db->getKmerLength()));
+		alphabet = std::shared_ptr<Alphabet>(AlphabetFactory::instance().create(db->getAlphabetType()));
 	}
 	else {
-		filter = std::make_shared<MinHashFilter>(params.fraction, params.fractionStart, params.kmerLength);
+		filter = std::shared_ptr<MinHashFilter>(FilterFactory::create(params.fraction, params.fractionStart, params.kmerLength));
+		alphabet = params.alphabet;
 	}
 
 	std::chrono::duration<double> sortingTime{ 0 }, processingTime{ 0 };
@@ -62,7 +65,7 @@ void BuildConsole::run(const Params& params){
 	LOG_NORMAL("Processing samples..." << endl);
 	LOG_DEBUG("Creating Loader object..." << endl);
 
-	LoaderEx loader(filter, params.inputFormat, params.numReaderThreads, params.numThreads, params.multisampleFasta);
+	LoaderEx loader(filter, alphabet, params.inputFormat, params.numReaderThreads, params.numThreads, params.multisampleFasta);
 	loader.configure(multipleSamples);
 
 	LOG_DEBUG("Starting loop..." << endl);
@@ -105,7 +108,15 @@ void BuildConsole::run(const Params& params){
 			auto start2 = std::chrono::high_resolution_clock::now();
 			sortingTime += start2 - start;
 
-			db->addKmers(task->sampleName, task->kmers, task->kmersCount, task->kmerLength, task->fraction, atp);
+			db->addKmers(
+				task->sampleName, 
+				task->kmers, 
+				task->kmersCount, 
+				task->kmerLength, 
+				task->fraction, 
+				params.alphabet->type,
+				atp);
+			
 			processingTime += std::chrono::high_resolution_clock::now() - start2;
 			
 			loader.releaseTask(*task);

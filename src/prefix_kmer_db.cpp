@@ -17,8 +17,8 @@ using namespace std;
 
 // *****************************************************************************************
 //
-PrefixKmerDb::PrefixKmerDb(int _num_threads) : AbstractKmerDb(),
-	num_threads(_num_threads)
+PrefixKmerDb::PrefixKmerDb(int _num_threads) 
+	: AbstractKmerDb(), num_threads(_num_threads)
 {
 	patterns.reserve(2 << 20);
 	patterns.push_back(pattern_t());
@@ -45,10 +45,13 @@ PrefixKmerDb::~PrefixKmerDb() {
 
 // *****************************************************************************************
 //
-void PrefixKmerDb::initialize(uint32_t kmerLength, double fraction) {
-	AbstractKmerDb::initialize(kmerLength, fraction);
+void PrefixKmerDb::initialize(uint32_t kmerLength, double fraction, AlphabetType alphabetType) {
+	AbstractKmerDb::initialize(kmerLength, fraction, alphabetType);
 
-	int prefixBits = ((int)kmerLength - SUFFIX_LEN) * 2;
+	// temporary instance
+	std::shared_ptr<Alphabet> alphabet(AlphabetFactory::instance().create(alphabetType));
+	
+	int prefixBits = (int)kmerLength * alphabet->bitsPerSymbol - SUFFIX_BITS;
 	
 	if (prefixBits < 8) {
 		prefixBits = 8;
@@ -244,9 +247,10 @@ sample_id_t PrefixKmerDb::addKmers(
 	uint32_t kmersCount,
 	uint32_t kmerLength,
 	double fraction,
+	AlphabetType alphabetType,
 	refresh::active_thread_pool& atp)
 {
-	sample_id_t sampleId = AbstractKmerDb::addKmers(sampleName, kmers, kmersCount, kmerLength, fraction, atp);
+	sample_id_t sampleId = AbstractKmerDb::addKmers(sampleName, kmers, kmersCount, kmerLength, fraction, alphabetType, atp);
 	uint32_t n_kmers = static_cast<uint32_t>(kmersCount);
 	
 	if (n_kmers == 0)
@@ -448,6 +452,7 @@ void PrefixKmerDb::serialize(std::ofstream& file, bool rawHashtables) const {
 	save(file, kmerLength);
 	save(file, fraction);
 	save(file, startFraction);
+	save(file, alphabetType);
 	save(file, isInitialized);
 	save(file, kmersCount);
 
@@ -589,6 +594,7 @@ bool PrefixKmerDb::deserialize(std::ifstream& file, DeserializationMode mode) {
 	load(file, kmerLength);
 	load(file, fraction);
 	load(file, startFraction);
+	load(file, alphabetType);
 	load(file, isInitialized);
 	load(file, kmersCount);
 

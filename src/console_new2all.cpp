@@ -36,9 +36,10 @@ void New2AllConsole::run(const Params& params)
 	LOG_NORMAL("OK (" << dt.count() << " seconds)" << endl << db.printStats() << endl);
 
 	LOG_DEBUG("Creating Loader object..." << endl);
-	shared_ptr<MinHashFilter> filter = shared_ptr<MinHashFilter>(new MinHashFilter(db.getFraction(), db.getStartFraction(), db.getKmerLength()));
+	std::shared_ptr<MinHashFilter> filter(FilterFactory::create(db.getFraction(), db.getStartFraction(), db.getKmerLength()));
+	std::shared_ptr<Alphabet> alphabet(AlphabetFactory::instance().create(db.getAlphabetType()));
 
-	LoaderEx loader(filter, params.inputFormat, params.numReaderThreads, params.numThreads, params.multisampleFasta);
+	LoaderEx loader(filter, alphabet, params.inputFormat, params.numReaderThreads, params.numThreads, params.multisampleFasta);
 	loader.configure(multipleSamples);
 	LOG_NORMAL(endl);
 

@@ -4,8 +4,7 @@
 
 #define KMER_MSB (1ULL << 63)
 
-#define SUFFIX_LEN 16
-#define SUFFIX_BITS (SUFFIX_LEN * 2)
+#define SUFFIX_BITS 32
 
 #define SUFFIX_MASK ((1ULL << SUFFIX_BITS) - 1)
 #define PREFIX_MASK (~SUFFIX_MASK)

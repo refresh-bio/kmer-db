@@ -1,5 +1,5 @@
 #include "console.h"
-#include "input_file.h"
+#include "minhashed_input_file.h"
 #include "loader_ex.h"
 #include "kmer_extract.h"
 
@@ -16,9 +16,9 @@ void MinhashConsole::run(const Params& params) {
 
 	LOG_DEBUG("Creating Loader object..." << endl);
 
-	auto filter = std::make_shared<MinHashFilter>(params.fraction, 0, params.kmerLength);
+	std::shared_ptr<MinHashFilter> filter(FilterFactory::create(params.fraction, 0, params.kmerLength));
 
-	LoaderEx loader(filter, params.inputFormat, params.numReaderThreads, params.numThreads, params.multisampleFasta);
+	LoaderEx loader(filter, params.alphabet, params.inputFormat, params.numReaderThreads, params.numThreads, params.multisampleFasta);
 	loader.configure(multipleKmcSamples);
 
 	LOG_DEBUG("Starting loop..." << endl);
@@ -32,7 +32,7 @@ void MinhashConsole::run(const Params& params) {
 		if (task) {
 			auto start = std::chrono::high_resolution_clock::now();
 
-			MihashedInputFile file(nullptr);
+			MihashedInputFile file;
 
 			// postprocess k-mers if neccessary
 			if (params.inputFormat == InputFile::Format::GENOME) {

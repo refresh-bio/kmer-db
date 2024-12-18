@@ -88,8 +88,8 @@ jobs:
 
 
  ########################################################################################
-  synth:
-    name: Synthetic data
+  synth-dna:
+    name: Synthetic DNA data
     needs: help
     strategy:
       fail-fast: false
@@ -211,9 +211,9 @@ jobs:
       
     
   ########################################################################################
-  main:
-    name: Virus data
-    needs: synth
+  virus-dna:
+    name: Virus DNA data
+    needs: synth-dna
     strategy:
       fail-fast: false
       matrix:
@@ -285,7 +285,7 @@ jobs:
         
     - name: build (default k, multifasta) + all2all 
       run: |
-        ${EXEC} build -t ${{matrix.threads}} -multisample-fasta ${INPUT_DIR}/multi.list k18.multi.db
+        ${EXEC} build -t ${{matrix.threads}} -multisample-fasta ${INPUT_DIR}/data/seqs.fasta k18.multi.db
         ${EXEC} all2all -t ${{matrix.threads}} k18.multi.db k18.multi.csv
         cmp k18.multi.csv ${INPUT_DIR}/k18.csv
 
@@ -321,7 +321,7 @@ jobs:
         ${EXEC} all2all -t ${{matrix.threads}} k24.db k24.csv
         cmp k24.csv ${INPUT_DIR}/k24.csv
         
-    - name: build (k=25, f=0.1) + one2all 
+    - name: build (k=25, fraction 0.1) + one2all 
       run: |
         ${EXEC} build -t ${{matrix.threads}} -k 25 -f 0.1 ${INPUT_DIR}/seqs.part1.list k25.db
         ${EXEC} one2all -t ${{matrix.threads}} k25.db ${INPUT_DIR}/data/MT159713 MT159713.csv
@@ -342,5 +342,68 @@ jobs:
         cmp k18.parts.csv ${INPUT_DIR}/k18.sparse.csv
 
 
-   
+  ########################################################################################
+  synth-protein:
+    name: Synthetic protein data
+    needs: synth-dna
+    strategy:
+      fail-fast: false
+      matrix:
+        machine: [x64_linux, x64_mac, arm64_linux, arm64_mac]
+        compiler: [11, 12, 13]
+        threads: [1, 2, 16]
+        include:
+        - {machine: x64_linux, compiler: 14, threads: 1}
+        - {machine: x64_linux, compiler: 14, threads: 2}
+        - {machine: x64_linux, compiler: 14, threads: 16}
+        exclude:
+        - {machine: arm64_linux, compiler: 13}
+     
+
+    runs-on: [self-hosted, kmer-db, '${{ matrix.machine }}']
+    
+    env: 
+      INPUT_DIR: ./test/protein
+      EXEC: ./kmer-db-${{matrix.compiler}}
  
+    steps:
+    
+    - name: build + all2all DNA (k = 24)
+      run: | 
+        ${EXEC} build -t ${{matrix.threads}} -k 24 -multisample-fasta ${INPUT_DIR}/dna_100x1000.fasta dna.db
+        ${EXEC} all2all dna.db dna.a2a
+        cmp dna.a2a ${INPUT_DIR}/dna.a2a
+
+    - name: build + all2all DNA (k = 24, preserve strand)
+      run: |
+        ${EXEC} build -t ${{matrix.threads}} -k 24 -multisample-fasta -preserve-strand ${INPUT_DIR}/dna_100x1000.fasta dna-preserve.db
+        ${EXEC} all2all dna-preserve.db dna-preserve.a2a
+        cmp dna-preserve.a2a ${INPUT_DIR}/dna-preserve.a2a
+
+    - name: build + all2all protein (k = 8, aa alphabet)
+      run: |
+        ${EXEC} build -t ${{matrix.threads}} -k 8 -multisample-fasta -alphabet aa ${INPUT_DIR}/aa_100x1000.fasta aa.db
+        ${EXEC} all2all aa.db aa.a2a
+        cmp aa.a2a ${INPUT_DIR}/aa.a2a
+
+    - name: build + all2all protein (k = 8, aa11_diamond alphabet)
+      run: |
+        ${EXEC} build -t ${{matrix.threads}} -k 8 -multisample-fasta -alphabet aa11_diamond ${INPUT_DIR}/aa_100x1000.fasta aa11_diamond.db
+        ${EXEC} all2all aa11_diamond.db aa11_diamond.a2a
+        cmp aa11_diamond.a2a ${INPUT_DIR}/aa11_diamond.a2a
+
+    - name: build + all2all protein (k = 8, aa12_mmseqs alphabet)
+      run: |
+        ${EXEC} build -t ${{matrix.threads}} -k 8 -multisample-fasta -alphabet aa12_mmseqs ${INPUT_DIR}/aa_100x1000.fasta aa12_mmseqs.db
+        ${EXEC} all2all aa12_mmseqs.db aa12_mmseqs.a2a
+        cmp aa12_mmseqs.a2a ${INPUT_DIR}/aa12_mmseqs.a2a
+ 
+    - name: build + all2all protein (k = 8, aa6_dayhoff alphabet)
+      run: |
+        ${EXEC} build -t ${{matrix.threads}} -k 8 -multisample-fasta -alphabet aa6_dayhoff ${INPUT_DIR}/aa_100x1000.fasta aa6_dayhoff.db
+        ${EXEC} all2all aa6_dayhoff.db aa6_dayhoff.a2a
+        cmp aa6_dayhoff.a2a ${INPUT_DIR}/aa6_dayhoff.a2a
+
+
+
+      

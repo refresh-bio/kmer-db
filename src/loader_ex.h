@@ -11,6 +11,7 @@ Authors: Sebastian Deorowicz, Adam Gudys, Maciej Dlugosz, Marek Kokot, Agnieszka
 #include "queue.h"
 #include "filter.h"
 #include "loader_tasks.h"
+#include "alphabet.h"
 
 #include <vector>
 #include <memory>
@@ -26,7 +27,8 @@ class LoaderEx {
 public:
 
 	LoaderEx(
-		std::shared_ptr<AbstractFilter> filter, 
+		std::shared_ptr<AbstractFilter> filter,
+		std::shared_ptr<Alphabet> alphabet,
 		InputFile::Format inputFormat, 
 		int suggestedNumThreads,
 		int numConsumers,
@@ -112,7 +114,7 @@ private:
 	} queues;
 
 
-	void prefetcherJob(std::shared_ptr<AbstractFilter> filter);
+	void prefetcherJob(std::shared_ptr<AbstractFilter> filter, std::shared_ptr<Alphabet> alphabet);
 
 	void readerJob(int tid);
 

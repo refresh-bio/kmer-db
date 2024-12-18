@@ -4,6 +4,8 @@
 #include "loader_ex.h"
 #include "kmer_extract.h"
 
+#include "input_file_factory.h"
+
 #include <chrono>
 #include <cstdint>
 
@@ -43,25 +45,17 @@ void One2AllConsole::run(const Params& params) {
 	std::vector<kmer_t> kmersBuffer;
 	std::vector<uint32_t> positions;
 	uint32_t kmerLength;
-	shared_ptr<MinHashFilter> filter = shared_ptr<MinHashFilter>(new MinHashFilter(db.getFraction(), db.getStartFraction(), db.getKmerLength()));
+	
+	std::shared_ptr<MinHashFilter> filter(FilterFactory::create(db.getFraction(), db.getStartFraction(), db.getKmerLength()));
+	std::shared_ptr<Alphabet> alphabet(AlphabetFactory::instance().create(db.getAlphabetType()));
 
-	std::shared_ptr<InputFile> file;
-
-	if (params.inputFormat == InputFile::KMC) {
-		file = std::make_shared<KmcInputFile>(filter->clone());
-	}
-	else if (params.inputFormat == InputFile::MINHASH) {
-		file = std::make_shared<MihashedInputFile>(filter->clone());
-	}
-	else {
-		file = std::make_shared<GenomeInputFile>(filter->clone(), false);
-	}
+	std::shared_ptr<InputFile> file(InputFileFactory::create(params.inputFormat, filter, alphabet));
 
 	double dummy;
 	size_t queryKmersCount;
 	kmer_t* queryKmers;
 
-	if (!file->open(sampleFasta) || !file->load(kmersBuffer, positions, queryKmers, queryKmersCount, kmerLength, dummy, params.nonCanonical)) {
+	if (!file->open(sampleFasta) || !file->load(kmersBuffer, positions, queryKmers, queryKmersCount, kmerLength, dummy)) {
 		throw runtime_error("Cannot open sample file: " + sampleFasta);
 	}
 

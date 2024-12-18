@@ -2,10 +2,12 @@
 
 #include "input_file.h"
 #include "sparse_filters.h"
+#include "alphabet.h"
 
 #include <string>
 #include <algorithm>
 #include <vector>
+#include <memory>
 
 // *****************************************************************************************
 //
@@ -41,8 +43,7 @@ public:
 	const std::string SWITCH_PHYLIP_OUT = "-phylip-out";
 	const std::string SWITCH_EXTEND_DB = "-extend";
 	const std::string SWITCH_SPARSE = "-sparse";
-	const std::string SWITCH_NON_CANONICAL = "-non-canonical";
-
+	
 	const std::string OPTION_FRACTION = "-f";
 	const std::string OPTION_FRACTION_START = "-f-start";
 	const std::string OPTION_LENGTH = "-k";
@@ -55,6 +56,9 @@ public:
 
 	const std::string OPTION_MAX = "-max";
 	const std::string OPTION_MIN = "-min";
+
+	const std::string OPTION_ALPHABET = "-alphabet";
+	const std::string SWITCH_PRESERVE_STRAND = "-preserve-strand";
 
 	const std::string OPTION_SAMPLE_ROWS = "-sample-rows";
 
@@ -80,8 +84,7 @@ public:
 	bool sparseOut{ false };
 	bool extendDb{ false };
 	bool phylipOut{ false };
-	bool nonCanonical{ false };
-
+	
 	int samplingSize{ 0 };
 	metric_fun_t samplingCriterion;
 
@@ -89,6 +92,8 @@ public:
 	InputFile::Format inputFormat { InputFile::GENOME };
 	Mode mode;
 
+	std::shared_ptr<Alphabet> alphabet{ AlphabetFactory::instance().create(AlphabetType::nt) };
+	
 	std::vector<std::string> files;
 
 	std::map<std::string, MetricFilter> metricFilters;
