@@ -1,11 +1,14 @@
 #pragma once
 
-#define VERSION "2.3.0"
-#define DATE "16.12.2024"
+#define VERSION "2.3.1"
+#define DATE "20.12.2024"
 
 /* 
 
 Version history
+
+2.3.1 (20.12.2024)
+- Improved sparse processing of samples in new2all mode.
 
 2.3.0 (16.12.2024)
 - Added amino acid alphabets and -preserve-strand option.

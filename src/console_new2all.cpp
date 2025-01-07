@@ -50,6 +50,8 @@ void New2AllConsole::run(const Params& params)
 
 	// create set of buffers for storing similarities
 	std::vector<std::vector<uint32_t>> buffers(loader.getOutputBuffersCount());
+	std::vector<std::vector<std::pair<sample_id_t, num_kmers_t>>> sparseBuffers(loader.getOutputBuffersCount());
+
 	RegisteringQueue<int> freeBuffersQueue(1);
 	for (size_t i = 0; i < buffers.size(); ++i) {
 		freeBuffersQueue.Push(i);
@@ -60,18 +62,25 @@ void New2AllConsole::run(const Params& params)
 	std::atomic<int> sample_id{ 0 };
 
 	for (int tid = 0; tid < params.numThreads; ++tid) {
-		workers[tid] = thread([&db, &loader, &freeBuffersQueue, &similarityQueue, &buffers, &calculator, &sample_id, tid]() {
+		workers[tid] = thread([&params, &db, &loader, &freeBuffersQueue, &similarityQueue, &buffers, &sparseBuffers, &calculator, &sample_id, tid]() {
 			int task_id = sample_id.fetch_add(1);
 			while (!loader.isCompleted()) {
 				std::shared_ptr<SampleTask> task;
 				if ((task = loader.popTask(task_id)) && freeBuffersQueue.Pop(task->bufferId2)) {
 					LOG_DEBUG("loader queue " << task_id + 1 << " -> (" << task->id + 1 << ", " << task->sampleName << ")" << endl);
-					buffers[task->bufferId2].clear();
-
+				
 					// only unique k-mers are needed
 					KmerHelper::unique(task->kmers, task->kmersCount);
 
-					calculator.one2all<false>(db, task->kmers, task->kmersCount, buffers[task->bufferId2]);
+					// run sparse variant when needed
+					if (params.sparseOut) {
+						sparseBuffers[task->bufferId2].clear();
+						calculator.one2all_sp(db, task->kmers, task->kmersCount, sparseBuffers[task->bufferId2]);
+					}
+					else {
+						buffers[task->bufferId2].clear();
+						calculator.one2all<false>(db, task->kmers, task->kmersCount, buffers[task->bufferId2]);
+					}
 					similarityQueue.Push(task_id, task);
 
 					LOG_DEBUG("(" << task->id + 1 << ", " << task->sampleName << ") -> similarity queue, tid:" << tid << ", buf:" << task->bufferId2 << endl);
@@ -113,6 +122,7 @@ void New2AllConsole::run(const Params& params)
 
 			LOG_DEBUG("similarity queue -> (" << task_id + 1 << ", " << task->sampleName << "), buf:" << task->bufferId2 << endl);
 			auto& buf = buffers[task->bufferId2];
+			auto& sparseBuf = sparseBuffers[task->bufferId2];
 
 			ptr = row;
 			ptr += sprintf(ptr, "%s,%lu,", task->sampleName.c_str(), task->kmersCount);
@@ -128,13 +138,15 @@ void New2AllConsole::run(const Params& params)
 					db.getKmerLength());
 				
 				// filter row
-				for (int j = 0; j < buf.size(); ++j) {
-					if (!filter(buf[j], 0, j)) {
-						buf[j] = 0;
+				for (int j = 0; j < sparseBuf.size(); ++j) {
+					auto x = sparseBuf[j];
+					if (filter(x.second, 0, x.first)) {
+						x.first += 1; // 1-based indexing
+						ptr += num2str(x, ptr);
+						*ptr++ = ',';
 					}
 				}
-				
-				ptr += num2str_sparse(buf.data(), buf.size(), ',', ptr);
+
 			}
 			else {
 				ptr += num2str(buf.data(), buf.size(), ',', ptr);

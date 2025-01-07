@@ -261,7 +261,7 @@ int num2str(Floating val, char *out) {
 
 // pair specialization
 template <typename T, typename U>
-int num2str(const std::pair<T,U> val, char *out) {
+int num2str(const std::pair<T,U>& val, char *out) {
 	char* ptr = out;
 	ptr += num2str(val.first, ptr);
 	*ptr++ = ':';

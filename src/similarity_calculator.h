@@ -9,10 +9,11 @@ public:
 	void all2all_sp(PrefixKmerDb& db, SparseMatrix<uint32_t>& matrix, CBubbleHelper& bubbles) const;
 
 	template <bool parallel = true>
-	void one2all(const PrefixKmerDb& db, const kmer_t* kmers, size_t kmersCount, std::vector<uint32_t>& vector) const;
+	void one2all(const PrefixKmerDb& db, const kmer_t* kmers, size_t kmersCount, std::vector<uint32_t>& similarities) const;
+	void one2all_sp(const PrefixKmerDb& db, const kmer_t* kmers, size_t kmersCount, std::vector<std::pair<sample_id_t,num_kmers_t>>& similarities) const;
 
 	void db2db(const PrefixKmerDb& db1, const PrefixKmerDb& db2, LowerTriangularMatrix<uint32_t>& matrix) const;
-	void db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, SparseMatrix<uint32_t>& matrix, CBubbleHelper& bubbles);
+	void db2db_sp(PrefixKmerDb& db1, PrefixKmerDb& db2, SparseMatrix<uint32_t>& matrix, CBubbleHelper& bubbles) const;
 
 protected:
 
@@ -22,7 +23,7 @@ protected:
 
 	size_t cacheBufferMb;
 
-	refresh::active_thread_pool atp;
+	mutable refresh::active_thread_pool atp;
 
 	bool avx2_present;
 
