@@ -301,3 +301,5 @@ List of the pathogens investigated in Kmer-db study can be found [here](https://
 
 ## Citing
 [Deorowicz, S., Gudyś, A., Długosz, M., Kokot, M., Danek, A. (2019) Kmer-db: instant evolutionary distance estimation, Bioinformatics, 35(1): 133–136](https://academic.oup.com/bioinformatics/advance-article-abstract/doi/10.1093/bioinformatics/bty610/5050791?redirectedFrom=fulltext)
+
+[Zielezinski A, Gudyś A, Barylski J, Siminski K, Rozwalak P, Dutilh BE, Deorowicz S. Ultrafast and accurate sequence alignment and clustering of viral genomes. Nat Methods. https://doi.org/10.1038/s41592-025-02701-7](https://doi.org/10.1038/s41592-025-02701-7)
