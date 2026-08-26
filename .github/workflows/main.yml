@@ -19,7 +19,7 @@ jobs:
         machine: [ubuntu-latest]
         gmake_install_command: ['gmake --version']
         include:
-        - {machine: macOS-13, gmake_install_command: 'brew install make && gmake --version'}
+        - {machine: macOS-14, gmake_install_command: 'brew install make && gmake --version'}
     runs-on: ['${{ matrix.machine }}']   
    
     steps:
@@ -31,7 +31,7 @@ jobs:
     
     - name: make
       run: | 
-        gmake -j CXX=g++-12 CC=gcc-12 STATIC_LINK=true
+        gmake -j CXX=g++-13 CC=gcc-13 STATIC_LINK=true
 
     - name: tar artifacts
       run: tar -cvf kmer-db.tar ./test/virus -C ./bin kmer-db
@@ -48,7 +48,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        machine: [ubuntu-latest, macOS-13]
+        machine: [ubuntu-latest, macOS-14]
     runs-on: ['${{ matrix.machine }}']
     env: 
       INPUT_DIR: ./test/virus
